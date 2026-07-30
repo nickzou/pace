@@ -1,3 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Dependencies whose install/build scripts are allowed to run (pnpm blocks
+# these by default). esbuild + lightningcss ship native binaries Vite/Tailwind need.
+onlyBuiltDependencies:
+  - esbuild
+  - lightningcss
