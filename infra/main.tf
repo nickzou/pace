@@ -35,7 +35,10 @@ resource "hcloud_server" "web" {
   firewall_ids = [hcloud_firewall.web.id]
   labels       = { project = "pace" }
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    ssh_public_key = data.hcloud_ssh_key.main.public_key
+    ssh_public_keys = [
+      data.hcloud_ssh_key.main.public_key,
+      trimspace(file("${path.module}/public_keys/deploy_key.pub")),
+    ]
   })
 }
 
