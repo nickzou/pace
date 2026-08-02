@@ -1,0 +1,22 @@
+# Traefik static configuration.
+
+entryPoints:
+  web:
+    address: ":80"
+    # Anything hitting plain HTTP gets bounced to HTTPS.
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  # Discover routers/services from container labels (see docker-compose.yml).
+  docker:
+    exposedByDefault: false
+  # Load TLS certificate definitions from the dynamic config dir.
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

@@ -1,0 +1,13 @@
+# TLS certificates for Traefik (loaded via the file provider).
+# The cert/key are the Cloudflare Origin Certificate — written onto the box by
+# the deploy workflow from GitHub secrets, never committed.
+
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/origin.pem
+        keyFile: /certs/origin-key.pem
+  certificates:
+    - certFile: /certs/origin.pem
+      keyFile: /certs/origin-key.pem

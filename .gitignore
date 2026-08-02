@@ -19,6 +19,11 @@ target/
 .env.*
 !.env.example
 
+# TLS certs / keys — provisioned onto the box from secrets, never committed
+*.pem
+*.key
+deploy/certs/
+
 # Logs
 *.log
 npm-debug.log*
