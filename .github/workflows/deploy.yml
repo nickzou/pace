@@ -3,6 +3,8 @@ name: Deploy
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 # Don't let two deploys race; a newer push supersedes an in-flight one.
 concurrency:
@@ -28,6 +30,8 @@ jobs:
 
   deploy:
     needs: check
+    # Deploy only on pushes to main — a PR runs the checks but never deploys.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
