@@ -59,10 +59,36 @@ jobs:
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
+          ORIGIN_CERT: ${{ secrets.ORIGIN_CERT }}
+          ORIGIN_KEY: ${{ secrets.ORIGIN_KEY }}
+          IMAGE_REF: ${{ env.IMAGE }}:${{ github.sha }}
         run: |
+          set -e
+
+          # SSH key + pin the host key
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" \
-            "echo '$REGISTRY_TOKEN' | docker login ghcr.io -u '$ACTOR' --password-stdin && docker pull '$IMAGE:latest' && (docker rm -f pace-web || true) && docker run -d --name pace-web --restart unless-stopped -p 80:3000 '$IMAGE:latest' && docker image prune -f"
+          SSH="ssh -i $HOME/.ssh/deploy_key deploy@$DEPLOY_HOST"
+          SCP="scp -i $HOME/.ssh/deploy_key"
+
+          # Cloudflare origin cert/key from secrets (local to the runner, gitignored)
+          printf '%s\n' "$ORIGIN_CERT" > origin.pem
+          printf '%s\n' "$ORIGIN_KEY"  > origin-key.pem
+
+          # Ship the compose stack + Traefik config + certs to the box
+          $SSH "mkdir -p pace/traefik/dynamic pace/certs"
+          $SCP deploy/docker-compose.yml      "deploy@$DEPLOY_HOST:pace/docker-compose.yml"
+          $SCP deploy/traefik/traefik.yml     "deploy@$DEPLOY_HOST:pace/traefik/traefik.yml"
+          $SCP deploy/traefik/dynamic/tls.yml "deploy@$DEPLOY_HOST:pace/traefik/dynamic/tls.yml"
+          $SCP origin.pem origin-key.pem      "deploy@$DEPLOY_HOST:pace/certs/"
+          $SSH "chmod 600 pace/certs/origin-key.pem"
+
+          # Deploy: login to GHCR, retire the old single container, bring up the stack
+          $SSH "cd pace \
+            && echo '$REGISTRY_TOKEN' | docker login ghcr.io -u '$ACTOR' --password-stdin \
+            && (docker rm -f pace-web 2>/dev/null || true) \
+            && IMAGE='$IMAGE_REF' docker compose pull \
+            && IMAGE='$IMAGE_REF' docker compose up -d --remove-orphans \
+            && docker image prune -f"
