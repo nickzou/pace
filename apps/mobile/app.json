@@ -3,6 +3,7 @@
     "name": "Pace",
     "slug": "pace-mobile",
     "version": "1.0.0",
+    "scheme": "pace",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -26,6 +27,7 @@
       "eas": {
         "projectId": "f29e9d37-53d3-4555-9443-10e85b9e008f"
       }
-    }
+    },
+    "plugins": ["expo-secure-store", "expo-web-browser"]
   }
 }
