@@ -13,8 +13,15 @@ function required(name: string): string {
   return value
 }
 
+function optional(name: string, fallback: string): string {
+  return process.env[name] ?? fallback
+}
+
 export const env = {
   DATABASE_URL: required("DATABASE_URL"),
   BETTER_AUTH_SECRET: required("BETTER_AUTH_SECRET"),
   BETTER_AUTH_URL: required("BETTER_AUTH_URL"),
+  // Comma-separated web origins allowed to call the auth API (CORS + Better
+  // Auth's own origin check). Dev default is the web app on :3000.
+  TRUSTED_ORIGINS: optional("TRUSTED_ORIGINS", "http://localhost:3000"),
 }

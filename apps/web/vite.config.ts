@@ -8,6 +8,9 @@ import { nitro } from "nitro/vite"
 import { defineConfig } from "vite"
 
 const config = defineConfig({
+  // Load env (only VITE_* reaches the client) from the repo-root .env, the
+  // single source of truth shared with apps/api and docker-compose.
+  envDir: "../..",
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),
