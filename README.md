@@ -82,6 +82,7 @@ in the Nix dev shell. In dev it loads the web app at `localhost:3000`.
 |---|---|
 | `start` | `expo start` (Metro dev server) |
 | `android` / `ios` / `web` | `expo start --<platform>` |
+| `typecheck` | `tsc --noEmit` |
 
 EAS builds (`eas build …`) use the EAS CLI, not a pnpm script. On-device runs
 need `EXPO_PUBLIC_API_URL` set to your machine's LAN IP (see

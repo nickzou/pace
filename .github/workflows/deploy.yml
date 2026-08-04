@@ -1,8 +1,10 @@
 name: Deploy
 
 on:
+  # Run the checks on every branch push (fast feedback before a PR exists)…
   push:
-    branches: [main]
+    branches: ["**"]
+  # …and on PRs into main.
   pull_request:
     branches: [main]
 
@@ -24,14 +26,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Typecheck
-        run: pnpm --filter @pace/web run typecheck
+        run: pnpm turbo typecheck # api + web + mobile
       - name: Biome check
         run: pnpm exec biome check .
 
   deploy:
     needs: check
-    # Deploy only on pushes to main — a PR runs the checks but never deploys.
-    if: github.event_name == 'push'
+    # Deploy ONLY on pushes that land on main. Every feature branch and PR runs
+    # the checks above but never deploys.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
