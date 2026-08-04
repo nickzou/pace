@@ -2,18 +2,18 @@ packages:
   - "apps/*"
   - "packages/*"
 
-# Dependencies whose install/build scripts are allowed to run (pnpm blocks
-# these by default). esbuild + lightningcss ship native binaries Vite/Tailwind
-# (and drizzle-kit) need.
-onlyBuiltDependencies:
-  - esbuild
-  - lightningcss
-
-# Native adapters pulled in transitively by drizzle-kit / better-auth's CLI that
-# we don't use (Pace is on postgres.js). Skip their build scripts, no prompt.
-ignoredBuiltDependencies:
-  - "@prisma/client"
-  - better-sqlite3
+# Which dependencies may run install/build scripts (pnpm blocks all by default).
+# true = build it, false = skip without prompting. Every dependency that ships a
+# build script must be listed, or `pnpm install` fails with ERR_PNPM_IGNORED_BUILDS.
+#   esbuild / lightningcss — native binaries Vite/Tailwind/drizzle-kit need.
+#   @prisma/client / better-sqlite3 — unused adapters pulled in transitively by
+#     drizzle-kit / better-auth's CLI (we're on postgres.js); skip their heavy
+#     native builds.
+allowBuilds:
+  esbuild: true
+  lightningcss: true
+  "@prisma/client": false
+  better-sqlite3: false
 
 minimumReleaseAgeExclude:
   - expo-constants@57.0.9
