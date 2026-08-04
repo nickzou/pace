@@ -1,0 +1,36 @@
+name: Renovate
+
+# Self-hosted Renovate: runs on GitHub's runners using our own token (no
+# third-party service sees the repo). Repo config lives in renovate.json5.
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC — the actual update cadence
+  workflow_dispatch: # run on demand from the Actions tab (e.g. to test config)
+    inputs:
+      logLevel:
+        description: "Renovate log level"
+        default: "info"
+        type: choice
+        options:
+          - "info"
+          - "debug"
+
+# Never let two Renovate runs overlap.
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Renovate
+        # Renovate keeps this action version updated via the github-actions
+        # manager (it'll open PRs to bump this pin like any other dependency).
+        uses: renovatebot/github-action@v46.2.1
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+        env:
+          # Scope Renovate to this repo only (don't autodiscover the whole account).
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}

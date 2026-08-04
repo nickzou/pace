@@ -1,0 +1,68 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  extends: [
+    "config:recommended",
+    "group:monorepos", // bump known monorepos (TanStack, Expo, ...) as one PR
+    "group:recommended",
+  ],
+
+  // Clean conventional-commit messages (chore(deps): ...), matching the repo.
+  semanticCommits: "enabled",
+  labels: ["dependencies"],
+
+  // Let Renovate propose migrations of its own (deprecated) config over time.
+  configMigration: true,
+
+  // Cadence is driven by the workflow cron (.github/workflows/renovate.yml),
+  // so we leave Renovate itself unscheduled — whenever the Action runs, it acts.
+  // Keep the pnpm lockfile fresh (refreshes transitive deps within ranges).
+  lockFileMaintenance: { enabled: true },
+
+  // De-dupe the pnpm lockfile after updates.
+  postUpdateOptions: ["pnpmDedupe"],
+
+  // Modest first-run throttle so we don't get a wall of PRs at once; the rest
+  // queue on the Dependency Dashboard issue Renovate opens.
+  prConcurrentLimit: 10,
+
+  // Surface security fixes prominently (these bypass throttling).
+  vulnerabilityAlerts: { labels: ["security"] },
+
+  packageRules: [
+    // Better Auth's CLI lags the core package and hard-pins its own better-auth
+    // version, so the whole family must move in lockstep (that's why they're
+    // pinned exactly in apps/api). One grouped PR keeps them consistent.
+    {
+      matchPackageNames: ["better-auth", "@better-auth/**"],
+      groupName: "better-auth",
+    },
+    // Drizzle ORM + kit share a schema format; bump them together.
+    {
+      matchPackageNames: ["drizzle-orm", "drizzle-kit"],
+      groupName: "drizzle",
+    },
+    // Expo / React Native SDK bumps need a native rebuild (EAS) — isolate them
+    // into their own PR so they're easy to schedule deliberately.
+    {
+      matchPackageNames: ["expo", "expo-*", "@expo/**", "react-native", "@react-native/**"],
+      groupName: "expo / react-native",
+    },
+  ],
+
+  // ── Automerge is OFF: every PR waits for your review and manual merge. ──────
+  // Nothing reaches `main` (and therefore prod, via deploy.yml) without a human.
+  //
+  // When you're ready to let low-risk updates merge themselves on green CI,
+  // add rules to `packageRules` above. Start small, e.g. dev-dependency patches:
+  //
+  //   {
+  //     matchDepTypes: ["devDependencies"],
+  //     matchUpdateTypes: ["patch"],
+  //     automerge: true,
+  //   }
+  //
+  // Reminder: an automerged PR pushes to `main`, which triggers deploy.yml →
+  // a prod deploy. Loosen only once you trust green CI to mean "safe to ship".
+  // ───────────────────────────────────────────────────────────────────────────
+}
