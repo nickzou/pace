@@ -8,6 +8,10 @@ build/
 out/
 *.tsbuildinfo
 
+# Nitro (apps/api) build + generated types
+.output/
+.nitro/
+
 # Turborepo
 .turbo/
 
