@@ -11,8 +11,10 @@ WORKDIR /app
 FROM base AS deps
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/mobile/package.json ./apps/mobile/
 COPY packages/tsconfig/package.json ./packages/tsconfig/
-RUN pnpm install --frozen-lockfile
+# Only the web subtree is needed to build web — skips Expo/RN from apps/mobile.
+RUN pnpm install --frozen-lockfile --filter @pace/web...
 
 # ---- build: produces the Nitro node-server output ----
 FROM deps AS build
