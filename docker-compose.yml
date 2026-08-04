@@ -1,0 +1,26 @@
+name: pace-dev
+
+# Local development services. One command to a real Postgres:
+#   docker compose up -d
+# (Production runtime lives in deploy/docker-compose.yml.)
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pace}
+      POSTGRES_DB: ${POSTGRES_DB:-pace}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pace} -d ${POSTGRES_DB:-pace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
