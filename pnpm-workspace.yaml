@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
 
 # Which dependencies may run install/build scripts (pnpm blocks all by default).
 # true = build it, false = skip without prompting. Every dependency that ships a

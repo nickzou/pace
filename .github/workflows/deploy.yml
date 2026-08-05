@@ -30,8 +30,50 @@ jobs:
       - name: Biome check
         run: pnpm exec biome check .
 
+  # End-to-end auth flow (web → API → Postgres) in a real browser.
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pace
+          POSTGRES_PASSWORD: pace
+          POSTGRES_DB: pace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # The E2E stack reads these from the environment (there's no .env in CI).
+      # Ports / origins are set per-server in playwright.config.ts.
+      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      BETTER_AUTH_SECRET: ci-e2e-secret-not-used-in-prod
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright browser
+        run: pnpm --filter @pace/e2e exec playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: pnpm --filter @pace/e2e test
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
   deploy:
-    needs: check
+    needs: [check, e2e]
     # Deploy ONLY on pushes that land on main. Every feature branch and PR runs
     # the checks above but never deploys.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

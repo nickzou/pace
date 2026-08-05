@@ -43,7 +43,11 @@ function SignIn() {
           type="password"
           autoComplete="current-password"
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-red-400">
+            {error}
+          </p>
+        )}
         <SubmitButton pending={pending}>Sign in</SubmitButton>
       </form>
     </AuthShell>

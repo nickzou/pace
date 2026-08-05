@@ -1,0 +1,19 @@
+{
+  "name": "@pace/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "@pace/tsconfig": "workspace:*",
+    "@types/node": "^22.10.2",
+    "dotenv": "^17.0.0",
+    "postgres": "^3.4.0",
+    "typescript": "^6.0.2"
+  }
+}
