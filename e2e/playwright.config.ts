@@ -48,24 +48,26 @@ export default defineConfig({
     },
   ],
 
-  // The API runs on the pace_test DB. The web app is *built* and served as its
-  // production output (not `vite dev`) — the dev server's on-demand dep
-  // optimization races with the first navigation and leaves the page
-  // un-hydrated, exactly what we want tests to never hit. Test the artifact.
+  // Both servers are built and served as their production output (not the dev
+  // servers) against the pace_test DB. Reasons: (1) the web dev server's
+  // on-demand dep optimization races the first navigation and leaves the page
+  // un-hydrated; (2) a built server has no file-watcher, which is unpredictable
+  // in a long-lived `--ui` watch session. Test the artifact.
   //
   // On dedicated ports, so reuse is safe (nothing else uses them): faster local
   // re-runs, fresh servers in CI. Restart the run after changing app code.
   webServer: [
     {
-      command: "pnpm --filter @pace/api exec nitro dev --port 3101",
+      command: "pnpm --filter @pace/api build && pnpm --filter @pace/api start",
       port: 3101,
       reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
       env: {
         DATABASE_URL: TEST_DB_URL,
         BETTER_AUTH_URL: API,
         TRUSTED_ORIGINS: WEB,
+        PORT: "3101",
       },
-      stdout: "pipe",
     },
     {
       command: "pnpm --filter @pace/web build && pnpm --filter @pace/web start",
@@ -74,7 +76,6 @@ export default defineConfig({
       timeout: 180_000,
       // VITE_API_URL is baked into the build; PORT is read by the node server.
       env: { VITE_API_URL: API, PORT: "3100" },
-      stdout: "pipe",
     },
   ],
 })
