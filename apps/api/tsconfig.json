@@ -1,0 +1,8 @@
+{
+  "extends": "nitro/tsconfig",
+  "compilerOptions": {
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src/**/*.ts", "nitro.config.ts", "node_modules/.nitro/types/nitro.d.ts"]
+}
