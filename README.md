@@ -13,6 +13,7 @@ A pnpm + Turborepo monorepo:
 | `@pace/web` | `apps/web` | TanStack Start web app (also hosts the Tauri desktop shell in `src-tauri/`) |
 | `@pace/mobile` | `apps/mobile` | Expo / React Native app |
 | `@pace/tsconfig` | `packages/tsconfig` | Shared TypeScript base config |
+| `@pace/e2e` | `e2e` | Playwright end-to-end tests (web → API → Postgres) |
 
 All clients talk to `@pace/api` over HTTP: web + desktop authenticate with
 cookies, mobile with a secure-store token.
@@ -87,6 +88,27 @@ in the Nix dev shell. In dev it loads the web app at `localhost:3000`.
 EAS builds (`eas build …`) use the EAS CLI, not a pnpm script. On-device runs
 need `EXPO_PUBLIC_API_URL` set to your machine's LAN IP (see
 `apps/mobile/.env.example`).
+
+### `@pace/e2e` — `e2e`
+
+Playwright end-to-end tests (the auth flow, web → API → Postgres, in a real browser).
+
+| Script | Command |
+|---|---|
+| `test` | `playwright test` |
+| `test:ui` | `playwright test --ui` |
+| `typecheck` | `tsc --noEmit` |
+
+Tests run against a dedicated **`pace_test`** database (created, migrated, and truncated automatically) and the **production web build** — both started by Playwright on dedicated ports (web `:3100`, API `:3101`), so the suite coexists with your dev servers. Postgres must be up (`docker compose up -d`).
+
+**NixOS browsers:** Playwright's prebuilt browsers don't run on NixOS, so the flake's dev shell wires up the nix-provided ones (`PLAYWRIGHT_BROWSERS_PATH`). Enter it first:
+
+```bash
+nix develop
+pnpm --filter @pace/e2e test       # or test:ui
+```
+
+`@playwright/test` is pinned to the flake's `playwright-driver` version (both **1.59.1**) so the browser build matches — keep them in lockstep when bumping either. CI (Ubuntu) uses the standard `playwright install` instead.
 
 ## Formatting & linting
 
