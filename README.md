@@ -110,6 +110,21 @@ pnpm --filter @pace/e2e test       # or test:ui
 
 `@playwright/test` is pinned to the flake's `playwright-driver` version (both **1.59.1**) so the browser build matches — keep them in lockstep when bumping either. CI (Ubuntu) uses the standard `playwright install` instead.
 
+### Mobile e2e — Maestro (`apps/mobile/.maestro`)
+
+Native RN can't be driven by Playwright, so mobile flows use **Maestro** (provided by the flake, along with `adb`). Flows are YAML in `apps/mobile/.maestro/`.
+
+Needs a device/emulator with the **dev build** installed, **Metro** running, and the app able to reach the API — set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env.local` (real device → your LAN IP; Android emulator → `http://10.0.2.2:3001`). Then:
+
+```bash
+nix develop
+pnpm --filter @pace/api dev          # API the app talks to
+cd apps/mobile && pnpm start         # Metro
+pnpm --filter @pace/mobile test:e2e  # runs .maestro flows against the connected device
+```
+
+Elements are targeted by `testID` (`email-input`, `submit-button`, `signed-in`, …). Runs on-device/emulator only — CI (nightly emulator or a cloud device farm) is a later step.
+
 ## Formatting & linting
 
 Biome is run as a **binary**, not a pnpm script (a NixOS provisioning quirk):
