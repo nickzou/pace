@@ -9,6 +9,7 @@
     "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
     "build": "vite build",
+    "build:desktop": "PACE_DESKTOP=1 vite build && node -e \"require('node:fs').copyFileSync('.output/public/_shell.html', '.output/public/index.html')\"",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsc --noEmit"
