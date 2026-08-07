@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "app.paceproductivity.desktop",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "../.output/public",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeBuildCommand": "pnpm build:desktop"
   },
   "app": {
     "windows": [
