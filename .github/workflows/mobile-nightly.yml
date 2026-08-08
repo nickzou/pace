@@ -106,22 +106,9 @@ jobs:
           profile: pixel_6
           ram-size: 4096M
           disable-animations: true
-          script: |
-            adb install -r "$GITHUB_WORKSPACE/pace-app.apk"
-            # Run each flow in isolation. The session persists in secure-store and
-            # the auth form keeps its input, so without a reset a later flow starts
-            # already signed-in (or with stale text that inputText appends to) and
-            # fails. `pm clear` wipes app data; then relaunch fresh per flow.
-            fail=0
-            for flow in apps/mobile/.maestro/*.yaml; do
-              echo "::group::maestro $flow"
-              adb shell pm clear app.paceproductivity.mobile
-              adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
-              sleep 5
-              maestro test "$flow" || fail=1
-              echo "::endgroup::"
-            done
-            exit $fail
+          # Single line: this action runs the script one line at a time (each as
+          # its own `sh -c`), so the loop lives in a file. See the script header.
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/mobile-e2e.sh"
 
       - name: Upload Maestro artifacts on failure
         if: failure()
