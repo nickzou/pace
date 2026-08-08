@@ -1,6 +1,7 @@
 import { expo } from "@better-auth/expo"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { bearer } from "better-auth/plugins"
 import { db } from "./db"
 import * as schema from "./db/schema"
 import { env } from "./env"
@@ -15,5 +16,8 @@ export const auth = betterAuth({
   trustedOrigins: [...env.TRUSTED_ORIGINS.split(","), MOBILE_SCHEME],
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: { enabled: true },
-  plugins: [expo()],
+  // expo(): mobile token-in-header flow. bearer(): lets the packaged desktop app
+  // (served from tauri://, where cross-site cookies aren't sent) authenticate
+  // with an Authorization: Bearer token instead. Web stays on cookies.
+  plugins: [expo(), bearer()],
 })
