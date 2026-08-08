@@ -1,0 +1,106 @@
+name: Mobile E2E (nightly)
+
+# Runs the Maestro flows against a headless Android emulator. Nightly, because
+# building an APK + booting an emulator is slow — not a per-PR gate. Trigger by
+# hand from the Actions tab (workflow_dispatch) to iterate without waiting.
+on:
+  schedule:
+    - cron: "0 7 * * *" # 07:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-nightly
+  cancel-in-progress: false
+
+jobs:
+  mobile-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pace
+          POSTGRES_PASSWORD: pace
+          POSTGRES_DB: pace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      BETTER_AUTH_SECRET: ci-mobile-secret-not-used-in-prod
+      BETTER_AUTH_URL: http://localhost:3001
+      # The emulator reaches the runner's API via 10.0.2.2; this is baked into
+      # the APK at build time.
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:3001
+      # Permit cleartext http in the preview APK — CI only (see app.config.ts).
+      PACE_ALLOW_CLEARTEXT: "1"
+      MAESTRO_CLI_NO_ANALYTICS: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Set up JDK (Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pnpm install --frozen-lockfile
+
+      - name: Migrate database
+        run: pnpm --filter @pace/api db:migrate
+
+      - name: Start API (background, all interfaces)
+        run: |
+          pnpm --filter @pace/api dev > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3001/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:3001/health || (echo "API failed to start"; cat /tmp/api.log; exit 1)
+
+      - name: Build preview APK (local)
+        working-directory: apps/mobile
+        run: npx eas-cli build --platform android --profile preview --local --non-interactive --output "$GITHUB_WORKSPACE/pace-preview.apk"
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Maestro on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          script: |
+            adb install -r "$GITHUB_WORKSPACE/pace-preview.apk"
+            # Preview build launches straight into the app; open it, then the
+            # flows drive the foreground app (same as local).
+            adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
+            sleep 5
+            maestro test apps/mobile/.maestro
+
+      - name: Upload Maestro artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-output
+          path: ~/.maestro/tests/
+          retention-days: 7
