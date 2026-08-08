@@ -1,0 +1,38 @@
+# Mobile auth happy path: sign up -> signed in -> sign out.
+# Run: maestro test apps/mobile/.maestro/sign-up.yaml  (device/emulator with the
+# dev build installed + Metro running; the app must reach the API — see README).
+appId: app.paceproductivity.mobile
+---
+# On a dev build, open the app to the sign-in screen first (see README) — we
+# drive the foreground app rather than launchApp, which lands on the dev-client
+# launcher. A preview/standalone build can use `- launchApp: { clearState: true }`.
+- assertVisible: "Welcome back"
+
+# Unique email per run so repeated runs don't collide.
+- evalScript: ${output.email = 'maestro-' + Date.now() + '@pace.test'}
+
+# Switch to sign-up and register.
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro User"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+# Dismiss the keyboard so it isn't covering the submit button.
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+
+# Landed on the signed-in home.
+- assertVisible:
+    id: "signed-in"
+
+# Sign out returns to the auth screen.
+- tapOn:
+    id: "sign-out"
+- assertVisible: "Welcome back"

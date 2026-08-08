@@ -40,7 +40,20 @@ export default defineHandler(async (event) => {
     return new Response(null, { status: 204, headers })
   }
 
-  const res = await auth.handler(event.req)
+  // Rebuild a native Request before handing off. h3/srvx provides its own
+  // Request implementation, but Better Auth's expo plugin does
+  // `new Request(req, …)` with Node's undici Request, which rejects a foreign
+  // instance ("Cannot read private member #state"). Reconstructing from
+  // url/method/headers/body yields a native Request the whole pipeline accepts.
+  const raw = event.req
+  const hasBody = raw.method !== "GET" && raw.method !== "HEAD"
+  const req = new Request(raw.url, {
+    method: raw.method,
+    headers: raw.headers,
+    body: hasBody ? await raw.arrayBuffer() : undefined,
+  })
+
+  const res = await auth.handler(req)
   for (const [key, value] of headers) res.headers.set(key, value)
   return res
 })

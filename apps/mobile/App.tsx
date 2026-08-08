@@ -33,10 +33,10 @@ function SignedIn({ email }: { email: string }) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.authBar}>
-        <Text style={styles.authBarText} numberOfLines={1}>
+        <Text testID="signed-in" style={styles.authBarText} numberOfLines={1}>
           Signed in as <Text style={styles.authBarEmail}>{email}</Text>
         </Text>
-        <Pressable onPress={() => signOut()}>
+        <Pressable testID="sign-out" onPress={() => signOut()}>
           <Text style={styles.signOut}>Sign out</Text>
         </Pressable>
       </View>

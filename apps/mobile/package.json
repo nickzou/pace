@@ -6,6 +6,7 @@
     "@better-auth/expo": "1.4.22",
     "better-auth": "1.4.22",
     "expo": "~57.0.9",
+    "expo-build-properties": "~57.0.9",
     "expo-constants": "~57.0.9",
     "expo-dev-client": "~57.0.10",
     "expo-linking": "~57.0.5",
@@ -25,7 +26,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "maestro test .maestro"
   },
   "private": true
 }

@@ -34,6 +34,7 @@ export function AuthScreen() {
 
       {isSignUp && (
         <TextInput
+          testID="name-input"
           style={styles.input}
           placeholder="Name"
           placeholderTextColor="#525252"
@@ -43,6 +44,7 @@ export function AuthScreen() {
         />
       )}
       <TextInput
+        testID="email-input"
         style={styles.input}
         placeholder="Email"
         placeholderTextColor="#525252"
@@ -53,6 +55,7 @@ export function AuthScreen() {
         onChangeText={setEmail}
       />
       <TextInput
+        testID="password-input"
         style={styles.input}
         placeholder="Password"
         placeholderTextColor="#525252"
@@ -61,9 +64,13 @@ export function AuthScreen() {
         onChangeText={setPassword}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text testID="auth-error" style={styles.error}>
+          {error}
+        </Text>
+      ) : null}
 
-      <Pressable style={styles.button} onPress={submit} disabled={pending}>
+      <Pressable testID="submit-button" style={styles.button} onPress={submit} disabled={pending}>
         {pending ? (
           <ActivityIndicator color="#0a0a0a" />
         ) : (
@@ -72,6 +79,7 @@ export function AuthScreen() {
       </Pressable>
 
       <Pressable
+        testID="mode-toggle"
         onPress={() => {
           setMode(isSignUp ? "sign-in" : "sign-up")
           setError(null)
