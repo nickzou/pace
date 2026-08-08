@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
   - "e2e"
+  - "desktop-e2e"
 
 # Which dependencies may run install/build scripts (pnpm blocks all by default).
 # true = build it, false = skip without prompting. Every dependency that ships a
@@ -15,6 +16,10 @@ allowBuilds:
   lightningcss: true
   "@prisma/client": false
   better-sqlite3: false
+  # WebdriverIO (desktop e2e) pulls these Edge/Firefox drivers transitively; the
+  # Tauri suite uses WebKitWebDriver, so skip their browser-driver downloads.
+  edgedriver: false
+  geckodriver: false
 
 minimumReleaseAgeExclude:
   - expo-constants@57.0.9

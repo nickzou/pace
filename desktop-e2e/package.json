@@ -1,0 +1,26 @@
+{
+  "name": "@pace/desktop-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:app": "VITE_API_URL=http://localhost:3101 pnpm --filter @pace/web exec cargo tauri build --debug --no-bundle",
+    "build:app:ci": "VITE_API_URL=http://localhost:3101 pnpm --filter @pace/web exec tauri build --debug --no-bundle",
+    "test": "wdio run ./wdio.conf.ts",
+    "test:build": "pnpm build:app && pnpm test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@pace/tsconfig": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@wdio/cli": "^9.19.0",
+    "@wdio/globals": "^9.19.0",
+    "@wdio/local-runner": "^9.19.0",
+    "@wdio/mocha-framework": "^9.19.0",
+    "@wdio/spec-reporter": "^9.19.0",
+    "dotenv": "^17.0.0",
+    "postgres": "^3.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^6.0.2",
+    "webdriverio": "^9.19.0"
+  }
+}
