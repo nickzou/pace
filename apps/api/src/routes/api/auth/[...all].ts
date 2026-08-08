@@ -17,6 +17,9 @@ function corsHeaders(origin: string | null): Headers {
   if (origin && trusted.has(origin)) {
     headers.set("access-control-allow-origin", origin)
     headers.set("access-control-allow-credentials", "true")
+    // Let cross-origin JS read the bearer token off the response (Better Auth's
+    // bearer plugin emits it here) — the desktop app needs this to work.
+    headers.set("access-control-expose-headers", "set-auth-token")
     headers.set("vary", "origin")
   }
   return headers
