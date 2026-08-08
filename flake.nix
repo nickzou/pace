@@ -21,6 +21,7 @@
           wrapGAppsHook3
           maestro # mobile (Expo/RN) e2e runner
           android-tools # adb, so Maestro can reach a device/emulator
+          xvfb-run # headless X for the desktop (Tauri/WebKitWebDriver) e2e
         ];
 
         # GTK/WebKit stack Tauri compiles + links against.
@@ -47,6 +48,12 @@
 
         # Maestro (mobile e2e): opt out of anonymous analytics.
         MAESTRO_CLI_NO_ANALYTICS = "1";
+
+        # Desktop e2e (WebdriverIO + tauri-driver): the native WebDriver that
+        # tauri-driver proxies to. Not on PATH from buildInputs, so hand its
+        # store path to wdio.conf via --native-driver. (tauri-driver itself is
+        # cargo-installed — see desktop-e2e/README.md — since it's not packaged.)
+        WEBKIT_WEB_DRIVER = "${pkgs.webkitgtk_4_1}/bin/WebKitWebDriver";
 
         shellHook = ''
           echo "🦀 Pace dev shell — rustc $(rustc --version 2>/dev/null | awk '{print $2}'); Playwright browsers wired"
