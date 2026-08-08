@@ -71,17 +71,21 @@ jobs:
           done
           curl -sf http://localhost:3001/health || (echo "API failed to start"; cat /tmp/api.log; exit 1)
 
-      # Build a debug APK with Gradle directly — no EAS, no account, no managed
-      # keystore. `expo prebuild` regenerates the native android/ project from the
-      # Expo config (applying app.config.ts, so PACE_ALLOW_CLEARTEXT takes effect);
-      # a debug build is auto-signed with Android's debug keystore, which is all an
-      # e2e smoke test needs. android/ stays gitignored (regenerated each run).
-      - name: Build debug APK (Gradle)
+      # Build a standalone APK with Gradle directly — no EAS, no account, no
+      # managed keystore. `expo prebuild` regenerates the native android/ project
+      # from the Expo config (applying app.config.ts, so PACE_ALLOW_CLEARTEXT
+      # takes effect). We build `release`, not `debug`: a debug APK loads its JS
+      # from a Metro dev server (absent in CI), whereas release bundles the JS in.
+      # The Expo template debug-signs the release build by default (see the
+      # generated app/build.gradle: `signingConfig signingConfigs.debug`), so this
+      # stays secret-free — debug signing is all an e2e smoke test needs.
+      # android/ stays gitignored (regenerated each run).
+      - name: Build APK (Gradle)
         working-directory: apps/mobile
         run: |
           npx expo prebuild --platform android --no-install
-          ./android/gradlew -p android assembleDebug
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/pace-debug.apk"
+          ./android/gradlew -p android assembleRelease
+          cp android/app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/pace-app.apk"
 
       - name: Install Maestro
         run: |
@@ -103,7 +107,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           script: |
-            adb install -r "$GITHUB_WORKSPACE/pace-debug.apk"
+            adb install -r "$GITHUB_WORKSPACE/pace-app.apk"
             # Preview build launches straight into the app; open it, then the
             # flows drive the foreground app (same as local).
             adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
