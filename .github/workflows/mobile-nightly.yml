@@ -42,7 +42,7 @@ jobs:
       # The emulator reaches the runner's API via 10.0.2.2; this is baked into
       # the APK at build time.
       EXPO_PUBLIC_API_URL: http://10.0.2.2:3001
-      # Permit cleartext http in the preview APK — CI only (see app.config.ts).
+      # Permit cleartext http in the debug APK — CI only (see app.config.ts).
       PACE_ALLOW_CLEARTEXT: "1"
       MAESTRO_CLI_NO_ANALYTICS: "1"
     steps:
@@ -71,9 +71,17 @@ jobs:
           done
           curl -sf http://localhost:3001/health || (echo "API failed to start"; cat /tmp/api.log; exit 1)
 
-      - name: Build preview APK (local)
+      # Build a debug APK with Gradle directly — no EAS, no account, no managed
+      # keystore. `expo prebuild` regenerates the native android/ project from the
+      # Expo config (applying app.config.ts, so PACE_ALLOW_CLEARTEXT takes effect);
+      # a debug build is auto-signed with Android's debug keystore, which is all an
+      # e2e smoke test needs. android/ stays gitignored (regenerated each run).
+      - name: Build debug APK (Gradle)
         working-directory: apps/mobile
-        run: npx eas-cli build --platform android --profile preview --local --non-interactive --output "$GITHUB_WORKSPACE/pace-preview.apk"
+        run: |
+          npx expo prebuild --platform android --no-install
+          ./android/gradlew -p android assembleDebug
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/pace-debug.apk"
 
       - name: Install Maestro
         run: |
@@ -95,7 +103,7 @@ jobs:
           ram-size: 4096M
           disable-animations: true
           script: |
-            adb install -r "$GITHUB_WORKSPACE/pace-preview.apk"
+            adb install -r "$GITHUB_WORKSPACE/pace-debug.apk"
             # Preview build launches straight into the app; open it, then the
             # flows drive the foreground app (same as local).
             adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
