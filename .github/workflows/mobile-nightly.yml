@@ -108,11 +108,20 @@ jobs:
           disable-animations: true
           script: |
             adb install -r "$GITHUB_WORKSPACE/pace-app.apk"
-            # Preview build launches straight into the app; open it, then the
-            # flows drive the foreground app (same as local).
-            adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
-            sleep 5
-            maestro test apps/mobile/.maestro
+            # Run each flow in isolation. The session persists in secure-store and
+            # the auth form keeps its input, so without a reset a later flow starts
+            # already signed-in (or with stale text that inputText appends to) and
+            # fails. `pm clear` wipes app data; then relaunch fresh per flow.
+            fail=0
+            for flow in apps/mobile/.maestro/*.yaml; do
+              echo "::group::maestro $flow"
+              adb shell pm clear app.paceproductivity.mobile
+              adb shell monkey -p app.paceproductivity.mobile -c android.intent.category.LAUNCHER 1
+              sleep 5
+              maestro test "$flow" || fail=1
+              echo "::endgroup::"
+            done
+            exit $fail
 
       - name: Upload Maestro artifacts on failure
         if: failure()
