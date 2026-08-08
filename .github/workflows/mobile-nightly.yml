@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "0 7 * * *" # 07:00 UTC
   workflow_dispatch:
+  # TEMP: run on pushes to this branch so we can shake it out before merge
+  # (workflow_dispatch only works once the file is on the default branch).
+  # Remove this `push:` block before merging.
+  push:
+    branches: [test/native-e2e]
 
 concurrency:
   group: mobile-nightly
