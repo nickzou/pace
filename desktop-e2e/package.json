@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build:app": "VITE_API_URL=http://localhost:3101 pnpm --filter @pace/web exec cargo tauri build --debug --no-bundle",
+    "build:app:ci": "VITE_API_URL=http://localhost:3101 pnpm --filter @pace/web exec tauri build --debug --no-bundle",
     "test": "wdio run ./wdio.conf.ts",
     "test:build": "pnpm build:app && pnpm test",
     "typecheck": "tsc --noEmit"

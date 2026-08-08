@@ -53,6 +53,20 @@ Rebuild the binary after changing app code:
 pnpm --filter @pace/desktop-e2e build:app
 ```
 
+### Two build scripts: local vs CI
+
+- **`build:app`** (local) — the nix-provided `cargo tauri build --debug
+  --no-bundle`. Ergonomic, and what you run day to day.
+- **`build:app:ci`** — the same via the **npm** Tauri CLI (`@tauri-apps/cli`).
+  `ubuntu-latest` has no `cargo-tauri`, and the npm CLI's prebuilt binary runs
+  there (just not on NixOS — hence the split). Used by
+  `.github/workflows/desktop-e2e.yml`.
+
+Both bake `VITE_API_URL=http://localhost:3101` and emit `target/debug/app`.
+(A plain `cargo build` won't do: Tauri treats a bare debug build as *dev* and
+loads `devUrl` instead of the bundled frontend — the CLI is what marks it a
+bundled build.)
+
 ### Headless (no display / CI)
 
 The app opens a real GTK window, so a display is required. With none, wrap it:

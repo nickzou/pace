@@ -1,0 +1,89 @@
+name: Desktop E2E
+
+# Drives the packaged Tauri app through its real WebKitWebView with WebdriverIO
+# + tauri-driver. Runs wherever the web checks run — a desktop build is far
+# lighter than the mobile emulator, so it can gate per-push rather than nightly.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: desktop-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pace
+          POSTGRES_PASSWORD: pace
+          POSTGRES_DB: pace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      BETTER_AUTH_SECRET: ci-desktop-secret-not-used-in-prod
+      # The apt `webkit2gtk-driver` package installs the native WebDriver here;
+      # wdio.conf hands it to tauri-driver via --native-driver.
+      WEBKIT_WEB_DRIVER: /usr/bin/WebKitWebDriver
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/web/src-tauri
+
+      # Tauri's Linux build deps + the WebKitWebDriver + a virtual display. This
+      # is the CI counterpart to the nix dev shell (which supplies these locally).
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            librsvg2-dev \
+            libayatana-appindicator3-dev \
+            patchelf \
+            webkit2gtk-driver \
+            xvfb
+
+      # Not packaged for apt; cargo-installed like locally (~/.cargo/bin).
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - run: pnpm install --frozen-lockfile
+
+      # Build via the npm Tauri CLI (@tauri-apps/cli) — its prebuilt binary runs
+      # on ubuntu (local uses nix cargo-tauri). Bakes VITE_API_URL at :3101.
+      - name: Build desktop app
+        run: pnpm --filter @pace/desktop-e2e build:app:ci
+
+      # wdio.conf resets pace_test, starts the API on :3101, spawns tauri-driver,
+      # and drives the app. xvfb gives the GTK window a display.
+      - name: Run desktop e2e
+        run: xvfb-run -a pnpm --filter @pace/desktop-e2e test
+
+      - name: Upload wdio logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-e2e-logs
+          path: desktop-e2e/logs/
+          retention-days: 7
