@@ -22,6 +22,13 @@
       "when": 1786311296263,
       "tag": "0002_powersync_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786313475161,
+      "tag": "0003_handy_gideon",
+      "breakpoints": true
     }
   ]
 }
