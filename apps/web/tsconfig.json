@@ -11,6 +11,10 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    // Apps don't emit .d.ts, so skip the declaration-portability check that trips
+    // (TS2883) on re-exported inferred types from deeply-nested deps (better-auth).
+    "declaration": false,
+    "declarationMap": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true
