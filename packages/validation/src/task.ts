@@ -30,3 +30,18 @@ export const newTaskSchema = taskSchema.pick({
 })
 
 export type NewTask = z.infer<typeof newTaskSchema>
+
+// A partial update: `id` names the row; any mutable field may be set, and an
+// omitted field is left unchanged — so no defaults here (a default would blank a
+// field you didn't send). `title` mirrors taskSchema's rule.
+export const updateTaskSchema = z.object({
+  id: z.uuid(),
+  title: z.string().min(1).max(500).optional(),
+  description: z.string().optional(),
+  completed: z.boolean().optional(),
+})
+
+export type UpdateTask = z.infer<typeof updateTaskSchema>
+
+// Identifies a single task by id (used by softDelete).
+export const taskIdSchema = z.object({ id: z.uuid() })
