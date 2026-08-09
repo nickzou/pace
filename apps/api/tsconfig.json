@@ -4,5 +4,11 @@
     "types": ["node"],
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*.ts", "nitro.config.ts", "node_modules/.nitro/types/nitro.d.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "vitest.config.ts",
+    "nitro.config.ts",
+    "node_modules/.nitro/types/nitro.d.ts"
+  ]
 }

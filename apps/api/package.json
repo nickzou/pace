@@ -11,7 +11,8 @@
     "auth:generate": "better-auth generate --config src/auth.ts --output src/db/auth.ts -y",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/expo": "1.4.22",
@@ -28,6 +29,7 @@
     "@types/node": "^22.10.2",
     "dotenv": "^17.0.0",
     "drizzle-kit": "^0.31.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.10"
   }
 }
