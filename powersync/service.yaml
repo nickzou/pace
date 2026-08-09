@@ -1,0 +1,37 @@
+# PowerSync service configuration. Mounted into the container at /config
+# (see docker-compose.yml). Env placeholders use the `!env` tag and are supplied
+# by the compose file. Both the source DB and the sync bucket storage are
+# Postgres — there is no MongoDB in this stack.
+
+telemetry:
+  # Self-hosted and self-managed: don't phone home.
+  disable_telemetry_sharing: true
+
+# The source database PowerSync replicates from (the app's `postgres`, running
+# with wal_level=logical). PowerSync creates its own publication + replication
+# slot here on first connect.
+replication:
+  connections:
+    - type: postgresql
+      uri: !env PS_DATA_SOURCE_URI
+      sslmode: disable
+
+# Where PowerSync keeps its sync buckets / replication bookkeeping. A separate
+# Postgres (`powersync-storage`), not the app DB.
+storage:
+  type: postgresql
+  uri: !env PS_STORAGE_SOURCE_URI
+  sslmode: disable
+
+port: !env PS_PORT
+
+# Sync rules live in a sibling file (resolved relative to this config).
+sync_config:
+  path: sync-config.yaml
+
+# Clients authenticate with a JWT that PowerSync validates against this JWKS
+# endpoint (Better Auth's jwt() plugin — wired up in Checkpoint 2). The JWT's
+# `aud` must be one of these audiences and its `sub` is the user id.
+client_auth:
+  jwks_uri: !env PS_JWKS_URL
+  audience: ["powersync"]

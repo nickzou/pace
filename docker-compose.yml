@@ -8,6 +8,9 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
+    # wal_level=logical lets PowerSync replicate row changes off the WAL (M11).
+    # The default is `replica`, which PowerSync can't stream from.
+    command: ["postgres", "-c", "wal_level=logical"]
     ports:
       - "5432:5432"
     environment:
@@ -22,5 +25,64 @@ services:
       timeout: 5s
       retries: 5
 
+  # PowerSync's sync bucket storage. A separate Postgres from the source `postgres`
+  # above (keeps sync-engine bookkeeping out of the app DB) — but still Postgres,
+  # so there's no MongoDB in the stack. Not exposed on the host; only the
+  # powersync service talks to it over the compose network.
+  powersync-storage:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pace}
+      POSTGRES_DB: powersync
+    volumes:
+      - powersync_storage_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pace} -d powersync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # The PowerSync service: replicates `tasks` from `postgres` into per-user sync
+  # buckets and streams them to clients' local SQLite. Config is mounted from
+  # ./powersync (service.yaml + sync-config.yaml). Pinned, not :latest.
+  powersync:
+    image: journeyapps/powersync-service:1.23.3
+    restart: unless-stopped
+    command: ["start", "-r", "unified"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      powersync-storage:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./powersync:/config
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      PS_DATA_SOURCE_URI: postgresql://${POSTGRES_USER:-pace}:${POSTGRES_PASSWORD:-pace}@postgres:5432/${POSTGRES_DB:-pace}
+      PS_STORAGE_SOURCE_URI: postgresql://${POSTGRES_USER:-pace}:${POSTGRES_PASSWORD:-pace}@powersync-storage:5432/powersync
+      # The API runs on the host (`pnpm dev`, :3001), not in this compose file, so
+      # the container reaches its JWKS endpoint via the host gateway. Wired up in
+      # Checkpoint 2 (Better Auth jwt() plugin); until then clients can't auth.
+      PS_JWKS_URL: http://host.docker.internal:3001/api/auth/jwks
+      PS_PORT: "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/probes/liveness').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 1s
+      retries: 15
+
 volumes:
   pgdata:
+  powersync_storage_data:

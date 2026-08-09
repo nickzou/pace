@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://unpkg.com/@powersync/service-sync-rules@latest/schema/sync_rules.json
+#
+# Sync rules (edition 3 / streams). Defines what each client syncs down into its
+# local SQLite. Changes here are NOT hot-reloaded — restart the powersync service.
+# https://docs.powersync.com/sync/streams/overview
+
+config:
+  edition: 3
+
+streams:
+  # Each signed-in user syncs their own, non-deleted tasks. auth.user_id() is the
+  # JWT `sub` (the Better Auth user id) — this WHERE clause is the boundary that
+  # keeps one user's rows off another's device, so it must never be dropped.
+  #
+  # Soft-deleted rows fall out of the query, so a delete propagates to clients as
+  # a removal from local SQLite (the deletedAt tombstone earns its keep here).
+  tasks:
+    auto_subscribe: true
+    query: SELECT * FROM tasks WHERE user_id = auth.user_id() AND deleted_at IS NULL

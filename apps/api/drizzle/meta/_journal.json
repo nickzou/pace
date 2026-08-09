@@ -15,6 +15,13 @@
       "when": 1786235842527,
       "tag": "0001_past_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786311296263,
+      "tag": "0002_powersync_publication",
+      "breakpoints": true
     }
   ]
 }
