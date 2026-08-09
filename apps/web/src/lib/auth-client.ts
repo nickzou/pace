@@ -8,11 +8,19 @@ import { createAuthClient } from "better-auth/react"
 //
 // Normal web — and `tauri dev`, which loads http://localhost:3000 (same-site
 // with the API) — stays on cookies, unchanged.
-const useTokens =
+// True on the packaged desktop app (served from tauri://), where cookies aren't
+// sent cross-site so we authenticate with a stored bearer token instead.
+export const useTokens =
   typeof window !== "undefined" &&
   (window.location.protocol === "tauri:" || window.location.hostname === "tauri.localhost")
 
 const TOKEN_KEY = "pace.token"
+
+// The bearer token for the tRPC/api client to send on desktop; null on web
+// (which relies on the session cookie). Same storage the auth client uses.
+export function getStoredToken(): string | null {
+  return useTokens ? localStorage.getItem(TOKEN_KEY) : null
+}
 
 export const authClient = createAuthClient({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:3001",

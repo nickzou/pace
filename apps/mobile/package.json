@@ -4,6 +4,8 @@
   "main": "index.ts",
   "dependencies": {
     "@better-auth/expo": "1.4.22",
+    "@pace/api-client": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
     "better-auth": "1.4.22",
     "expo": "~57.0.9",
     "expo-build-properties": "~57.0.9",

@@ -24,3 +24,11 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - expo-constants@57.0.9
   - expo-linking@57.0.5
+
+# Force a single React across the workspace. The release-age policy handed
+# @pace/api-client an older react than apps/web, so @trpc/tanstack-react-query
+# bound to a *second* React copy — crashing SSR with "Invalid hook call". One
+# version means one copy.
+overrides:
+  react: 19.2.3
+  react-dom: 19.2.3

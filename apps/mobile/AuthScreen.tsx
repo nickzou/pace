@@ -83,6 +83,11 @@ export function AuthScreen() {
         onPress={() => {
           setMode(isSignUp ? "sign-in" : "sign-up")
           setError(null)
+          // Reset the form when switching modes so a half-typed sign-in doesn't
+          // bleed into sign-up (and vice versa).
+          setName("")
+          setEmail("")
+          setPassword("")
         }}
       >
         <Text style={styles.switch}>

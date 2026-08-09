@@ -1,0 +1,48 @@
+# Mobile tasks flow: sign up -> add a task -> it shows up in the list.
+# Run: maestro test apps/mobile/.maestro/tasks.yaml  (dev build installed + Metro
+# running; the app must reach the API — see the runbook).
+appId: app.paceproductivity.mobile
+---
+# Reach a clean signed-out start — the session persists in secure-store, so a
+# prior run (or a manual login) can leave the app signed in. (Dev build: we drive
+# the foreground app rather than launchApp, which lands on the dev-client launcher.)
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user so we're authenticated (unique email per run).
+- evalScript: ${output.email = 'maestro-tasks-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Tasks"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+# Dismiss the keyboard so it isn't covering the submit button.
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+
+# Landed on the signed-in home.
+- assertVisible:
+    id: "signed-in"
+
+# Add a task (unique title per run) — it should appear in the list below.
+- evalScript: ${output.task = 'Buy milk ' + Date.now()}
+- tapOn:
+    id: "task-input"
+- inputText: ${output.task}
+- hideKeyboard
+- tapOn:
+    id: "add-task"
+- assertVisible: ${output.task}

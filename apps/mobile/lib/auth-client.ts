@@ -1,5 +1,6 @@
 import { expoClient } from "@better-auth/expo/client"
 import { createAuthClient } from "better-auth/react"
+import * as Linking from "expo-linking"
 import * as SecureStore from "expo-secure-store"
 
 // Talks to the standalone API (apps/api). Unlike the web/desktop cookie flow,
@@ -22,3 +23,13 @@ export const authClient = createAuthClient({
 })
 
 export const { useSession, signIn, signUp, signOut } = authClient
+
+// Headers the tRPC/api client must send so the API can find the session on
+// native: the stored session cookie (there's no cookie jar to send it
+// automatically) plus the expo deep-link origin — the same pair the auth client
+// attaches to its own /api/auth requests. Empty when signed out.
+export function getApiHeaders(): Record<string, string> {
+  const cookie = authClient.getCookie()
+  if (!cookie) return {}
+  return { cookie, "expo-origin": Linking.createURL("", { scheme: "pace" }) }
+}
