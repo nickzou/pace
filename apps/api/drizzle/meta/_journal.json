@@ -8,6 +8,13 @@
       "when": 1785851862654,
       "tag": "0000_careful_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786235842527,
+      "tag": "0001_past_tigra",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { bearer } from "better-auth/plugins"
 import { db } from "./db"
-import * as schema from "./db/schema"
+import * as schema from "./db/auth"
 import { env } from "./env"
 
 // The mobile app (apps/mobile) authenticates via its deep-link scheme rather

@@ -30,6 +30,43 @@ jobs:
       - name: Biome check
         run: pnpm exec biome check .
 
+  # Unit + integration tests (Vitest): the tasks tRPC API against a real
+  # Postgres, plus the shared Zod schemas. Fast — no browsers.
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pace
+          POSTGRES_PASSWORD: pace
+          POSTGRES_DB: pace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # No .env in CI — the vitest setup derives pace_test from DATABASE_URL and
+      # creates + migrates it. env.ts requires these three.
+      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      BETTER_AUTH_SECRET: ci-test-secret-not-used-in-prod
+      BETTER_AUTH_URL: http://localhost:3001
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run tests
+        # Fast tests only — the e2e packages also have a `test` script but run in
+        # their own jobs/workflows (browsers, drivers, emulators).
+        run: pnpm turbo test --filter=@pace/api --filter=@pace/validation
+
   # End-to-end auth flow (web → API → Postgres) in a real browser.
   e2e:
     runs-on: ubuntu-latest
@@ -73,7 +110,7 @@ jobs:
           retention-days: 7
 
   deploy:
-    needs: [check, e2e]
+    needs: [check, test, e2e]
     # Deploy ONLY on pushes that land on main. Every feature branch and PR runs
     # the checks above but never deploys.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

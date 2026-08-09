@@ -11,6 +11,10 @@
     "typecheck": {
       "dependsOn": ["^build"]
     },
+    "test": {
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "TRUSTED_ORIGINS"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
