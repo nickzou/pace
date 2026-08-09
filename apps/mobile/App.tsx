@@ -1,16 +1,29 @@
+import { useTRPC } from "@pace/api-client"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { StatusBar } from "expo-status-bar"
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { useState } from "react"
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native"
 import { AuthScreen } from "./AuthScreen"
+import { ApiProvider } from "./lib/api"
 import { signOut, useSession } from "./lib/auth-client"
 
-const sampleTasks = [
-  { id: 1, title: "Set up the monorepo", done: true },
-  { id: 2, title: "Stand up the web + desktop shells", done: true },
-  { id: 3, title: "Get the mobile shell on a real device", done: true },
-  { id: 4, title: 'Figure out what a "task" actually is in Pace', done: false },
-]
-
 export default function App() {
+  return (
+    <ApiProvider>
+      <Main />
+    </ApiProvider>
+  )
+}
+
+function Main() {
   const { data: session, isPending } = useSession()
 
   return (
@@ -43,23 +56,100 @@ function SignedIn({ email }: { email: string }) {
 
       <Text style={styles.brand}>Pace</Text>
       <Text style={styles.tag}>set your own pace</Text>
-      <Text style={styles.eyebrow}>Native shell · signed in</Text>
 
-      <Text style={styles.section}>Sample tasks (hard-coded)</Text>
-      {sampleTasks.map((task) => (
-        <View key={task.id} style={styles.task}>
-          <View style={[styles.checkbox, task.done && styles.checkboxDone]}>
-            {task.done ? <Text style={styles.check}>✓</Text> : null}
-          </View>
-          <Text style={[styles.taskText, task.done && styles.taskTextDone]}>{task.title}</Text>
-        </View>
-      ))}
-
-      <Text style={styles.footer}>
-        Still fake data — but the account above is real, authenticated against the same API the web
-        and desktop apps use.
-      </Text>
+      <Tasks />
     </ScrollView>
+  )
+}
+
+function Tasks() {
+  const trpc = useTRPC()
+  const queryClient = useQueryClient()
+  const [title, setTitle] = useState("")
+
+  const listKey = trpc.tasks.list.queryKey()
+  const tasks = useQuery(trpc.tasks.list.queryOptions())
+
+  const createTask = useMutation(
+    trpc.tasks.create.mutationOptions({
+      // Optimistic: show the new task immediately, roll back on error, re-fetch
+      // on settle to reconcile with the server.
+      onMutate: async (input) => {
+        await queryClient.cancelQueries({ queryKey: listKey })
+        const previous = queryClient.getQueryData(listKey)
+        const now = new Date().toISOString()
+        queryClient.setQueryData(listKey, (old = []) => [
+          {
+            id: `optimistic-${now}`,
+            title: input.title,
+            description: input.description ?? "",
+            completed: false,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          },
+          ...old,
+        ])
+        return { previous }
+      },
+      onError: (_error, _input, context) => {
+        if (context?.previous) queryClient.setQueryData(listKey, context.previous)
+      },
+      onSettled: () => queryClient.invalidateQueries({ queryKey: listKey }),
+    }),
+  )
+
+  function add() {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    createTask.mutate({ title: trimmed })
+    setTitle("")
+  }
+
+  return (
+    <>
+      <Text style={styles.section}>Tasks</Text>
+
+      <View style={styles.addRow}>
+        <TextInput
+          testID="task-input"
+          value={title}
+          onChangeText={setTitle}
+          onSubmitEditing={add}
+          placeholder="Add a task…"
+          placeholderTextColor="#525252"
+          style={styles.input}
+          returnKeyType="done"
+        />
+        <Pressable
+          testID="add-task"
+          onPress={add}
+          disabled={!title.trim() || createTask.isPending}
+          style={styles.addBtn}
+        >
+          <Text style={styles.addBtnText}>Add</Text>
+        </Pressable>
+      </View>
+
+      {tasks.isPending ? (
+        <ActivityIndicator color="#e5e5e5" style={styles.tasksLoading} />
+      ) : tasks.isError ? (
+        <Text style={styles.footer}>Couldn't load tasks.</Text>
+      ) : tasks.data.length === 0 ? (
+        <Text style={styles.footer}>No tasks yet — add your first above.</Text>
+      ) : (
+        tasks.data.map((task) => (
+          <View key={task.id} style={styles.task}>
+            <View style={[styles.checkbox, task.completed && styles.checkboxDone]}>
+              {task.completed ? <Text style={styles.check}>✓</Text> : null}
+            </View>
+            <Text style={[styles.taskText, task.completed && styles.taskTextDone]}>
+              {task.title}
+            </Text>
+          </View>
+        ))
+      )}
+    </>
   )
 }
 
@@ -84,13 +174,6 @@ const styles = StyleSheet.create({
   signOut: { color: "#a3a3a3", fontSize: 13, marginLeft: 12 },
   brand: { fontSize: 44, fontWeight: "700", color: "#e5e5e5" },
   tag: { fontSize: 16, fontStyle: "italic", color: "#a3a3a3", marginTop: 4 },
-  eyebrow: {
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: "uppercase",
-    color: "#737373",
-    marginTop: 12,
-  },
   section: {
     fontSize: 13,
     fontWeight: "600",
@@ -98,8 +181,29 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: "#a3a3a3",
     marginTop: 28,
-    marginBottom: 8,
+    marginBottom: 12,
   },
+  addRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#404040",
+    backgroundColor: "#0a0a0a",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    color: "#e5e5e5",
+    fontSize: 15,
+  },
+  addBtn: {
+    backgroundColor: "#0ea5e9",
+    borderRadius: 10,
+    paddingHorizontal: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addBtnText: { color: "#0a0a0a", fontWeight: "600", fontSize: 15 },
+  tasksLoading: { marginTop: 12, alignSelf: "flex-start" },
   task: {
     flexDirection: "row",
     alignItems: "center",
@@ -125,5 +229,5 @@ const styles = StyleSheet.create({
   check: { color: "#34d399", fontSize: 12 },
   taskText: { color: "#e5e5e5", fontSize: 15, flexShrink: 1 },
   taskTextDone: { color: "#737373", textDecorationLine: "line-through" },
-  footer: { color: "#525252", fontSize: 12, marginTop: 32, lineHeight: 18 },
+  footer: { color: "#525252", fontSize: 12, marginTop: 12, lineHeight: 18 },
 })

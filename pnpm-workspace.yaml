@@ -30,5 +30,5 @@ minimumReleaseAgeExclude:
 # bound to a *second* React copy — crashing SSR with "Invalid hook call". One
 # version means one copy.
 overrides:
-  react: 19.2.8
-  react-dom: 19.2.8
+  react: 19.2.3
+  react-dom: 19.2.3
