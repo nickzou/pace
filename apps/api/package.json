@@ -2,6 +2,9 @@
   "name": "@pace/api",
   "private": true,
   "type": "module",
+  "exports": {
+    "./router": "./src/trpc/router.ts"
+  },
   "scripts": {
     "dev": "nitro dev --port 3001",
     "build": "nitro build",
