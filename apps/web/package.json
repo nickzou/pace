@@ -15,8 +15,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pace/api-client": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "0.10.9",
+    "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-router": "1.170.18",
     "@tanstack/react-router-devtools": "1.167.0",
     "@tanstack/react-start": "1.168.35",
@@ -27,15 +29,15 @@
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
+    "@pace/tsconfig": "workspace:*",
     "@tanstack/devtools-vite": "0.8.3",
-    "@tauri-apps/cli": "^2",
     "@tanstack/router-cli": "^1.132.0",
+    "@tauri-apps/cli": "^2",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.2",
-    "vite": "^8.0.0",
-    "@pace/tsconfig": "workspace:*"
+    "vite": "^8.0.0"
   }
 }
