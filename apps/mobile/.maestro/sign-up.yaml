@@ -3,15 +3,24 @@
 # dev build installed + Metro running; the app must reach the API — see README).
 appId: app.paceproductivity.mobile
 ---
-# On a dev build, open the app to the sign-in screen first (see README) — we
-# drive the foreground app rather than launchApp, which lands on the dev-client
-# launcher. A preview/standalone build can use `- launchApp: { clearState: true }`.
+# Reach a clean signed-out start — the session persists in secure-store, so a
+# prior run (or a manual login) can leave the app signed in. (Dev build: we drive
+# the foreground app rather than launchApp, which lands on the dev-client launcher.
+# A preview/standalone build could use `- launchApp: { clearState: true }` instead.)
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
 - assertVisible: "Welcome back"
 
 # Unique email per run so repeated runs don't collide.
 - evalScript: ${output.email = 'maestro-' + Date.now() + '@pace.test'}
 
-# Switch to sign-up and register.
+# Switch to sign-up and register. The toggle resets the form, so fields start
+# empty even when flows run back-to-back against one long-lived app instance.
 - tapOn: "Need an account? Sign up"
 - assertVisible: "Create your account"
 - tapOn:
