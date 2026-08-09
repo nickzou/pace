@@ -1,16 +1,36 @@
-name: Mobile E2E (nightly)
+name: Mobile E2E
 
-# Runs the Maestro flows against a headless Android emulator. Nightly, because
-# building an APK + booting an emulator is slow — not a per-PR gate. Trigger by
-# hand from the Actions tab (workflow_dispatch) to iterate without waiting.
+# Runs the Maestro flows against a headless Android emulator. Building an APK +
+# booting an emulator is slow, so this does NOT gate every push like the web and
+# desktop suites. Instead it runs:
+#   - nightly, as a catch-all;
+#   - on PRs touching the mobile app or the shared packages/deps it's built on
+#     (see paths) — the changes that can break mobile while web + desktop stay
+#     green: a shared client change, the single-React override, a Renovate bump;
+#   - on demand from the Actions tab (workflow_dispatch).
 on:
   schedule:
     - cron: "0 7 * * *" # 07:00 UTC
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      # The backend the app talks to — its mobile-specific auth path (the expo()
+      # plugin + expo-origin header) isn't exercised by the web/desktop suites.
+      - "apps/api/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/mobile-e2e.yml"
+      - ".github/scripts/mobile-e2e.sh"
   workflow_dispatch:
 
 concurrency:
-  group: mobile-nightly
-  cancel-in-progress: false
+  # Per-ref so a new push to a PR cancels its own in-flight run; but let a
+  # scheduled nightly finish (only PR events cancel in progress).
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   mobile-e2e:
