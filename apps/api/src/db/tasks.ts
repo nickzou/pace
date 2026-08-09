@@ -1,12 +1,11 @@
 import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
-import { user } from "./schema"
+import { user } from "./auth"
 
 // The tasks table — the persistence mirror of @pace/validation's taskSchema
 // (M07), plus the DB-only `userId` owner (a row belongs to exactly one user).
 //
-// Kept in its own file, NOT in schema.ts, because `pnpm auth:generate`
-// regenerates schema.ts from the Better Auth config and would clobber anything
-// hand-added there.
+// Kept in its own file, NOT in auth.ts, because `pnpm auth:generate` regenerates
+// auth.ts from the Better Auth config and would clobber anything hand-added there.
 //
 // Timestamps are real `timestamptz` (Drizzle Date mode); the API converts them
 // to ISO strings at the edge to match the wire contract. `deletedAt` is a
