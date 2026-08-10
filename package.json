@@ -8,7 +8,7 @@
   },
   "scripts": {},
   "devDependencies": {
-    "@biomejs/biome": "2.4.15",
+    "@biomejs/biome": "2.5.7",
     "turbo": "^2.10.7"
   }
 }
