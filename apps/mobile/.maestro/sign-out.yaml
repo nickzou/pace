@@ -1,0 +1,42 @@
+# Mobile sign-out regression guard: tapping "Sign out" must return to the auth
+# screen AND leave the signed-in state. This is the bug we hit — the signed-in
+# gate got stuck, so the tap appeared to do nothing.
+appId: app.paceproductivity.mobile
+---
+# Reach a clean signed-out start (the session persists in secure-store, so a prior
+# run can leave the app signed in).
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user so we're signed in (unique email per run; the toggle resets
+# the form so fields start empty even across back-to-back flows).
+- evalScript: ${output.email = 'maestro-signout-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro SignOut"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Sign out — must land back on the auth screen and leave the signed-in state.
+- tapOn:
+    id: "sign-out"
+- assertVisible: "Welcome back"
+- assertNotVisible:
+    id: "signed-in"
