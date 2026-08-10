@@ -1,27 +1,22 @@
-import { dirname, resolve } from "node:path"
-import { fileURLToPath } from "node:url"
 import { defineConfig, devices } from "@playwright/test"
-import { config as loadEnv } from "dotenv"
 
-// Local dev reads Postgres creds from the repo-root .env; CI sets DATABASE_URL
-// in the environment (dotenv won't override an already-set var).
-const here = dirname(fileURLToPath(import.meta.url))
-loadEnv({ path: resolve(here, "../.env") })
-
-const BASE_DB_URL =
-  process.env.DATABASE_URL ?? "postgresql://pace:pace_dev_password@localhost:5432/pace"
-
-// Tests run against a dedicated database, never the dev one.
+// The e2e stack is fully self-contained (docker-compose.e2e.yml): its own Postgres
+// on 5433 (never the dev DB) plus a PowerSync service on 8180. global-setup.ts
+// brings it up before the run. Point everything here at it, so a run behaves
+// identically locally and in CI and never touches whatever you're developing.
+const BASE_DB_URL = "postgresql://pace:pace@localhost:5433/pace"
 const testDbUrl = new URL(BASE_DB_URL)
 testDbUrl.pathname = "/pace_test"
 const TEST_DB_URL = testDbUrl.toString()
-// Hand the derived URL to global-setup (same process, evaluated first).
+// Hand the URLs to global-setup (same process, evaluated first).
+process.env.E2E_BASE_DATABASE_URL = BASE_DB_URL
 process.env.TEST_DATABASE_URL = TEST_DB_URL
 
-// Dedicated ports so the e2e stack coexists with dev servers (web :3000 / API
-// :3001) — run tests without stopping whatever you're developing.
+// Dedicated ports so the e2e stack coexists with the dev servers (web :3000 /
+// API :3001 / PowerSync :8080).
 const WEB = "http://localhost:3100"
 const API = "http://localhost:3101"
+const POWERSYNC_URL = "http://localhost:8180"
 
 export default defineConfig({
   testDir: "./tests",
@@ -74,8 +69,9 @@ export default defineConfig({
       url: WEB,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
-      // VITE_API_URL is baked into the build; PORT is read by the node server.
-      env: { VITE_API_URL: API, PORT: "3100" },
+      // VITE_* are baked into the build; PORT is read by the node server. The web
+      // app syncs through the e2e PowerSync service (docker-compose.e2e.yml :8180).
+      env: { VITE_API_URL: API, VITE_POWERSYNC_URL: POWERSYNC_URL, PORT: "3100" },
     },
   ],
 })
