@@ -1,4 +1,5 @@
 import { expoClient } from "@better-auth/expo/client"
+import { jwtClient } from "better-auth/client/plugins"
 import { createAuthClient } from "better-auth/react"
 import * as Linking from "expo-linking"
 import * as SecureStore from "expo-secure-store"
@@ -19,10 +20,31 @@ export const authClient = createAuthClient({
       // SDK 57 SecureStore exposes the sync getItem/setItem the client expects.
       storage: SecureStore,
     }),
+    // jwtClient() exposes authClient.token() — the short-lived JWT the PowerSync
+    // connector hands to the sync service (verified via /api/auth/jwks).
+    jwtClient(),
   ],
 })
 
-export const { useSession, signIn, signUp, signOut } = authClient
+export const { useSession, signIn, signUp } = authClient
+
+// Wrap sign-out to also wipe the local PowerSync DB. This is the ONLY place we
+// clear it, so an incidental unmount (e.g. a transient session blip on reconnect)
+// can never drop local data — including offline writes still waiting to upload.
+export async function signOut() {
+  const result = await authClient.signOut()
+  const { clearDb } = await import("./powersync/db")
+  await clearDb()
+  return result
+}
+
+// True when a session is stored locally (in SecureStore). This is the offline-
+// durable source of truth for "am I logged in" — useSession().data blips to null
+// when the server is unreachable (offline / reconnect), but the stored session is
+// still valid, so the UI should stay signed in. Cleared by signOut().
+export function hasStoredSession(): boolean {
+  return !!authClient.getCookie()
+}
 
 // Headers the tRPC/api client must send so the API can find the session on
 // native: the stored session cookie (there's no cookie jar to send it

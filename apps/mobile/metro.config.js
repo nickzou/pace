@@ -18,4 +18,17 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules"),
 ]
 
+// 3. @powersync/react-native relies on module side effects at import time, which
+//    Metro's inline requires defer/break. Keep inline requires on everywhere
+//    except the PowerSync SDK. (PowerSync M11.)
+config.transformer.getTransformOptions = async () => ({
+  transform: {
+    inlineRequires: {
+      blockList: {
+        [require.resolve("@powersync/react-native")]: true,
+      },
+    },
+  },
+})
+
 module.exports = config
