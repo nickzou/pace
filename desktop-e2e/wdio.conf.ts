@@ -8,17 +8,19 @@ import postgres from "postgres"
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, "..")
 
-// Local dev reads Postgres creds from the repo-root .env; CI sets DATABASE_URL
-// in the environment (dotenv won't override an already-set var).
+// Loaded for BETTER_AUTH_SECRET etc. in local runs; CI sets those in the env.
 loadEnv({ path: resolve(repoRoot, ".env") })
 
-// Dedicated port/DB so the desktop suite coexists with the dev servers. Reuses
-// the Playwright suite's API port (3101) + pace_test DB — they never run at once.
+// The isolated e2e stack (docker-compose.e2e.yml): its own Postgres on 5433 + a
+// PowerSync service on 8180. Same stack the Playwright suite uses (they never run
+// at once), so the desktop app syncs through PowerSync during tests.
+const composeFile = resolve(repoRoot, "docker-compose.e2e.yml")
+
+// Dedicated port/DB so the desktop suite coexists with the dev servers.
 const API = "http://localhost:3101"
 const API_PORT = "3101"
 
-const BASE_DB_URL =
-  process.env.DATABASE_URL ?? "postgresql://pace:pace_dev_password@localhost:5432/pace"
+const BASE_DB_URL = "postgresql://pace:pace@localhost:5433/pace"
 const testDbUrl = new URL(BASE_DB_URL)
 testDbUrl.pathname = "/pace_test"
 const TEST_DB_URL = testDbUrl.toString()
@@ -121,6 +123,11 @@ export const config: WebdriverIO.Config = {
         "WEBKIT_WEB_DRIVER is not set — run inside `nix develop` (the flake exports it).",
       )
     }
+    // Bring up the e2e Postgres + PowerSync (the app was built pointing at :8180).
+    execSync(`docker compose -f "${composeFile}" up -d --wait`, {
+      cwd: repoRoot,
+      stdio: "inherit",
+    })
     await resetDb()
     await startApi()
   },

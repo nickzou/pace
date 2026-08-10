@@ -12,9 +12,31 @@ let dbPromise: Promise<AbstractPowerSyncDatabase> | null = null
 export function getDb(): Promise<AbstractPowerSyncDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      const { PowerSyncDatabase } = await import("@powersync/web")
+      const { PowerSyncDatabase, WASQLiteVFS } = await import("@powersync/web")
       const { AppSchema } = await import("./schema")
-      return new PowerSyncDatabase({ schema: AppSchema, database: { dbFilename: "pace.db" } })
+      // The desktop app (Tauri, served from tauri://) runs in a WebKitGTK webview
+      // that doesn't support the OPFS VFS wa-sqlite defaults to — so on desktop use
+      // the IndexedDB VFS, which every engine supports. Real browsers keep the
+      // default (OPFS: faster, and validated by the web e2e).
+      const isDesktop =
+        window.location.protocol === "tauri:" || window.location.hostname === "tauri.localhost"
+      return new PowerSyncDatabase({
+        schema: AppSchema,
+        database: {
+          dbFilename: "pace.db",
+          // Tauri's WebKitGTK webview: use the IndexedDB VFS (no OPFS) and run
+          // SQLite on the main thread. Packaged tauri:// web/shared workers don't
+          // load reliably, which hung the default worker-based setup. A single-
+          // window desktop app doesn't need the worker offload or multi-tab sync.
+          ...(isDesktop
+            ? {
+                vfs: WASQLiteVFS.IDBBatchAtomicVFS,
+                useWebWorker: false,
+                enableMultiTabs: false,
+              }
+            : {}),
+        },
+      })
     })()
   }
   return dbPromise
