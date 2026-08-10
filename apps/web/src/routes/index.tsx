@@ -1,8 +1,8 @@
-import { useTRPC } from "@pace/api-client"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { usePowerSync, useQuery } from "@powersync/react"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
+import { PowerSyncProvider } from "#/lib/powersync/provider"
 
 export const Route = createFileRoute("/")({ component: Home })
 
@@ -43,53 +43,16 @@ function AuthBar() {
   )
 }
 
+// Renders the local database only in the browser, for a signed-in user.
+// @powersync/web (wa-sqlite) can't run during SSR, and there's nothing to sync
+// until we can mint a token — so gate on both `mounted` and `session` before
+// mounting the provider, which owns the DB lifecycle.
 function Tasks() {
-  const { data: session, isPending: sessionPending } = useSession()
-  const trpc = useTRPC()
-  const queryClient = useQueryClient()
-  const [title, setTitle] = useState("")
+  const { data: session, isPending } = useSession()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
-  const listKey = trpc.tasks.list.queryKey()
-  const tasks = useQuery({ ...trpc.tasks.list.queryOptions(), enabled: !!session })
-
-  const createTask = useMutation(
-    trpc.tasks.create.mutationOptions({
-      // Optimistic: drop the new task into the cached list immediately, roll back
-      // on error, and re-fetch on settle to reconcile with the server.
-      onMutate: async (input) => {
-        await queryClient.cancelQueries({ queryKey: listKey })
-        const previous = queryClient.getQueryData(listKey)
-        const now = new Date().toISOString()
-        queryClient.setQueryData(listKey, (old = []) => [
-          {
-            id: `optimistic-${now}`,
-            title: input.title,
-            description: input.description ?? "",
-            completed: false,
-            createdAt: now,
-            updatedAt: now,
-            deletedAt: null,
-          },
-          ...old,
-        ])
-        return { previous }
-      },
-      onError: (_error, _input, context) => {
-        if (context?.previous) queryClient.setQueryData(listKey, context.previous)
-      },
-      onSettled: () => queryClient.invalidateQueries({ queryKey: listKey }),
-    }),
-  )
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault()
-    const trimmed = title.trim()
-    if (!trimmed) return
-    createTask.mutate({ title: trimmed })
-    setTitle("")
-  }
-
-  if (sessionPending) return <p className="text-sm text-neutral-500">…</p>
+  if (isPending || !mounted) return <p className="text-sm text-neutral-500">…</p>
   if (!session) {
     return (
       <p className="text-sm text-neutral-400">
@@ -102,12 +65,53 @@ function Tasks() {
   }
 
   return (
+    <PowerSyncProvider>
+      <TaskList />
+    </PowerSyncProvider>
+  )
+}
+
+// Reads and writes go straight to local SQLite. useQuery is live — it re-runs
+// whenever the tasks table changes, whether from a local write or a row synced
+// down from the server — so there's no cache to invalidate and no optimistic
+// bookkeeping. PowerSync uploads the local writes to the API in the background.
+type TaskRow = { id: string; title: string; completed: number }
+
+function TaskList() {
+  const db = usePowerSync()
+  const [title, setTitle] = useState("")
+  const { data: tasks, isLoading } = useQuery<TaskRow>(
+    "SELECT id, title, completed FROM tasks ORDER BY created_at DESC",
+  )
+
+  async function add(event: FormEvent) {
+    event.preventDefault()
+    const trimmed = title.trim()
+    if (!trimmed) return
+    const now = new Date().toISOString()
+    await db.execute(
+      "INSERT INTO tasks (id, title, description, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), trimmed, "", 0, now, now],
+    )
+    setTitle("")
+  }
+
+  const toggle = (task: TaskRow) =>
+    db.execute("UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?", [
+      task.completed ? 0 : 1,
+      new Date().toISOString(),
+      task.id,
+    ])
+
+  const remove = (id: string) => db.execute("DELETE FROM tasks WHERE id = ?", [id])
+
+  return (
     <section>
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-neutral-400">
         Tasks
       </h2>
 
-      <form onSubmit={onSubmit} className="mb-4 flex gap-2">
+      <form onSubmit={add} className="mb-4 flex gap-2">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
@@ -116,27 +120,28 @@ function Tasks() {
         />
         <button
           type="submit"
-          disabled={!title.trim() || createTask.isPending}
+          disabled={!title.trim()}
           className="rounded-lg bg-sky-500 px-4 py-2 font-medium text-neutral-950 transition hover:bg-sky-400 disabled:opacity-50"
         >
           Add
         </button>
       </form>
 
-      {tasks.isPending ? (
+      {isLoading ? (
         <p className="text-sm text-neutral-500">Loading…</p>
-      ) : tasks.isError ? (
-        <p className="text-sm text-red-400">Couldn't load tasks.</p>
-      ) : tasks.data.length === 0 ? (
+      ) : tasks.length === 0 ? (
         <p className="text-sm text-neutral-500">No tasks yet — add your first above.</p>
       ) : (
         <ul className="space-y-2">
-          {tasks.data.map((task) => (
+          {tasks.map((task) => (
             <li
               key={task.id}
               className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3"
             >
-              <span
+              <button
+                type="button"
+                onClick={() => toggle(task)}
+                aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
                 className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
                   task.completed
                     ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
@@ -144,10 +149,18 @@ function Tasks() {
                 }`}
               >
                 {task.completed ? "✓" : ""}
-              </span>
-              <span className={task.completed ? "text-neutral-500 line-through" : ""}>
+              </button>
+              <span className={`flex-1 ${task.completed ? "text-neutral-500 line-through" : ""}`}>
                 {task.title}
               </span>
+              <button
+                type="button"
+                onClick={() => remove(task.id)}
+                aria-label="Delete task"
+                className="text-neutral-600 transition hover:text-red-400"
+              >
+                ✕
+              </button>
             </li>
           ))}
         </ul>

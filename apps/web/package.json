@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@pace/api-client": "workspace:*",
+    "@powersync/react": "^2.0.0",
+    "@powersync/web": "^2.1.1",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "0.10.9",
     "@tanstack/react-query": "^5.101.4",
@@ -38,6 +40,7 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.2",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "vite-plugin-wasm": "^3.6.0"
   }
 }

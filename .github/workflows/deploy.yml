@@ -67,27 +67,16 @@ jobs:
         # their own jobs/workflows (browsers, drivers, emulators).
         run: pnpm turbo test --filter=@pace/api --filter=@pace/validation
 
-  # End-to-end auth flow (web → API → Postgres) in a real browser.
+  # End-to-end tasks/auth flow (web → API → Postgres, synced via PowerSync) in a
+  # real browser. The e2e infra — Postgres (wal_level=logical) + a PowerSync
+  # service + bucket storage — is the docker-compose.e2e.yml stack that
+  # global-setup.ts brings up (a plain service container can't set wal_level).
+  # Ports / URLs live in playwright.config.ts.
   e2e:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: pace
-          POSTGRES_PASSWORD: pace
-          POSTGRES_DB: pace
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U pace"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      # The E2E stack reads these from the environment (there's no .env in CI).
-      # Ports / origins are set per-server in playwright.config.ts.
-      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      # The API server needs its auth secret from the environment (no .env in CI);
+      # the DB URL + PowerSync URL are set per-server in playwright.config.ts.
       BETTER_AUTH_SECRET: ci-e2e-secret-not-used-in-prod
     steps:
       - uses: actions/checkout@v7

@@ -17,22 +17,10 @@ jobs:
   desktop-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: pace
-          POSTGRES_PASSWORD: pace
-          POSTGRES_DB: pace
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U pace"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      # DB + PowerSync come from docker-compose.e2e.yml, which wdio.conf brings up
+      # in onPrepare (a service container can't set wal_level=logical). The API
+      # just needs its auth secret from the environment.
       BETTER_AUTH_SECRET: ci-desktop-secret-not-used-in-prod
       # The apt `webkit2gtk-driver` package installs the native WebDriver here;
       # wdio.conf hands it to tauri-driver via --native-driver.
@@ -71,12 +59,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Build via the npm Tauri CLI (@tauri-apps/cli) — its prebuilt binary runs
-      # on ubuntu (local uses nix cargo-tauri). Bakes VITE_API_URL at :3101.
+      # on ubuntu (local uses nix cargo-tauri). Bakes VITE_API_URL :3101 +
+      # VITE_POWERSYNC_URL :8180.
       - name: Build desktop app
         run: pnpm --filter @pace/desktop-e2e build:app:ci
 
-      # wdio.conf resets pace_test, starts the API on :3101, spawns tauri-driver,
-      # and drives the app. xvfb gives the GTK window a display.
+      # wdio.conf brings up the e2e Postgres + PowerSync (docker-compose.e2e.yml),
+      # migrates pace_test, starts the API on :3101, spawns tauri-driver, and
+      # drives the app. xvfb gives the GTK window a display.
       - name: Run desktop e2e
         run: xvfb-run -a pnpm --filter @pace/desktop-e2e test
 

@@ -1,3 +1,4 @@
+import { jwtClient } from "better-auth/client/plugins"
 import { createAuthClient } from "better-auth/react"
 
 // The packaged desktop app is served from tauri:// (Linux/macOS) or
@@ -24,6 +25,9 @@ export function getStoredToken(): string | null {
 
 export const authClient = createAuthClient({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:3001",
+  // jwtClient() exposes authClient.token(), which mints the short-lived JWT the
+  // PowerSync connector hands to the sync service (verified via /api/auth/jwks).
+  plugins: [jwtClient()],
   fetchOptions: useTokens
     ? {
         onSuccess: (ctx) => {
@@ -45,5 +49,9 @@ export const { signIn, signUp, useSession } = authClient
 export async function signOut() {
   const result = await authClient.signOut()
   if (useTokens) localStorage.removeItem(TOKEN_KEY)
+  // Wipe the local PowerSync DB — the only place we clear it, so an incidental
+  // unmount never drops local data. Dynamic import keeps wa-sqlite out of SSR.
+  const { clearDb } = await import("./powersync/db")
+  await clearDb()
   return result
 }

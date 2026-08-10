@@ -1,0 +1,75 @@
+name: pace-e2e
+
+# Isolated infrastructure for the Playwright e2e run: its own Postgres (never the
+# dev DB) plus a PowerSync service wired to it, so the offline-first tasks UI
+# actually syncs during tests. Used by both local runs (started by global-setup.ts)
+# and CI. Dedicated ports so it coexists with the dev stack (docker-compose.yml).
+#
+#   docker compose -f docker-compose.e2e.yml up -d --wait
+
+services:
+  # The e2e source DB. wal_level=logical for PowerSync replication. Published on
+  # 5433 so it doesn't collide with the dev Postgres on 5432. The `pace` DB exists
+  # for global-setup's admin connection; it then creates + migrates `pace_test`.
+  postgres:
+    image: postgres:17-alpine
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: pace
+      POSTGRES_PASSWORD: pace
+      POSTGRES_DB: pace
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pace -d pace"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # PowerSync's sync bucket storage (internal only).
+  powersync-storage:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pace
+      POSTGRES_PASSWORD: pace
+      POSTGRES_DB: powersync
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pace -d powersync"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # PowerSync, reusing ./powersync/service.yaml but env-pointed at the e2e stack:
+  # it replicates pace_test and validates client JWTs against the test API's JWKS,
+  # which Playwright starts on the host at :3101. Published on 8180.
+  powersync:
+    image: journeyapps/powersync-service:1.23.3
+    command: ["start", "-r", "unified"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      powersync-storage:
+        condition: service_healthy
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./powersync:/config
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      PS_DATA_SOURCE_URI: postgresql://pace:pace@postgres:5432/pace_test
+      PS_STORAGE_SOURCE_URI: postgresql://pace:pace@powersync-storage:5432/powersync
+      PS_JWKS_URL: http://host.docker.internal:3101/api/auth/jwks
+      PS_PORT: "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8080/probes/liveness').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 2s
+      retries: 30
