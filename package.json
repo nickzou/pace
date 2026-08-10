@@ -6,7 +6,18 @@
   "engines": {
     "node": ">=24.16.0"
   },
-  "scripts": {},
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:api": "pnpm --filter @pace/api dev",
+    "dev:web": "pnpm --filter @pace/web dev",
+    "dev:desktop": "pnpm --filter @pace/web exec cargo tauri dev",
+    "dev:mobile": "pnpm --filter @pace/mobile start",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test --filter=@pace/api --filter=@pace/validation",
+    "check": "biome check . && turbo typecheck && turbo test --filter=@pace/api --filter=@pace/validation",
+    "format": "biome check --write ."
+  },
   "devDependencies": {
     "@biomejs/biome": "2.5.7",
     "turbo": "^2.10.7"

@@ -1,7 +1,9 @@
 # Pace
 
 A personal productivity app — *set your own pace*. Built as a self-managed
-learning project across web, desktop, and mobile, sharing one backend.
+learning project across web, desktop, and mobile — **offline-first**, sharing one
+backend: every client reads and writes a local SQLite database that a self-hosted
+PowerSync service keeps in sync with Postgres.
 
 ## Workspaces
 
@@ -12,43 +14,67 @@ A pnpm + Turborepo monorepo:
 | `@pace/api` | `apps/api` | Standalone Nitro API server + Better Auth, Postgres via Drizzle |
 | `@pace/web` | `apps/web` | TanStack Start web app (also hosts the Tauri desktop shell in `src-tauri/`) |
 | `@pace/mobile` | `apps/mobile` | Expo / React Native app |
+| `@pace/api-client` | `packages/api-client` | Shared tRPC client factory + provider |
+| `@pace/validation` | `packages/validation` | Shared Zod schemas — the domain model |
 | `@pace/tsconfig` | `packages/tsconfig` | Shared TypeScript base config |
-| `@pace/e2e` | `e2e` | Playwright end-to-end tests (web → API → Postgres) |
+| `@pace/e2e` | `e2e` | Playwright end-to-end tests (web) |
+| `@pace/desktop-e2e` | `desktop-e2e` | WebdriverIO + tauri-driver desktop tests |
 
-All clients talk to `@pace/api` over HTTP: web + desktop authenticate with
-cookies, mobile with a secure-store token.
+Sync flows through a self-hosted **PowerSync** service (in `docker-compose.yml`,
+config in `powersync/`): it replicates Postgres down into each client's local
+SQLite, and local writes replay **up** through `@pace/api`'s tRPC procedures — no
+separate write backend. Auth: web via cookies, desktop via a bearer token (served
+from `tauri://`), mobile via a secure-store token; PowerSync itself authenticates
+with a short-lived JWT from Better Auth's JWKS.
 
 ## Prerequisites
 
 - **Node** ≥ 24.16.0 and **pnpm** 11.9.0 (`packageManager` is pinned)
-- **Docker** — local Postgres runs via `docker-compose.yml`
+- **Docker** — Postgres, the PowerSync sync service, and its bucket storage all
+  run via `docker-compose.yml`
+
+## Quickstart
+
+From a clean clone to a running web + API:
 
 ```bash
 pnpm install
-cp .env.example .env          # then adjust values
-docker compose up -d          # start local Postgres
-pnpm --filter @pace/api db:migrate   # apply the schema
+cp .env.example .env                 # then adjust values (set a Better Auth secret)
+docker compose up -d                 # Postgres + PowerSync + bucket storage
+pnpm --filter @pace/api db:migrate   # schema + the PowerSync replication publication
+pnpm dev                             # API (:3001) + web (:3000), via Turbo
 ```
+
+The web app is then at http://localhost:3000. The desktop shell and mobile app
+are separate launches — see below.
 
 ## Running things
 
-There is **no root-level script** — each workspace owns its scripts. Run them
-by `cd`-ing into the folder, or from anywhere with `--filter`:
+Root scripts drive the whole monorepo through Turborepo:
 
-```bash
-cd apps/api && pnpm dev              # from the folder
-pnpm --filter @pace/api dev          # from anywhere (root included)
-```
+| Command | What it does |
+|---|---|
+| `pnpm dev` | API + web together — the everyday inner loop |
+| `pnpm dev:api` | just the API (`:3001`) |
+| `pnpm dev:web` | just the web app (`:3000`) |
+| `pnpm dev:desktop` | the Tauri desktop shell — starts web *and* the native window (needs `nix develop` for the Rust/Tauri toolchain) |
+| `pnpm dev:mobile` | Metro for the Expo app (needs a connected device/emulator) |
+| `pnpm build` | build every workspace, in dependency order (Turbo-cached) |
+| `pnpm typecheck` | typecheck all workspaces |
+| `pnpm test` | unit / integration tests (API + shared schemas) |
+| `pnpm check` | Biome + typecheck + tests — the pre-push gate |
+| `pnpm format` | Biome autofix |
 
-Bring several up together with Turborepo:
+Or target one workspace from anywhere with `--filter` (e.g.
+`pnpm --filter @pace/api dev`), or `cd` into it and run its own scripts.
 
-```bash
-pnpm turbo dev --filter=@pace/api --filter=@pace/web   # API + web
-pnpm turbo typecheck                                    # typecheck all apps
-pnpm turbo build                                        # build everything, in dependency order
-```
+`dev:web`, `dev:desktop`, and `dev:mobile` each need the **API reachable** — run
+`pnpm dev:api` alongside (or `pnpm dev` for API + web) — plus the infra up
+(`docker compose up -d` and `db:migrate`). `dev:desktop` starts its own web
+server, so don't also have `dev` / `dev:web` running on `:3000`.
 
-Default dev ports: **web** `:3000`, **API** `:3001`, **Postgres** `:5432`.
+Default dev ports: **web** `:3000`, **API** `:3001`, **PowerSync** `:8080`,
+**Postgres** `:5432`.
 
 ### `@pace/api` — `apps/api` (needs Postgres running)
 
@@ -86,8 +112,9 @@ in the Nix dev shell. In dev it loads the web app at `localhost:3000`.
 | `typecheck` | `tsc --noEmit` |
 
 EAS builds (`eas build …`) use the EAS CLI, not a pnpm script. On-device runs
-need `EXPO_PUBLIC_API_URL` set to your machine's LAN IP (see
-`apps/mobile/.env.example`).
+need `EXPO_PUBLIC_API_URL` **and** `EXPO_PUBLIC_POWERSYNC_URL` pointed at your
+machine's LAN IP (see `apps/mobile/.env.example`). Adding a native dependency
+means a fresh EAS dev build; JS-only changes are served live by Metro.
 
 ### `@pace/e2e` — `e2e`
 
@@ -99,7 +126,7 @@ Playwright end-to-end tests (the auth flow, web → API → Postgres, in a real 
 | `test:ui` | `playwright test --ui` |
 | `typecheck` | `tsc --noEmit` |
 
-Tests run against a dedicated **`pace_test`** database (created, migrated, and truncated automatically) and the **production web build** — both started by Playwright on dedicated ports (web `:3100`, API `:3101`), so the suite coexists with your dev servers. Postgres must be up (`docker compose up -d`).
+Tests run against a **fully isolated stack** that `global-setup` brings up automatically — its own Postgres (`:5433`) and PowerSync service (`:8180`) from `docker-compose.e2e.yml`, plus the **production** API + web builds on dedicated ports (API `:3101`, web `:3100`). Nothing touches your dev database, so the suite coexists with your running dev servers; Docker just needs to be available. The tasks spec proves the real sync round-trip: a write in one browser context appears in a second, fresh one.
 
 **NixOS browsers:** Playwright's prebuilt browsers don't run on NixOS, so the flake's dev shell wires up the nix-provided ones (`PLAYWRIGHT_BROWSERS_PATH`). Enter it first:
 
