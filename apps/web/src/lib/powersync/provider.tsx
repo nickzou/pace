@@ -4,10 +4,10 @@ import type { AbstractPowerSyncDatabase } from "@powersync/web"
 import { type ReactNode, useEffect, useState } from "react"
 
 // Provides a connected PowerSync database to its children. Mount it only on the
-// client, behind a signed-in check (see the caller) — it should never render
-// during SSR, because @powersync/web pulls in wa-sqlite (WASM + web workers),
-// which only exist in the browser. That's why the SDK, schema, and connector are
-// all dynamically imported inside the effect rather than imported at module top.
+// client, behind a signed-in check (see the caller) — it must never render during
+// SSR, because @powersync/web pulls in wa-sqlite (WASM + web workers), which only
+// exists in the browser. The DB itself is a lazy singleton (./db) that dynamic-
+// imports the SDK, so nothing PowerSync-related loads server-side.
 export function PowerSyncProvider({ children }: { children: ReactNode }) {
   const trpc = useTRPCClient()
   const [db, setDb] = useState<AbstractPowerSyncDatabase | null>(null)
@@ -17,24 +17,21 @@ export function PowerSyncProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     void (async () => {
-      const [{ PowerSyncDatabase }, { AppSchema }, { createConnector }] = await Promise.all([
-        import("@powersync/web"),
-        import("./schema"),
+      const [{ getDb }, { createConnector }] = await Promise.all([
+        import("./db"),
         import("./connector"),
       ])
-      database = new PowerSyncDatabase({
-        schema: AppSchema,
-        database: { dbFilename: "pace.db" },
-      })
+      database = await getDb()
       await database.connect(createConnector(trpc))
       if (!cancelled) setDb(database)
     })().catch((err) => console.error("PowerSync init failed", err))
 
     return () => {
       cancelled = true
-      // The caller unmounts this on sign-out, so wipe the local DB — the next
-      // user must not inherit the previous user's rows.
-      database?.disconnectAndClear().catch(() => {})
+      // Disconnect but do NOT clear — a transient unmount (navigation, a session
+      // blip) must not drop local rows or the pending upload queue. Clearing
+      // happens only on an explicit sign-out (see lib/auth-client).
+      void database?.disconnect()
     }
   }, [trpc])
 

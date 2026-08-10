@@ -49,5 +49,9 @@ export const { signIn, signUp, useSession } = authClient
 export async function signOut() {
   const result = await authClient.signOut()
   if (useTokens) localStorage.removeItem(TOKEN_KEY)
+  // Wipe the local PowerSync DB — the only place we clear it, so an incidental
+  // unmount never drops local data. Dynamic import keeps wa-sqlite out of SSR.
+  const { clearDb } = await import("./powersync/db")
+  await clearDb()
   return result
 }
