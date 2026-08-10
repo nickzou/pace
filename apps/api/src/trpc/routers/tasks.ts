@@ -34,19 +34,32 @@ export const tasksRouter = router({
     return rows.map(toTask)
   }),
 
-  // id + timestamps are DB-generated here (server-minted uuid); moving the mint
-  // to the client is an M11 change.
+  // The client may mint the id (PowerSync offline creates); fall back to the DB
+  // default when it's absent. Timestamps stay server-owned.
+  //
+  // When an id is supplied we upsert: PowerSync retries an upload whose ack was
+  // lost, so a plain insert would hit a duplicate-key error on the retry. The
+  // setWhere scopes the conflict update to the owner, so a guessed id can never
+  // overwrite another user's row.
   create: protectedProcedure.input(newTaskSchema).mutation(async ({ ctx, input }) => {
-    const [row] = await ctx.db
-      .insert(tasks)
-      .values({
-        userId: ctx.userId,
-        title: input.title,
-        description: input.description,
-        completed: input.completed,
-      })
-      .returning()
-    if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" })
+    const values = {
+      userId: ctx.userId,
+      title: input.title,
+      description: input.description,
+      completed: input.completed,
+    }
+    const [row] = input.id
+      ? await ctx.db
+          .insert(tasks)
+          .values({ id: input.id, ...values })
+          .onConflictDoUpdate({
+            target: tasks.id,
+            set: { title: input.title, description: input.description, completed: input.completed },
+            setWhere: eq(tasks.userId, ctx.userId),
+          })
+          .returning()
+      : await ctx.db.insert(tasks).values(values).returning()
+    if (!row) throw new TRPCError({ code: "CONFLICT" })
     return toTask(row)
   }),
 

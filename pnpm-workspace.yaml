@@ -20,6 +20,9 @@ allowBuilds:
   # Tauri suite uses WebKitWebDriver, so skip their browser-driver downloads.
   edgedriver: false
   geckodriver: false
+  # PowerSync's local SQLite engine. @powersync/web ships the prebuilt wasm, so
+  # wa-sqlite's own native build isn't needed — skip it.
+  "@journeyapps/wa-sqlite": false
 
 minimumReleaseAgeExclude:
   - expo-constants@57.0.9

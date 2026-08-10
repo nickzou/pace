@@ -20,14 +20,17 @@ export const taskSchema = z.object({
 
 export type Task = z.infer<typeof taskSchema>
 
-// What a client supplies to create a task; the server owns id + timestamps.
-// Derived from taskSchema so it can never drift from it (description/completed keep
-// their defaults, so they're optional here).
-export const newTaskSchema = taskSchema.pick({
-  title: true,
-  description: true,
-  completed: true,
-})
+// What a client supplies to create a task. `id` is optional: PowerSync clients
+// mint the uuid locally so a task created offline has a stable identity before it
+// ever reaches the server; callers that omit it get a DB-minted id. Timestamps
+// stay server-owned. Derived from taskSchema so it can never drift from it.
+export const newTaskSchema = taskSchema
+  .pick({
+    title: true,
+    description: true,
+    completed: true,
+  })
+  .extend({ id: taskSchema.shape.id.optional() })
 
 export type NewTask = z.infer<typeof newTaskSchema>
 
