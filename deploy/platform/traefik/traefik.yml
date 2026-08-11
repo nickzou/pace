@@ -1,0 +1,23 @@
+# Traefik static config for the shared platform edge. Same as the single-env
+# deploy/traefik/traefik.yml, plus `network: pace-net` so Traefik always reaches
+# env containers over the shared network (they're on pace-net only, but pinning
+# it is explicit and future-proofs multi-network containers).
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: pace-net
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true

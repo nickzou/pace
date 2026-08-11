@@ -48,3 +48,6 @@ Thumbs.db
 
 # Test / coverage
 coverage/
+
+# Generated per-environment deploy files (hold secrets)
+deploy/envs/

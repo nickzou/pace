@@ -1,0 +1,79 @@
+# Per-environment stack: api + powersync + web. One template, many instances —
+# every value comes from a generated env file (deploy/bin/render-env.sh), and the
+# project name isolates the container set. The shared Traefik + Postgres live in
+# deploy/platform. Brought up by deploy/bin/up.sh <env>.
+#
+# Routing is single-host + path-based (one hostname per env, so the wildcard cert
+# covers it): / -> web, /api -> api, /powersync -> powersync. Router/service and
+# network-alias names are namespaced by ${STACK} so many envs share one Traefik.
+
+services:
+  api:
+    image: ${IMAGE_API}
+    restart: unless-stopped
+    environment:
+      PORT: "3001"
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS}
+    networks:
+      pace-net:
+        # Per-env alias so powersync can reach *this* env's API for JWKS without
+        # colliding with other envs' `api` service on the shared network.
+        aliases:
+          - ${STACK}-api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${STACK}-api.rule=Host(`${HOST}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.${STACK}-api.entrypoints=websecure"
+      - "traefik.http.routers.${STACK}-api.tls=true"
+      - "traefik.http.services.${STACK}-api.loadbalancer.server.port=3001"
+
+  powersync:
+    image: ${POWERSYNC_IMAGE}
+    restart: unless-stopped
+    command: ["start", "-r", "unified"]
+    volumes:
+      - ../../powersync:/config:ro
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      PS_DATA_SOURCE_URI: ${PS_DATA_SOURCE_URI}
+      PS_STORAGE_SOURCE_URI: ${PS_STORAGE_SOURCE_URI}
+      PS_JWKS_URL: ${PS_JWKS_URL}
+      PS_PORT: "8080"
+    networks:
+      - pace-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${STACK}-sync.rule=Host(`${HOST}`) && PathPrefix(`/powersync`)"
+      - "traefik.http.routers.${STACK}-sync.entrypoints=websecure"
+      - "traefik.http.routers.${STACK}-sync.tls=true"
+      # Strip /powersync so the service sees its own root paths (/sync/stream, …).
+      - "traefik.http.routers.${STACK}-sync.middlewares=${STACK}-sync-strip"
+      - "traefik.http.middlewares.${STACK}-sync-strip.stripprefix.prefixes=/powersync"
+      - "traefik.http.services.${STACK}-sync.loadbalancer.server.port=8080"
+
+  web:
+    image: ${IMAGE_WEB}
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+      # Browser-facing URLs injected into the SSR HTML at runtime (getConfig()).
+      API_URL: ${API_URL}
+      POWERSYNC_URL: ${POWERSYNC_URL}
+    networks:
+      - pace-net
+    labels:
+      - "traefik.enable=true"
+      # Host-only rule — lower priority than the /api and /powersync routers
+      # above, so it catches everything else for this host.
+      - "traefik.http.routers.${STACK}-web.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.${STACK}-web.entrypoints=websecure"
+      - "traefik.http.routers.${STACK}-web.tls=true"
+      - "traefik.http.services.${STACK}-web.loadbalancer.server.port=3000"
+
+networks:
+  pace-net:
+    external: true
+    name: pace-net

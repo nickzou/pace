@@ -1,0 +1,64 @@
+name: pace-platform
+
+# The shared layer — run ONCE per box. Every environment stack (deploy/stack)
+# attaches to what this provides:
+#   - traefik: the single edge proxy. Routes to each env's containers by their
+#     Docker labels (Host + PathPrefix), so new environments route themselves.
+#   - postgres: ONE database *server* holding a database per environment
+#     (pace_<env> + powersync_<env>). Far lighter than a Postgres per env — the
+#     whole point of the "shared Postgres" resource strategy.
+#
+#   docker compose -f deploy/platform/docker-compose.yml up -d
+
+services:
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ../certs:/certs:ro
+    networks:
+      - pace-net
+
+  postgres:
+    image: postgres:17-alpine
+    # Fixed name so every env's DATABASE_URL can reach it as `pace-postgres`.
+    container_name: pace-postgres
+    restart: unless-stopped
+    # wal_level=logical for PowerSync; extra slots/senders so several envs can
+    # each hold their own publication + replication slot on the one server.
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=20"
+      - "-c"
+      - "max_wal_senders=20"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pace}
+      # A bootstrap DB only; each env gets its own DB created by deploy/bin/up.sh.
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - pace-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Shared, stable-named network the per-env stacks join as `external`.
+networks:
+  pace-net:
+    name: pace-net
+
+volumes:
+  pgdata:
