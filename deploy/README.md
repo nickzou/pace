@@ -8,31 +8,38 @@ and one set of images**. An environment is just a *value-set* — a generated
 
 ```
 deploy/
-  platform/          # run ONCE per box
-    docker-compose.yml   # Traefik (shared edge) + Postgres (shared server)
+  platform/          # run ONCE per box — STATELESS
+    docker-compose.yml   # Traefik (shared edge) + the shared network. No data.
     traefik/             # static + TLS config (wildcard Cloudflare Origin cert)
-  stack/             # run PER environment
-    docker-compose.yml   # api + powersync + web, fully parameterized
+  stack/             # run PER environment — owns ALL its state
+    docker-compose.yml   # postgres + powersync-storage + api + powersync + web
     env.template         # every variable an env needs (documentation)
   bin/
     render-env.sh        # env name  → derives values → writes envs/<env>.env
-    up.sh                # render → create DBs → migrate → compose up
-    down.sh              # compose down -v → drop DBs
+    up.sh                # render → DBs up → migrate → compose up
+    down.sh              # compose down -v  (deletes the env's Postgres volumes)
   envs/              # generated per-env .env files (gitignored — secrets)
   docker-compose.yml # LEGACY single-env stack (current prod; superseded)
 ```
 
 Images (built once, used by every env): `Dockerfile` → web, `Dockerfile.api` →
-api (which also has a `migrate` target the scripts use for drizzle migrations).
+api. `Dockerfile.api` also has a `migrate` target — the same source built as a
+one-off image that applies drizzle migrations, used by `up.sh`.
 
 ## The model
 
+- **Stateless shared platform.** The only shared thing is **Traefik** + its
+  network — it holds no data. So bringing it up (or restarting it) can never
+  lose an environment's data, and it's safe to bootstrap from CI.
+- **Each env owns its state.** A per-env stack runs its **own** Postgres +
+  powersync-storage. Isolation is a separate container + volume per env — a
+  faithful prod replica, and teardown is just `compose down -v` (no shared
+  database to prune, no orphaned replication slots affecting other envs).
 - **One Traefik** routes every environment by container labels. Each env is one
-  hostname with path-based routing: `/` → web, `/api` → api, `/powersync` →
-  powersync. One hostname per env keeps it under the wildcard cert.
-- **One Postgres server** holds a database per env (`pace_<env>` +
-  `powersync_<env>`) — the "shared Postgres" resource strategy, so many previews
-  fit on a small box.
+  hostname with path routing: `/` → web, `/api` → api, `/powersync` →
+  powersync. One hostname per env keeps it under the wildcard cert. Internal
+  traffic (api/powersync → postgres, powersync → api) uses each env's private
+  network, so plain service names never collide across envs.
 - **One web image** serves every env: it reads its API/PowerSync URLs at runtime
   from container env (`API_URL` / `POWERSYNC_URL` → injected as
   `window.__PACE_CONFIG__`), instead of baking them in at build time.
@@ -59,6 +66,10 @@ deploy/bin/down.sh pr-101
 BASE_DOMAIN=paceproductivity.app deploy/bin/render-env.sh pr-101
 cat deploy/envs/pr-101.env
 ```
+
+Each env's Postgres is a container with its own volume — `up.sh` starts it,
+waits for it, then runs migrations against it before starting the app. There is
+no shared database server.
 
 ## Prerequisites (one-time, Cloudflare side)
 

@@ -1,16 +1,79 @@
-# Per-environment stack: api + powersync + web. One template, many instances —
-# every value comes from a generated env file (deploy/bin/render-env.sh), and the
-# project name isolates the container set. The shared Traefik + Postgres live in
-# deploy/platform. Brought up by deploy/bin/up.sh <env>.
+# Per-environment stack — its OWN Postgres + powersync-storage + api + powersync
+# + web. Fully isolated: all state lives here, so teardown is `compose down -v`
+# with nothing shared to clean up. One template, many instances — every value
+# comes from a generated env file (deploy/bin/render-env.sh), the project name
+# (${STACK}) isolates the container set + its volumes, and the stack joins the
+# shared platform only for edge routing. Brought up by deploy/bin/up.sh <env>.
 #
-# Routing is single-host + path-based (one hostname per env, so the wildcard cert
-# covers it): / -> web, /api -> api, /powersync -> powersync. Router/service and
-# network-alias names are namespaced by ${STACK} so many envs share one Traefik.
+# Networks:
+#   default  — this env's PRIVATE network (per compose project). All internal
+#              traffic (api/powersync → postgres, powersync → api for JWKS) uses
+#              it, so plain service names resolve unambiguously per env.
+#   pace-net — the shared platform network. ONLY the edge services join it, so
+#              Traefik can reach them. They also get a ${STACK}-prefixed alias
+#              there: the generic name (`api`) is ambiguous across envs on a
+#              shared network, so powersync targets the unique ${STACK}-api.
+#
+# Routing is single-host + path-based (one hostname per env → wildcard cert):
+#   /          -> web       /api -> api       /powersync -> powersync
 
 services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    # wal_level=logical so PowerSync can replicate this env's tasks off the WAL.
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d pace"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  powersync-storage:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: powersync
+    volumes:
+      - storagedata:/var/lib/postgresql/data
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d powersync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-off: applies drizzle migrations to this env's Postgres, then exits.
+  # Profiled so a normal `up` skips it; up.sh runs it explicitly between bringing
+  # the DB up and starting the app (see deploy/bin/up.sh).
+  migrate:
+    image: ${IMAGE_API_MIGRATE}
+    profiles: ["migrate"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      - default
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     image: ${IMAGE_API}
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       PORT: "3001"
       DATABASE_URL: ${DATABASE_URL}
@@ -18,9 +81,10 @@ services:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS}
     networks:
+      default: {}
       pace-net:
-        # Per-env alias so powersync can reach *this* env's API for JWKS without
-        # colliding with other envs' `api` service on the shared network.
+        # Globally-unique alias so powersync reaches *this* env's API for JWKS
+        # (the generic `api` is ambiguous across envs on the shared network).
         aliases:
           - ${STACK}-api
     labels:
@@ -34,6 +98,11 @@ services:
     image: ${POWERSYNC_IMAGE}
     restart: unless-stopped
     command: ["start", "-r", "unified"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      powersync-storage:
+        condition: service_healthy
     volumes:
       - ../../powersync:/config:ro
     environment:
@@ -43,6 +112,7 @@ services:
       PS_JWKS_URL: ${PS_JWKS_URL}
       PS_PORT: "8080"
     networks:
+      - default
       - pace-net
     labels:
       - "traefik.enable=true"
@@ -63,17 +133,25 @@ services:
       API_URL: ${API_URL}
       POWERSYNC_URL: ${POWERSYNC_URL}
     networks:
+      - default
       - pace-net
     labels:
       - "traefik.enable=true"
-      # Host-only rule — lower priority than the /api and /powersync routers
-      # above, so it catches everything else for this host.
+      # Host-only rule — lower priority than /api and /powersync above, so it
+      # catches everything else for this host.
       - "traefik.http.routers.${STACK}-web.rule=Host(`${HOST}`)"
       - "traefik.http.routers.${STACK}-web.entrypoints=websecure"
       - "traefik.http.routers.${STACK}-web.tls=true"
       - "traefik.http.services.${STACK}-web.loadbalancer.server.port=3000"
 
 networks:
+  # This env's private network — created per compose project (${STACK}_default).
+  default:
+  # The shared platform network (created by deploy/platform).
   pace-net:
     external: true
     name: pace-net
+
+volumes:
+  pgdata:
+  storagedata:

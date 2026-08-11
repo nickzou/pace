@@ -5,13 +5,18 @@
 # CI, your shell locally). Prints the path of the file it wrote.
 #
 #   deploy/bin/render-env.sh <env-name>     # "prod" | "staging" | "pr-<n>"
+#
+# Each env runs its OWN Postgres (deploy/stack), so DB hosts are the in-stack
+# service names (postgres / powersync-storage) and the DB names are fixed —
+# isolation comes from the separate container + volume, not a namespaced name.
 set -euo pipefail
 
 ENV_NAME="${1:?usage: render-env.sh <env-name>}"
 
-# A token safe for database names and DNS aliases: pr-101 -> pr_101 / pr-101.
-SLUG="$(printf '%s' "$ENV_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9' '_')"
-SLUG="${SLUG%_}"
+# A token safe for DNS aliases: pr-101 -> pr-101 (lowercased, non-alnum → -).
+SLUG="$(printf '%s' "$ENV_NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9' '-')"
+SLUG="${SLUG%-}"
+STACK="pace-${SLUG}"
 
 BASE_DOMAIN="${BASE_DOMAIN:-paceproductivity.app}"
 # prod serves the apex; every other env is a subdomain of it.
@@ -21,12 +26,6 @@ else
   HOST="${ENV_NAME}.${BASE_DOMAIN}"
 fi
 
-STACK="pace-${SLUG//_/-}"
-DB_NAME="pace_${SLUG}"
-STORAGE_DB_NAME="powersync_${SLUG}"
-
-PGHOST="${PGHOST:-pace-postgres}"
-PGPORT="${PGPORT:-5432}"
 POSTGRES_USER="${POSTGRES_USER:-pace}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-pace}"
 
@@ -36,10 +35,13 @@ BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-dev-insecure-secret-change-me}"
 
 IMAGE_WEB="${IMAGE_WEB:-ghcr.io/nickzou/pace/web:latest}"
 IMAGE_API="${IMAGE_API:-ghcr.io/nickzou/pace/api:latest}"
+IMAGE_API_MIGRATE="${IMAGE_API_MIGRATE:-ghcr.io/nickzou/pace/api-migrate:latest}"
 POWERSYNC_IMAGE="${POWERSYNC_IMAGE:-journeyapps/powersync-service:1.23.3}"
+POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:17-alpine}"
 
-DB_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${PGHOST}:${PGPORT}/${DB_NAME}"
-STORAGE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${PGHOST}:${PGPORT}/${STORAGE_DB_NAME}"
+# In-stack service names on the env's private network (fixed DB names).
+DB_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/pace"
+STORAGE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@powersync-storage:5432/powersync"
 
 OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/envs"
 mkdir -p "$OUT_DIR"
@@ -55,12 +57,12 @@ COMPOSE_PROJECT_NAME=${STACK}
 
 IMAGE_WEB=${IMAGE_WEB}
 IMAGE_API=${IMAGE_API}
+IMAGE_API_MIGRATE=${IMAGE_API_MIGRATE}
 POWERSYNC_IMAGE=${POWERSYNC_IMAGE}
+POSTGRES_IMAGE=${POSTGRES_IMAGE}
 
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-DB_NAME=${DB_NAME}
-STORAGE_DB_NAME=${STORAGE_DB_NAME}
 DATABASE_URL=${DB_URL}
 
 BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
