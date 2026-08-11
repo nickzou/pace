@@ -2,13 +2,12 @@ import type { useTRPCClient } from "@pace/api-client"
 import type { AbstractPowerSyncDatabase, PowerSyncBackendConnector } from "@powersync/web"
 import { UpdateType } from "@powersync/web"
 import { authClient } from "../auth-client"
+import { getConfig } from "../config"
 
 // The imperative tRPC client (from useTRPCClient) — the write path PowerSync
 // replays local mutations through. No new backend: this is the same API the
 // M08–M10 UI used, now driven by the sync engine instead of the UI directly.
 type TrpcClient = ReturnType<typeof useTRPCClient>
-
-const POWERSYNC_URL = import.meta.env.VITE_POWERSYNC_URL ?? "http://localhost:8080"
 
 // tRPC error codes that a retry can't fix (bad input, gone, not ours). We drop
 // the offending change instead of blocking the upload queue forever. Everything
@@ -34,7 +33,7 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
     async fetchCredentials() {
       const { data } = await authClient.token()
       if (!data?.token) throw new Error("Not authenticated — no PowerSync token")
-      return { endpoint: POWERSYNC_URL, token: data.token }
+      return { endpoint: getConfig().powersyncUrl, token: data.token }
     },
 
     // Drain the local write queue one transaction at a time, mapping each row op

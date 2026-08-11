@@ -3,7 +3,23 @@ import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 
 import { ApiProvider } from "../lib/api"
+import { getConfig } from "../lib/config"
 import appCss from "../styles.css?url"
+
+// Serialize the server's runtime config into the SSR HTML so the browser reads
+// its API/PowerSync URLs from window.__PACE_CONFIG__ instead of the build-time
+// bundle — letting one image serve every environment. Escape "<" so a URL can't
+// break out of the <script>. On the client this re-reads the same injected
+// object, so it hydrates without a mismatch.
+function ConfigScript() {
+  const json = JSON.stringify(getConfig()).replace(/</g, "\\u003c")
+  return (
+    <script
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: server-injected runtime config, escaped above
+      dangerouslySetInnerHTML={{ __html: `window.__PACE_CONFIG__=${json}` }}
+    />
+  )
+}
 
 export const Route = createRootRoute({
   head: () => ({
@@ -34,6 +50,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <ConfigScript />
       </head>
       <body>
         <ApiProvider>{children}</ApiProvider>
