@@ -98,17 +98,23 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 7
 
+  # Prod now runs on the shared platform + the per-env stack (deploy/stack) — the
+  # SAME machinery every pr-<n> preview uses, just with env name "prod" (apex
+  # host). This replaces the legacy web-only compose (traefik + a single `app`
+  # container). Legacy prod had no database, so there is no data to migrate: the
+  # first run just retires the old stack and stands prod up fresh on the new one.
   deploy:
     needs: [check, test, e2e]
     # Deploy ONLY on pushes that land on main. Every feature branch and PR runs
-    # the checks above but never deploys.
+    # the checks above but never deploys. Prod stays continuous-deploy on merge;
+    # the PR previews are the pre-merge gate.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write # push to GHCR with the built-in GITHUB_TOKEN
     env:
-      IMAGE: ghcr.io/${{ github.repository }}/web
+      REG: ghcr.io/${{ github.repository }}
     steps:
       - uses: actions/checkout@v7
 
@@ -119,24 +125,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      # The full stack needs three images (the old web-only prod built just web).
+      - name: Build and push web
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: Dockerfile
           push: true
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
+          tags: ${{ env.REG }}/web:${{ github.sha }}
 
-      - name: Deploy over SSH
+      - name: Build and push api
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: runtime
+          push: true
+          tags: ${{ env.REG }}/api:${{ github.sha }}
+
+      - name: Build and push api-migrate
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: migrate
+          push: true
+          tags: ${{ env.REG }}/api-migrate:${{ github.sha }}
+
+      - name: Deploy prod over SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
+          # Must be the *wildcard* origin cert (*.paceproductivity.app + apex) so
+          # the apex (prod) AND every pr-<n>.* preview are covered by one cert.
           ORIGIN_CERT: ${{ secrets.ORIGIN_CERT }}
           ORIGIN_KEY: ${{ secrets.ORIGIN_KEY }}
-          IMAGE_REF: ${{ env.IMAGE }}:${{ github.sha }}
+          BASE_DOMAIN: paceproductivity.app
+          POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          BETTER_AUTH_SECRET: ${{ secrets.PROD_BETTER_AUTH_SECRET }}
+          SHA: ${{ github.sha }}
+          REG: ghcr.io/${{ github.repository }}
         run: |
           set -e
 
@@ -146,24 +176,37 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           SSH="ssh -i $HOME/.ssh/deploy_key deploy@$DEPLOY_HOST"
-          SCP="scp -i $HOME/.ssh/deploy_key"
 
-          # Cloudflare origin cert/key from secrets (local to the runner, gitignored)
-          printf '%s\n' "$ORIGIN_CERT" > origin.pem
-          printf '%s\n' "$ORIGIN_KEY"  > origin-key.pem
+          # Ship the deploy machinery + PowerSync config to the box. up.sh runs ON
+          # the box against deploy/stack; that stack mounts ../../powersync for the
+          # PowerSync service config, so both trees must be present. tar keeps the
+          # scripts' +x bits.
+          tar czf - deploy powersync | $SSH "mkdir -p pace && tar xzf - -C pace"
 
-          # Ship the compose stack + Traefik config + certs to the box
-          $SSH "mkdir -p pace/traefik/dynamic pace/certs"
-          $SCP deploy/docker-compose.yml      "deploy@$DEPLOY_HOST:pace/docker-compose.yml"
-          $SCP deploy/traefik/traefik.yml     "deploy@$DEPLOY_HOST:pace/traefik/traefik.yml"
-          $SCP deploy/traefik/dynamic/tls.yml "deploy@$DEPLOY_HOST:pace/traefik/dynamic/tls.yml"
-          $SCP origin.pem origin-key.pem      "deploy@$DEPLOY_HOST:pace/certs/"
-          $SSH "chmod 600 pace/certs/origin-key.pem"
+          # Wildcard origin cert/key from secrets → pace/deploy/certs, where the
+          # platform compose mounts them (../certs:/certs) and tls.yml serves the
+          # pair as Traefik's default cert for every env host.
+          printf '%s\n' "$ORIGIN_CERT" | $SSH "mkdir -p pace/deploy/certs && cat > pace/deploy/certs/origin.pem"
+          printf '%s\n' "$ORIGIN_KEY"  | $SSH "cat > pace/deploy/certs/origin-key.pem && chmod 600 pace/deploy/certs/origin-key.pem"
 
-          # Deploy: login to GHCR, retire the old single container, bring up the stack
+          # Retire the legacy web-only stack (compose project "pace": its private
+          # Traefik + `app`). It binds :80/:443, so it MUST come down before the
+          # shared platform Traefik can bind them. Idempotent — a no-op once gone.
+          $SSH "cd pace \
+            && (docker compose -p pace down --remove-orphans 2>/dev/null || true) \
+            && (docker rm -f pace-traefik-1 pace-app-1 pace-web 2>/dev/null || true) \
+            && rm -f docker-compose.yml"
+
+          # Bring up the stateless shared platform (idempotent), then prod on the
+          # new per-env stack with this commit's images.
           $SSH "cd pace \
             && echo '$REGISTRY_TOKEN' | docker login ghcr.io -u '$ACTOR' --password-stdin \
-            && (docker rm -f pace-web 2>/dev/null || true) \
-            && IMAGE='$IMAGE_REF' docker compose pull \
-            && IMAGE='$IMAGE_REF' docker compose up -d --remove-orphans \
+            && docker compose -f deploy/platform/docker-compose.yml up -d \
+            && BASE_DOMAIN='$BASE_DOMAIN' \
+               IMAGE_WEB='$REG/web:$SHA' \
+               IMAGE_API='$REG/api:$SHA' \
+               IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
+               POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
+               BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
+               bash deploy/bin/up.sh prod \
             && docker image prune -f"

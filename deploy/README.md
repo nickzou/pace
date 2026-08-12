@@ -19,7 +19,6 @@ deploy/
     up.sh                # render → DBs up → migrate → compose up
     down.sh              # compose down -v  (deletes the env's Postgres volumes)
   envs/              # generated per-env .env files (gitignored — secrets)
-  docker-compose.yml # LEGACY single-env stack (current prod; superseded)
 ```
 
 Images (built once, used by every env): `Dockerfile` → web, `Dockerfile.api` →
@@ -79,7 +78,10 @@ no shared database server.
 
 ## Status
 
-Subtask 1 (this) builds the template + images + scripts. Wiring staging to
-`main`, the PR-preview lifecycle workflow, and the prod cutover are the next
-subtasks. The legacy `deploy/docker-compose.yml` still serves current prod until
-that cutover.
+The template + images + scripts are in place, and **prod runs on this stack**:
+the Deploy workflow builds the three images on each merge to `main`, brings up
+the stateless platform, and runs `up.sh prod` (apex host). The legacy web-only
+compose has been retired. Persistent staging was dropped (prod is the only
+long-lived env; PR previews are the pre-merge gate). Next: the **PR-preview
+lifecycle workflow** — `up.sh pr-<n>` on PR open/update, `down.sh pr-<n>` on
+close/merge — plus per-env seed data.
