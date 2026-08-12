@@ -1,0 +1,13 @@
+# Default TLS cert for every environment. A single *wildcard* Cloudflare Origin
+# cert (*.paceproductivity.app + the apex) covers prod, staging, and every
+# pr-<n> subdomain — Traefik serves it as the default for all hosts. The cert
+# files are written by CI from secrets; never committed.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/origin.pem
+        keyFile: /certs/origin-key.pem
+  certificates:
+    - certFile: /certs/origin.pem
+      keyFile: /certs/origin-key.pem

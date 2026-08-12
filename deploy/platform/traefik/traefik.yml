@@ -1,9 +1,10 @@
-# Traefik static configuration.
+# Traefik static config for the shared platform edge. `network: pace-net` pins
+# the network Traefik uses to reach env containers (they're on pace-net only, but
+# pinning it is explicit and future-proofs multi-network containers).
 
 entryPoints:
   web:
     address: ":80"
-    # Anything hitting plain HTTP gets bounced to HTTPS.
     http:
       redirections:
         entryPoint:
@@ -13,10 +14,9 @@ entryPoints:
     address: ":443"
 
 providers:
-  # Discover routers/services from container labels (see docker-compose.yml).
   docker:
     exposedByDefault: false
-  # Load TLS certificate definitions from the dynamic config dir.
+    network: pace-net
   file:
     directory: /etc/traefik/dynamic
     watch: true

@@ -2,8 +2,7 @@ import { createClient, TRPCProvider } from "@pace/api-client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { type ReactNode, useState } from "react"
 import { getStoredToken } from "./auth-client"
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001"
+import { getConfig } from "./config"
 
 // Provides the tRPC + TanStack Query context to the whole app. The clients are
 // created with useState so each SSR request gets its own (no cross-request data
@@ -12,7 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001"
 export function ApiProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
   const [trpcClient] = useState(() =>
-    createClient({ url: `${API_URL}/api/trpc`, getToken: getStoredToken }),
+    createClient({ url: `${getConfig().apiUrl}/api/trpc`, getToken: getStoredToken }),
   )
 
   return (

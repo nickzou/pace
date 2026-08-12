@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Lint GitHub Actions workflows with actionlint whenever a workflow file is part
+# of the commit. Skips instantly when none are staged, so it's free on the vast
+# majority of commits. Shared via core.hooksPath (.githooks) — see the repo's
+# `prepare` script, which points git at this directory on install.
+set -euo pipefail
+
+# Staged, still-present files under .github/workflows (a dir pathspec matches
+# recursively). --diff-filter=ACMR drops deletions so we don't lint a removed file.
+mapfile -t WORKFLOWS < <(git diff --cached --name-only --diff-filter=ACMR -- .github/workflows)
+[ "${#WORKFLOWS[@]}" -eq 0 ] && exit 0
+
+# Resolve an actionlint runner: an installed binary if present, else `go run` a
+# pinned version (needs Go). If neither exists, warn but don't block the commit.
+if command -v actionlint >/dev/null 2>&1; then
+  runner=(actionlint)
+elif command -v go >/dev/null 2>&1; then
+  runner=(go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12)
+else
+  echo "pre-commit: neither actionlint nor go found — skipping workflow lint." >&2
+  exit 0
+fi
+
+echo "pre-commit: actionlint → ${WORKFLOWS[*]}"
+
+# actionlint shell-checks the run: blocks only when shellcheck is reachable. Use
+# it from PATH; else borrow it from nixpkgs for this one run (handy on NixOS,
+# where it isn't installed globally); else lint the schema only.
+if command -v shellcheck >/dev/null 2>&1; then
+  "${runner[@]}" "${WORKFLOWS[@]}"
+elif command -v nix >/dev/null 2>&1; then
+  nix shell nixpkgs#shellcheck --command "${runner[@]}" "${WORKFLOWS[@]}"
+else
+  echo "pre-commit: shellcheck not found — checking workflow schema only (run: blocks unchecked)." >&2
+  "${runner[@]}" "${WORKFLOWS[@]}"
+fi

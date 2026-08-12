@@ -1,0 +1,30 @@
+name: pace-platform
+
+# The shared, STATELESS layer — run once per box. It holds no data: just the one
+# edge proxy and the network every environment attaches to for routing. Because
+# nothing here is stateful, standing it up (or restarting it) can never lose an
+# environment's data — that lives inside each per-env stack's own Postgres
+# (deploy/stack). Traefik routes each env by its Docker labels.
+#
+#   docker compose -f deploy/platform/docker-compose.yml up -d
+
+services:
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ../certs:/certs:ro
+    networks:
+      - pace-net
+
+# Shared, stable-named network the per-env stacks join as `external`. Traefik
+# reaches each env's edge services (web/api/powersync) over this network.
+networks:
+  pace-net:
+    name: pace-net

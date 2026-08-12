@@ -16,7 +16,9 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test --filter=@pace/api --filter=@pace/validation",
     "check": "biome check . && turbo typecheck && turbo test --filter=@pace/api --filter=@pace/validation",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "lint:actions": "actionlint",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.7",
