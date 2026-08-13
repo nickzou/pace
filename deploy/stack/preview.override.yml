@@ -1,0 +1,22 @@
+# Overlay applied by up.sh for ephemeral previews ONLY (pr-<n>): puts an HTTP
+# Basic Auth gate in front of the web/UI router, so people who stumble onto a
+# preview URL (e.g. real users guessing a subdomain) can't browse it. Prod never
+# loads this file, so prod is never gated.
+#
+# Scope is deliberately the web router only. /api and /powersync are NOT gated:
+# PowerSync authenticates with `Authorization: Bearer <jwt>`, which would collide
+# with Basic auth on the same header — and both already require app-level auth.
+# The browser caches the Basic creds per origin but won't override an explicit
+# Authorization header (PowerSync's Bearer), so in-app sync/API calls keep working
+# once you're past the gate on the UI.
+#
+# Credentials come from ${BASIC_AUTH_USERS} (htpasswd format, e.g.
+# "preview:$apr1$...."), supplied via the process environment (a CI secret), NOT
+# the generated env file — so compose substitutes it verbatim. That both avoids
+# the usual need to double every `$` in an inline htpasswd label, and avoids the
+# hash being mangled when up.sh sources the env file.
+services:
+  web:
+    labels:
+      - "traefik.http.routers.${STACK}-web.middlewares=${STACK}-preview-auth"
+      - "traefik.http.middlewares.${STACK}-preview-auth.basicauth.users=${BASIC_AUTH_USERS}"

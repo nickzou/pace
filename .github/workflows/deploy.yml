@@ -284,6 +284,9 @@ jobs:
           # falls back to throwaway defaults (fine — Postgres isn't edge-exposed).
           POSTGRES_PASSWORD: ${{ secrets.PREVIEW_POSTGRES_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.PREVIEW_BETTER_AUTH_SECRET }}
+          # Shared htpasswd credential gating the preview's web UI (soft gate so
+          # stray users can't browse it). Unset → preview comes up ungated.
+          BASIC_AUTH_USERS: ${{ secrets.PREVIEW_BASIC_AUTH }}
           REG: ghcr.io/${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
@@ -312,6 +315,7 @@ jobs:
                IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
                POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
+               BASIC_AUTH_USERS='$BASIC_AUTH_USERS' \
                bash deploy/bin/up.sh pr-$PR \
             && docker image prune -f"
 
