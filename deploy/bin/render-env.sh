@@ -36,6 +36,7 @@ BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:-dev-insecure-secret-change-me}"
 IMAGE_WEB="${IMAGE_WEB:-ghcr.io/nickzou/pace/web:latest}"
 IMAGE_API="${IMAGE_API:-ghcr.io/nickzou/pace/api:latest}"
 IMAGE_API_MIGRATE="${IMAGE_API_MIGRATE:-ghcr.io/nickzou/pace/api-migrate:latest}"
+IMAGE_API_SEED="${IMAGE_API_SEED:-ghcr.io/nickzou/pace/api-seed:latest}"
 POWERSYNC_IMAGE="${POWERSYNC_IMAGE:-journeyapps/powersync-service:1.23.3}"
 POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:17-alpine}"
 
@@ -58,6 +59,7 @@ COMPOSE_PROJECT_NAME=${STACK}
 IMAGE_WEB=${IMAGE_WEB}
 IMAGE_API=${IMAGE_API}
 IMAGE_API_MIGRATE=${IMAGE_API_MIGRATE}
+IMAGE_API_SEED=${IMAGE_API_SEED}
 POWERSYNC_IMAGE=${POWERSYNC_IMAGE}
 POSTGRES_IMAGE=${POSTGRES_IMAGE}
 

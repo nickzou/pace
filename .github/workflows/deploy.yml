@@ -4,11 +4,14 @@ on:
   # Run the checks on every branch push (fast feedback before a PR exists)…
   push:
     branches: ["**"]
-  # …and on PRs into main.
+  # …and on PRs into main — open/update build the PR's preview env, close tears
+  # it down (see deploy-preview / teardown-preview).
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
 
-# Don't let two deploys race; a newer push supersedes an in-flight one.
+# Don't let two deploys race; a newer push supersedes an in-flight one. On PRs
+# github.ref is refs/pull/<n>/merge, so this also isolates previews per PR.
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
@@ -16,6 +19,8 @@ concurrency:
 jobs:
   # Gate: bad code never reaches the build/deploy jobs.
   check:
+    # PR-close events only tear a preview down — no need to re-run the checks.
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +38,7 @@ jobs:
   # Unit + integration tests (Vitest): the tasks tRPC API against a real
   # Postgres, plus the shared Zod schemas. Fast — no browsers.
   test:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -73,6 +79,7 @@ jobs:
   # global-setup.ts brings up (a plain service container can't set wal_level).
   # Ports / URLs live in playwright.config.ts.
   e2e:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     env:
       # The API server needs its auth secret from the environment (no .env in CI);
@@ -210,3 +217,154 @@ jobs:
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
                bash deploy/bin/up.sh prod \
             && docker image prune -f"
+
+  # Ephemeral per-PR preview: the SAME stack prod runs, keyed by env name
+  # "pr-<n>" → pr-<n>.paceproductivity.app. Comes up on PR open/update; gated on
+  # check + test only (not e2e) so it appears fast. Fork PRs get no preview —
+  # GitHub withholds secrets from pull_request runs on forks, by design.
+  deploy-preview:
+    needs: [check, test]
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push images to GHCR
+      pull-requests: write # comment the preview URL
+    env:
+      REG: ghcr.io/${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # Build the PR branch's actual tip so the image matches the SHA we tag.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push web
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.REG }}/web:${{ env.SHA }}
+
+      - name: Build and push api
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: runtime
+          push: true
+          tags: ${{ env.REG }}/api:${{ env.SHA }}
+
+      - name: Build and push api-migrate
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: migrate
+          push: true
+          tags: ${{ env.REG }}/api-migrate:${{ env.SHA }}
+
+      - name: Build and push api-seed
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: seed
+          push: true
+          tags: ${{ env.REG }}/api-seed:${{ env.SHA }}
+
+      - name: Deploy preview over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          BASE_DOMAIN: paceproductivity.app
+          # Optional hardening: if set, previews use these; unset → render-env.sh
+          # falls back to throwaway defaults (fine — Postgres isn't edge-exposed).
+          POSTGRES_PASSWORD: ${{ secrets.PREVIEW_POSTGRES_PASSWORD }}
+          BETTER_AUTH_SECRET: ${{ secrets.PREVIEW_BETTER_AUTH_SECRET }}
+          # Shared htpasswd credential gating the preview's web UI (soft gate so
+          # stray users can't browse it). Unset → preview comes up ungated.
+          BASIC_AUTH_USERS: ${{ secrets.PREVIEW_BASIC_AUTH }}
+          REG: ghcr.io/${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i $HOME/.ssh/deploy_key deploy@$DEPLOY_HOST"
+
+          # Ship this PR's deploy machinery + PowerSync config (a PR may change the
+          # per-env stack or scripts). gitignored deploy/certs isn't in the tree,
+          # so the box's cert is untouched. The shared platform (Traefik + cert +
+          # pace-net) is owned by prod deploys and already up (restart:
+          # unless-stopped survives reboots) — previews never touch it, so a PR
+          # can't disturb prod or other previews' edge routing.
+          tar czf - deploy powersync | $SSH "mkdir -p pace && tar xzf - -C pace"
+
+          # Bring up ONLY this PR's stack, attaching to the existing platform net.
+          $SSH "cd pace \
+            && echo '$REGISTRY_TOKEN' | docker login ghcr.io -u '$ACTOR' --password-stdin \
+            && BASE_DOMAIN='$BASE_DOMAIN' \
+               IMAGE_WEB='$REG/web:$SHA' \
+               IMAGE_API='$REG/api:$SHA' \
+               IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
+               IMAGE_API_SEED='$REG/api-seed:$SHA' \
+               POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
+               BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
+               BASIC_AUTH_USERS='$BASIC_AUTH_USERS' \
+               bash deploy/bin/up.sh pr-$PR \
+            && docker image prune -f"
+
+      - name: Comment preview URL on the PR
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "$PR" --repo "${{ github.repository }}" \
+            --body "🚀 Preview environment: https://pr-${PR}.paceproductivity.app (updates on every push; torn down when this PR closes)."
+
+  # Tear the PR's preview env down on close/merge: stop its containers and delete
+  # its volumes (down -v). Runs only on close; the build jobs are skipped there.
+  teardown-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    env:
+      PR: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Tear down preview over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i $HOME/.ssh/deploy_key deploy@$DEPLOY_HOST"
+          # down.sh is on the box from the preview deploy; removes the pr-<n> stack
+          # + volumes. Idempotent — a no-op if the env never came up.
+          $SSH "cd pace && bash deploy/bin/down.sh pr-$PR"
+
+      - name: Comment teardown on the PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "$PR" --repo "${{ github.repository }}" \
+            --body "🧹 Preview environment \`pr-${PR}\` torn down."

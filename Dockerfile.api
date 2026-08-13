@@ -32,6 +32,12 @@ RUN pnpm --filter @pace/api build
 FROM build AS migrate
 CMD ["pnpm", "--filter", "@pace/api", "db:migrate"]
 
+# ---- seed: one-off image that seeds a known-password test user, then exits ----
+# Reuses the build stage (dev deps incl. tsx + the source). deploy/bin/up.sh runs
+# this after migrate, for NON-prod envs only — idempotent, so re-runs are no-ops.
+FROM build AS seed
+CMD ["pnpm", "--filter", "@pace/api", "db:seed"]
+
 # ---- runtime: slim image with only the built server ----
 FROM node:24-slim AS runtime
 WORKDIR /app
