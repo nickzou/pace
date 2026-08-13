@@ -68,6 +68,24 @@ services:
       postgres:
         condition: service_healthy
 
+  # One-off: seeds a known-password test user into NON-prod envs (idempotent),
+  # then exits. Profiled so a normal `up` skips it; up.sh runs it explicitly after
+  # migrations, for previews only (never prod). Needs the auth env vars because it
+  # creates the user through Better Auth (auth.api.signUpEmail), not raw SQL.
+  seed:
+    image: ${IMAGE_API_SEED}
+    profiles: ["seed"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS}
+    networks:
+      - default
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     image: ${IMAGE_API}
     restart: unless-stopped

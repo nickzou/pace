@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/seed.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@types/node": "^22.10.2",
     "dotenv": "^17.0.0",
     "drizzle-kit": "^0.31.0",
+    "tsx": "^4.23.5",
     "typescript": "^6.0.2",
     "vitest": "^4.1.10"
   }

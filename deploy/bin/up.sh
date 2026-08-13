@@ -41,6 +41,12 @@ docker compose "${CF[@]}" up -d --wait postgres powersync-storage
 # 2. Apply drizzle migrations to this env's Postgres (one-off, then exits).
 docker compose "${CF[@]}" run --rm migrate
 
+# 2b. Seed a known-password test user into NON-prod envs (idempotent) so a
+# reviewer can log straight into a gated preview. Prod is never seeded.
+if [ "$ENV_NAME" != "prod" ]; then
+  docker compose "${CF[@]}" run --rm seed
+fi
+
 # 3. Start / update the app (api waits on healthy postgres; powersync on both).
 docker compose "${CF[@]}" up -d --remove-orphans
 

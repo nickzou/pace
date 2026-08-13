@@ -273,6 +273,15 @@ jobs:
           push: true
           tags: ${{ env.REG }}/api-migrate:${{ env.SHA }}
 
+      - name: Build and push api-seed
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: seed
+          push: true
+          tags: ${{ env.REG }}/api-seed:${{ env.SHA }}
+
       - name: Deploy preview over SSH
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
@@ -313,6 +322,7 @@ jobs:
                IMAGE_WEB='$REG/web:$SHA' \
                IMAGE_API='$REG/api:$SHA' \
                IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
+               IMAGE_API_SEED='$REG/api-seed:$SHA' \
                POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
                BASIC_AUTH_USERS='$BASIC_AUTH_USERS' \
