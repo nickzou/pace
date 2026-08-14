@@ -4,6 +4,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 
 import { ApiProvider } from "../lib/api"
 import { getConfig } from "../lib/config"
+import { ToastProvider } from "../lib/toast"
 import appCss from "../styles.css?url"
 
 // Serialize the server's runtime config into the SSR HTML so the browser reads
@@ -53,7 +54,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <ConfigScript />
       </head>
       <body>
-        <ApiProvider>{children}</ApiProvider>
+        <ApiProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ApiProvider>
         <TanStackDevtools
           config={{
             position: "bottom-right",
