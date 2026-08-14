@@ -75,6 +75,47 @@ describe("tasks router", () => {
     expect(rows[0]?.deletedAt).not.toBeNull()
   })
 
+  // The Undo mechanism: after a soft delete, the client re-inserts the captured
+  // row (same id), which replays as a create. Its upsert must clear deletedAt so
+  // the task comes back — otherwise Undo would silently do nothing.
+  it("re-creating a soft-deleted task (same id) restores it, clearing the tombstone", async () => {
+    const caller = appRouter.createCaller({ db, userId: await makeUser() })
+    const t = await caller.tasks.create({ title: "Buy milk", description: "2%" })
+    await caller.tasks.softDelete({ id: t.id })
+    expect(await caller.tasks.list()).toHaveLength(0)
+
+    const restored = await caller.tasks.create({
+      id: t.id,
+      title: "Buy milk",
+      description: "2%",
+      completed: false,
+    })
+    expect(restored.id).toBe(t.id)
+    expect(restored.deletedAt).toBeNull()
+    expect(await caller.tasks.list()).toHaveLength(1)
+
+    const rows = await db.select().from(tasks).where(eq(tasks.id, t.id))
+    expect(rows[0]?.deletedAt).toBeNull()
+  })
+
+  // The restore path shares the create upsert's owner-scoped setWhere, so a
+  // guessed id can neither hijack nor un-delete another user's task.
+  it("re-create can't hijack or restore another user's task", async () => {
+    const u1 = await makeUser()
+    const u2 = await makeUser()
+    const t = await appRouter.createCaller({ db, userId: u1 }).tasks.create({ title: "mine" })
+    await appRouter.createCaller({ db, userId: u1 }).tasks.softDelete({ id: t.id })
+
+    await expect(
+      appRouter.createCaller({ db, userId: u2 }).tasks.create({ id: t.id, title: "hijacked" }),
+    ).rejects.toMatchObject({ code: "CONFLICT" })
+
+    const rows = await db.select().from(tasks).where(eq(tasks.id, t.id))
+    expect(rows[0]?.userId).toBe(u1)
+    expect(rows[0]?.title).toBe("mine")
+    expect(rows[0]?.deletedAt).not.toBeNull()
+  })
+
   it("refuses an unauthenticated caller", async () => {
     await expect(appRouter.createCaller({ db, userId: null }).tasks.list()).rejects.toMatchObject({
       code: "UNAUTHORIZED",
