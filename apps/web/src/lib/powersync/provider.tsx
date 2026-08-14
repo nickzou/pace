@@ -3,37 +3,64 @@ import { PowerSyncContext } from "@powersync/react"
 import type { AbstractPowerSyncDatabase } from "@powersync/web"
 import { type ReactNode, useEffect, useState } from "react"
 
-// Provides a connected PowerSync database to its children. Mount it only on the
-// client, behind a signed-in check (see the caller) — it must never render during
-// SSR, because @powersync/web pulls in wa-sqlite (WASM + web workers), which only
-// exists in the browser. The DB itself is a lazy singleton (./db) that dynamic-
-// imports the SDK, so nothing PowerSync-related loads server-side.
-export function PowerSyncProvider({ children }: { children: ReactNode }) {
-  const trpc = useTRPCClient()
-  const [db, setDb] = useState<AbstractPowerSyncDatabase | null>(null)
+// The live, connected PowerSync database, cached at module scope so it SURVIVES
+// route navigation. Previously the provider connected on every mount and
+// disconnected on every unmount, so moving between the list and a task's detail
+// route tore down and re-established the sync connection each time — the
+// "Starting local database…" flash. Now we connect once and reuse it.
+//
+// Must stay client-only (see the caller): @powersync/web pulls in wa-sqlite (WASM
+// + web workers), so nothing PowerSync-related may load during SSR. The DB
+// instance is itself a lazy singleton (./db); this adds a cached *connection* on
+// top. It's torn down only by clearDb() on an explicit sign-out — after which the
+// `db.connected` check reconnects automatically on the next mount.
+let cached: AbstractPowerSyncDatabase | null = null
+let connecting: Promise<AbstractPowerSyncDatabase> | null = null
 
-  useEffect(() => {
-    let database: AbstractPowerSyncDatabase | undefined
-    let cancelled = false
-
-    void (async () => {
+// Connect exactly once, even under StrictMode's double-mount — concurrent callers
+// share the one in-flight promise.
+function connectOnce(trpc: ReturnType<typeof useTRPCClient>): Promise<AbstractPowerSyncDatabase> {
+  if (cached?.connected) return Promise.resolve(cached)
+  if (!connecting) {
+    connecting = (async () => {
       const [{ getDb }, { createConnector }] = await Promise.all([
         import("./db"),
         import("./connector"),
       ])
-      database = await getDb()
-      await database.connect(createConnector(trpc))
-      if (!cancelled) setDb(database)
-    })().catch((err) => console.error("PowerSync init failed", err))
+      const database = await getDb()
+      if (!database.connected) await database.connect(createConnector(trpc))
+      cached = database
+      return database
+    })().finally(() => {
+      connecting = null
+    })
+  }
+  return connecting
+}
 
+export function PowerSyncProvider({ children }: { children: ReactNode }) {
+  const trpc = useTRPCClient()
+  // Provide synchronously when a live connection already exists → no flash when
+  // navigating between routes. First mount (or post-sign-out) falls back to the
+  // async connect below.
+  const [db, setDb] = useState<AbstractPowerSyncDatabase | null>(() =>
+    cached?.connected ? cached : null,
+  )
+
+  useEffect(() => {
+    if (db) return
+    let cancelled = false
+    connectOnce(trpc)
+      .then((database) => {
+        if (!cancelled) setDb(database)
+      })
+      .catch((err) => console.error("PowerSync init failed", err))
+    // No disconnect on unmount — the connection persists across route changes, so
+    // there's no reconnect churn; clearDb() (sign-out) is the only teardown.
     return () => {
       cancelled = true
-      // Disconnect but do NOT clear — a transient unmount (navigation, a session
-      // blip) must not drop local rows or the pending upload queue. Clearing
-      // happens only on an explicit sign-out (see lib/auth-client).
-      void database?.disconnect()
     }
-  }, [trpc])
+  }, [db, trpc])
 
   if (!db) {
     return <p className="text-sm text-neutral-500">Starting local database…</p>
