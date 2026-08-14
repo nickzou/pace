@@ -17,3 +17,9 @@ streams:
   tasks:
     auto_subscribe: true
     query: SELECT * FROM tasks WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+  # A generic synced resource demonstrating offline-first patterns. Same auth
+  # scoping and soft-delete behavior as tasks.
+  items:
+    auto_subscribe: true
+    query: SELECT * FROM items WHERE user_id = auth.user_id() AND deleted_at IS NULL

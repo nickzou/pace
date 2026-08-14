@@ -6,7 +6,7 @@ import { getConfig } from "../config"
 
 // The imperative tRPC client (from useTRPCClient) — the write path PowerSync
 // replays local mutations through. No new backend: this is the same API the
-// M08–M10 UI used, now driven by the sync engine instead of the UI directly.
+// UI used, now driven by the sync engine instead of the UI directly.
 type TrpcClient = ReturnType<typeof useTRPCClient>
 
 // tRPC error codes that a retry can't fix (bad input, gone, not ours). We drop
@@ -45,36 +45,67 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
 
       try {
         for (const op of tx.crud) {
-          if (op.table !== "tasks") continue
           const data = op.opData ?? {}
 
-          switch (op.op) {
-            case UpdateType.PUT:
-              // A locally-created task. create upserts on the client-minted id,
-              // so a retried upload is idempotent.
-              await trpc.tasks.create.mutate({
-                id: op.id,
-                title: String(data.title ?? ""),
-                description: String(data.description ?? ""),
-                completed: !!data.completed,
-              })
-              break
-            case UpdateType.PATCH:
-              // A field change — send only what changed.
-              await trpc.tasks.update.mutate({
-                id: op.id,
-                ...(data.title !== undefined ? { title: String(data.title) } : {}),
-                ...(data.description !== undefined
-                  ? { description: String(data.description) }
-                  : {}),
-                ...(data.completed !== undefined ? { completed: !!data.completed } : {}),
-              })
-              break
-            case UpdateType.DELETE:
-              // A local delete becomes a soft delete server-side; the tombstone
-              // then removes the row from every device via the sync rules.
-              await trpc.tasks.softDelete.mutate({ id: op.id })
-              break
+          // Route to the appropriate router based on table name
+          if (op.table === "tasks") {
+            switch (op.op) {
+              case UpdateType.PUT:
+                // A locally-created task. create upserts on the client-minted id,
+                // so a retried upload is idempotent.
+                await trpc.tasks.create.mutate({
+                  id: op.id,
+                  title: String(data.title ?? ""),
+                  description: String(data.description ?? ""),
+                  completed: !!data.completed,
+                })
+                break
+              case UpdateType.PATCH:
+                // A field change — send only what changed.
+                await trpc.tasks.update.mutate({
+                  id: op.id,
+                  ...(data.title !== undefined ? { title: String(data.title) } : {}),
+                  ...(data.description !== undefined
+                    ? { description: String(data.description) }
+                    : {}),
+                  ...(data.completed !== undefined ? { completed: !!data.completed } : {}),
+                })
+                break
+              case UpdateType.DELETE:
+                // A local delete becomes a soft delete server-side; the tombstone
+                // then removes the row from every device via the sync rules.
+                await trpc.tasks.softDelete.mutate({ id: op.id })
+                break
+            }
+          } else if (op.table === "items") {
+            switch (op.op) {
+              case UpdateType.PUT:
+                // A locally-created item. create upserts on the client-minted id,
+                // so a retried upload is idempotent.
+                await trpc.items.create.mutate({
+                  id: op.id,
+                  title: String(data.title ?? ""),
+                  description: String(data.description ?? ""),
+                  completed: !!data.completed,
+                })
+                break
+              case UpdateType.PATCH:
+                // A field change — send only what changed.
+                await trpc.items.update.mutate({
+                  id: op.id,
+                  ...(data.title !== undefined ? { title: String(data.title) } : {}),
+                  ...(data.description !== undefined
+                    ? { description: String(data.description) }
+                    : {}),
+                  ...(data.completed !== undefined ? { completed: !!data.completed } : {}),
+                })
+                break
+              case UpdateType.DELETE:
+                // A local delete becomes a soft delete server-side; the tombstone
+                // then removes the row from every device via the sync rules.
+                await trpc.items.softDelete.mutate({ id: op.id })
+                break
+            }
           }
         }
         await tx.complete()

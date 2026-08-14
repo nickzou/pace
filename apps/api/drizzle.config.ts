@@ -12,7 +12,7 @@ const url = process.env.DATABASE_URL
 if (!url) throw new Error("Missing required env var: DATABASE_URL")
 
 export default defineConfig({
-  schema: ["./src/db/auth.ts", "./src/db/tasks.ts"],
+  schema: ["./src/db/auth.ts", "./src/db/tasks.ts", "./src/db/items.ts"],
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: { url },
