@@ -41,6 +41,10 @@ export const tasksRouter = router({
   // lost, so a plain insert would hit a duplicate-key error on the retry. The
   // setWhere scopes the conflict update to the owner, so a guessed id can never
   // overwrite another user's row.
+  //
+  // The conflict update also clears `deletedAt`: re-creating a soft-deleted task
+  // (same id) un-tombstones it. That's what powers Undo — the client re-inserts a
+  // just-deleted task locally, which replays as a create and restores the row.
   create: protectedProcedure.input(newTaskSchema).mutation(async ({ ctx, input }) => {
     const values = {
       userId: ctx.userId,
@@ -54,7 +58,12 @@ export const tasksRouter = router({
           .values({ id: input.id, ...values })
           .onConflictDoUpdate({
             target: tasks.id,
-            set: { title: input.title, description: input.description, completed: input.completed },
+            set: {
+              title: input.title,
+              description: input.description,
+              completed: input.completed,
+              deletedAt: null,
+            },
             setWhere: eq(tasks.userId, ctx.userId),
           })
           .returning()

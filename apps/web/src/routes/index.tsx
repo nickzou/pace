@@ -1,8 +1,11 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { createFileRoute, Link } from "@tanstack/react-router"
-import { type FormEvent, useEffect, useState } from "react"
+import { type FormEvent, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
-import { PowerSyncProvider } from "#/lib/powersync/provider"
+import { RequireLocalDb } from "#/lib/powersync/require-db"
+import { deleteWithUndo, type Task, toggleTask } from "#/lib/tasks/mutations"
+import { TaskModal } from "#/lib/tasks/task-modal"
+import { useToast } from "#/lib/toast"
 
 export const Route = createFileRoute("/")({ component: Home })
 
@@ -43,45 +46,17 @@ function AuthBar() {
   )
 }
 
-// Renders the local database only in the browser, for a signed-in user.
-// @powersync/web (wa-sqlite) can't run during SSR, and there's nothing to sync
-// until we can mint a token — so gate on both `mounted` and `session` before
-// mounting the provider, which owns the DB lifecycle.
-function Tasks() {
-  const { data: session, isPending } = useSession()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
-  if (isPending || !mounted) return <p className="text-sm text-neutral-500">…</p>
-  if (!session) {
-    return (
-      <p className="text-sm text-neutral-400">
-        <Link to="/sign-in" className="text-sky-400 hover:underline">
-          Sign in
-        </Link>{" "}
-        to see your tasks.
-      </p>
-    )
-  }
-
-  return (
-    <PowerSyncProvider>
-      <TaskList />
-    </PowerSyncProvider>
-  )
-}
-
 // Reads and writes go straight to local SQLite. useQuery is live — it re-runs
 // whenever the tasks table changes, whether from a local write or a row synced
 // down from the server — so there's no cache to invalidate and no optimistic
 // bookkeeping. PowerSync uploads the local writes to the API in the background.
-type TaskRow = { id: string; title: string; completed: number }
-
 function TaskList() {
   const db = usePowerSync()
+  const toast = useToast()
   const [title, setTitle] = useState("")
-  const { data: tasks, isLoading } = useQuery<TaskRow>(
-    "SELECT id, title, completed FROM tasks ORDER BY created_at DESC",
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { data: tasks, isLoading } = useQuery<Task>(
+    "SELECT id, title, description, completed, created_at, updated_at FROM tasks ORDER BY created_at DESC",
   )
 
   async function add(event: FormEvent) {
@@ -95,15 +70,6 @@ function TaskList() {
     )
     setTitle("")
   }
-
-  const toggle = (task: TaskRow) =>
-    db.execute("UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?", [
-      task.completed ? 0 : 1,
-      new Date().toISOString(),
-      task.id,
-    ])
-
-  const remove = (id: string) => db.execute("DELETE FROM tasks WHERE id = ?", [id])
 
   return (
     <section>
@@ -140,9 +106,9 @@ function TaskList() {
             >
               <button
                 type="button"
-                onClick={() => toggle(task)}
+                onClick={() => void toggleTask(db, task)}
                 aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
-                className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
                   task.completed
                     ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
                     : "border-neutral-600"
@@ -150,14 +116,25 @@ function TaskList() {
               >
                 {task.completed ? "✓" : ""}
               </button>
-              <span className={`flex-1 ${task.completed ? "text-neutral-500 line-through" : ""}`}>
-                {task.title}
-              </span>
               <button
                 type="button"
-                onClick={() => remove(task.id)}
+                onClick={() => setSelectedId(task.id)}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className={task.completed ? "text-neutral-500 line-through" : ""}>
+                  {task.title}
+                </span>
+                {task.description ? (
+                  <span className="block truncate text-xs text-neutral-500">
+                    {task.description}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteWithUndo(db, task, toast)}
                 aria-label="Delete task"
-                className="text-neutral-600 transition hover:text-red-400"
+                className="shrink-0 text-neutral-600 transition hover:text-red-400"
               >
                 ✕
               </button>
@@ -165,6 +142,8 @@ function TaskList() {
           ))}
         </ul>
       )}
+
+      {selectedId ? <TaskModal id={selectedId} onClose={() => setSelectedId(null)} /> : null}
     </section>
   )
 }
@@ -180,7 +159,9 @@ function Home() {
           </h1>
           <p className="mt-2 italic text-neutral-400">set your own pace</p>
         </header>
-        <Tasks />
+        <RequireLocalDb>
+          <TaskList />
+        </RequireLocalDb>
       </div>
     </main>
   )
