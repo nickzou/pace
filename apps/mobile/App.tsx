@@ -19,11 +19,16 @@ import { AuthScreen } from "./AuthScreen"
 import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
+import { deleteWithUndo, type Task, toggleTask } from "./lib/tasks/mutations"
+import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
+import { ToastProvider, useToast } from "./lib/toast"
 
 export default function App() {
   return (
     <ApiProvider>
-      <Main />
+      <ToastProvider>
+        <Main />
+      </ToastProvider>
     </ApiProvider>
   )
 }
@@ -91,13 +96,13 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
 // change to the tasks table (a local write or a row synced down), so there's no
 // cache to invalidate and no optimistic bookkeeping. PowerSync uploads local
 // writes to the API in the background. (Mirrors apps/web's TaskList.)
-type TaskRow = { id: string; title: string; completed: number }
-
 function Tasks() {
   const db = usePowerSync()
+  const toast = useToast()
   const [title, setTitle] = useState("")
-  const { data: tasks, isLoading } = useQuery<TaskRow>(
-    "SELECT id, title, completed FROM tasks ORDER BY created_at DESC",
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const { data: tasks, isLoading } = useQuery<Task>(
+    "SELECT id, title, description, completed, created_at, updated_at FROM tasks ORDER BY created_at DESC",
   )
 
   function add() {
@@ -110,15 +115,6 @@ function Tasks() {
     )
     setTitle("")
   }
-
-  const toggle = (task: TaskRow) =>
-    db.execute("UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?", [
-      task.completed ? 0 : 1,
-      new Date().toISOString(),
-      task.id,
-    ])
-
-  const remove = (id: string) => db.execute("DELETE FROM tasks WHERE id = ?", [id])
 
   return (
     <>
@@ -148,20 +144,41 @@ function Tasks() {
         tasks.map((task) => (
           <View key={task.id} style={styles.task}>
             <Pressable
-              onPress={() => toggle(task)}
+              testID={`toggle-${task.id}`}
+              onPress={() => void toggleTask(db, task)}
               style={[styles.checkbox, task.completed ? styles.checkboxDone : null]}
             >
               {task.completed ? <Text style={styles.check}>✓</Text> : null}
             </Pressable>
-            <Text style={[styles.taskText, task.completed ? styles.taskTextDone : null]}>
-              {task.title}
-            </Text>
-            <Pressable onPress={() => remove(task.id)} hitSlop={8}>
+            <Pressable
+              testID={`open-${task.id}`}
+              style={styles.taskBody}
+              onPress={() => setSelectedId(task.id)}
+            >
+              <Text
+                style={[styles.taskText, task.completed ? styles.taskTextDone : null]}
+                numberOfLines={1}
+              >
+                {task.title}
+              </Text>
+              {task.description ? (
+                <Text style={styles.taskDesc} numberOfLines={1}>
+                  {task.description}
+                </Text>
+              ) : null}
+            </Pressable>
+            <Pressable
+              testID={`delete-${task.id}`}
+              onPress={() => void deleteWithUndo(db, task, toast)}
+              hitSlop={8}
+            >
               <Text style={styles.delete}>✕</Text>
             </Pressable>
           </View>
         ))
       )}
+
+      <TaskDetailModal id={selectedId} onClose={() => setSelectedId(null)} />
     </>
   )
 }
@@ -240,7 +257,9 @@ const styles = StyleSheet.create({
   },
   checkboxDone: { borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.2)" },
   check: { color: "#34d399", fontSize: 12 },
-  taskText: { color: "#e5e5e5", fontSize: 15, flex: 1 },
+  taskBody: { flex: 1 },
+  taskText: { color: "#e5e5e5", fontSize: 15 },
+  taskDesc: { color: "#737373", fontSize: 13, marginTop: 2 },
   taskTextDone: { color: "#737373", textDecorationLine: "line-through" },
   delete: { color: "#525252", fontSize: 16, paddingHorizontal: 4 },
   footer: { color: "#525252", fontSize: 12, marginTop: 12, lineHeight: 18 },
