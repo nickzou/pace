@@ -1,4 +1,4 @@
-# Mobile tasks flow: sign up -> add a task -> it shows up in the list.
+# Mobile tasks flow: sign up -> add a task -> delete it -> Undo restores it.
 # Run: maestro test apps/mobile/.maestro/tasks.yaml  (dev build installed + Metro
 # running; the app must reach the API — see the runbook).
 appId: app.paceproductivity.mobile
@@ -45,4 +45,17 @@ appId: app.paceproductivity.mobile
 - hideKeyboard
 - tapOn:
     id: "add-task"
+- assertVisible: ${output.task}
+
+# Delete it (the row's ✕) — it leaves the list and an Undo toast appears. The
+# per-row delete id is "delete-<uuid>"; match it by pattern since there's one task.
+- tapOn:
+    id: "delete-.*"
+- assertNotVisible: ${output.task}
+- assertVisible: "Task deleted"
+
+# Undo re-inserts the row → replays as create, whose upsert clears deletedAt, so
+# the task comes back.
+- tapOn:
+    id: "toast-action"
 - assertVisible: ${output.task}
