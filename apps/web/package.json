@@ -12,7 +12,8 @@
     "build:desktop": "PACE_DESKTOP=1 vite build && node -e \"require('node:fs').copyFileSync('.output/public/_shell.html', '.output/public/index.html')\"",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@pace/api-client": "workspace:*",
@@ -41,6 +42,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
-    "vite-plugin-wasm": "^3.6.0"
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^4.1.10"
   }
 }
