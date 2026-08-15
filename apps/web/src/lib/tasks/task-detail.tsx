@@ -1,8 +1,13 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { useEffect, useRef, useState } from "react"
-import { fromLocalInput, isOverdue, toLocalInput } from "#/lib/tasks/dates"
+import { combineLocal, isOverdue, toDateInput, toTimeInput } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
 import { useToast } from "#/lib/toast"
+
+// When only a date is picked, fall back to a sensible wall-clock time: end-of-day
+// for a due date (so "due today" isn't overdue at 12:01am), start-of-day for start.
+const START_FALLBACK = "00:00"
+const DUE_FALLBACK = "23:59"
 
 // The single-task view/editor shared by the quick modal and the dedicated
 // /tasks/$taskId route. Reads the task live from local SQLite; title/notes edits
@@ -19,8 +24,10 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [startDate, setStartDate] = useState("")
-  const [dueDate, setDueDate] = useState("")
+  const [startDay, setStartDay] = useState("")
+  const [startTime, setStartTime] = useState("")
+  const [dueDay, setDueDay] = useState("")
+  const [dueTime, setDueTime] = useState("")
   const seededFor = useRef<string | null>(null)
 
   useEffect(() => {
@@ -28,8 +35,10 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       seededFor.current = task.id
       setTitle(task.title)
       setDescription(task.description)
-      setStartDate(toLocalInput(task.start_date))
-      setDueDate(toLocalInput(task.due_date))
+      setStartDay(toDateInput(task.start_date))
+      setStartTime(toTimeInput(task.start_date))
+      setDueDay(toDateInput(task.due_date))
+      setDueTime(toTimeInput(task.due_date))
     }
   }, [task])
 
@@ -47,23 +56,28 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       void updateTask(db, id, { title: task.title, description })
   }
 
-  // Dates save immediately on pick/clear (the input is discrete, not typed). If the
-  // local write throws — e.g. an out-of-date on-device schema missing the column —
-  // surface it and revert the field, rather than showing a value that never saved.
-  const saveStart = (value: string) => {
-    setStartDate(value)
-    updateTask(db, id, { start_date: fromLocalInput(value) }).catch((err) => {
+  // Dates save immediately on pick/clear. The date is required and the time is
+  // optional (defaulted) — so picking just a day still saves a full timestamp.
+  // If the local write throws — e.g. an out-of-date on-device schema missing the
+  // column — surface it and revert, rather than showing a value that never saved.
+  const saveStart = (day: string, time: string) => {
+    setStartDay(day)
+    setStartTime(time)
+    updateTask(db, id, { start_date: combineLocal(day, time, START_FALLBACK) }).catch((err) => {
       console.error("Failed to save start date", err)
       toast.show("Couldn't save the start date — try reloading")
-      setStartDate(toLocalInput(task.start_date))
+      setStartDay(toDateInput(task.start_date))
+      setStartTime(toTimeInput(task.start_date))
     })
   }
-  const saveDue = (value: string) => {
-    setDueDate(value)
-    updateTask(db, id, { due_date: fromLocalInput(value) }).catch((err) => {
+  const saveDue = (day: string, time: string) => {
+    setDueDay(day)
+    setDueTime(time)
+    updateTask(db, id, { due_date: combineLocal(day, time, DUE_FALLBACK) }).catch((err) => {
       console.error("Failed to save due date", err)
       toast.show("Couldn't save the due date — try reloading")
-      setDueDate(toLocalInput(task.due_date))
+      setDueDay(toDateInput(task.due_date))
+      setDueTime(toTimeInput(task.due_date))
     })
   }
 
@@ -105,13 +119,22 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
           Start
-          <input
-            type="datetime-local"
-            aria-label="Start date"
-            value={startDate}
-            onChange={(event) => saveStart(event.target.value)}
-            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              aria-label="Start date"
+              value={startDay}
+              onChange={(event) => saveStart(event.target.value, startTime)}
+              className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
+            />
+            <input
+              type="time"
+              aria-label="Start time"
+              value={startTime}
+              onChange={(event) => saveStart(startDay, event.target.value)}
+              className="w-28 shrink-0 rounded-lg border border-neutral-800 bg-neutral-950 px-2 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
+            />
+          </div>
         </label>
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
           <span className="flex items-center gap-2">
@@ -122,15 +145,26 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               </span>
             ) : null}
           </span>
-          <input
-            type="datetime-local"
-            aria-label="Due date"
-            value={dueDate}
-            onChange={(event) => saveDue(event.target.value)}
-            className={`rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
-              overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
-            }`}
-          />
+          <div className="flex gap-2">
+            <input
+              type="date"
+              aria-label="Due date"
+              value={dueDay}
+              onChange={(event) => saveDue(event.target.value, dueTime)}
+              className={`min-w-0 flex-1 rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
+                overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
+              }`}
+            />
+            <input
+              type="time"
+              aria-label="Due time"
+              value={dueTime}
+              onChange={(event) => saveDue(dueDay, event.target.value)}
+              className={`w-28 shrink-0 rounded-lg border bg-neutral-950 px-2 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
+                overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
+              }`}
+            />
+          </div>
         </label>
       </div>
 

@@ -48,7 +48,7 @@ test("delete a task → the Undo toast restores it (offline-first round-trip)", 
   await expect(page.getByText(title)).toBeVisible()
 })
 
-test("set a past due date → it's stored exactly (round-trips a reload) and flagged Overdue", async ({
+test("set a past due DATE only (no time) → it saves, is flagged Overdue, and round-trips a reload", async ({
   page,
 }) => {
   await page.goto("/")
@@ -59,20 +59,21 @@ test("set a past due date → it's stored exactly (round-trips a reload) and fla
   await page.getByRole("button", { name: "Add" }).click()
   await expect(page.getByText(title)).toBeVisible()
 
-  // Open the detail and set a due date in the past (datetime-local = local wall-clock).
+  // Open the detail and set only the DATE — no time. The regression this guards:
+  // a date-only entry must still save (it defaults to end-of-day), not silently
+  // no-op the way a single datetime-local input did when its time was left blank.
   await page.getByText(title).click()
   const due = page.getByLabel("Due date")
-  await due.fill("2020-01-01T08:00")
+  await due.fill("2020-01-01")
 
-  // Confirm the value is actually held, AND the task is now flagged Overdue.
-  await expect(due).toHaveValue("2020-01-01T08:00")
+  // The date is held, and the past due date flags the task Overdue.
+  await expect(due).toHaveValue("2020-01-01")
   await expect(page.getByText(/Overdue/).first()).toBeVisible()
 
-  // Reload a fresh page and reopen the task: the value stored as UTC round-trips
-  // back to the same local wall-clock — proving it reached the server and synced,
-  // and that the timezone conversion is lossless (not just "some past date").
+  // Reload a fresh page and reopen: the date stored as a UTC timestamp round-trips
+  // back to the same local day — proving it reached the server and synced back.
   await page.reload()
   await expect(page.getByText(/signed in as/i)).toBeVisible()
   await page.getByText(title).click()
-  await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01T08:00")
+  await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01")
 })
