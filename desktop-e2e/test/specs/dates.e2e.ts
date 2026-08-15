@@ -84,7 +84,7 @@ describe("desktop scheduling", () => {
     await $(`span*=${title}`).click()
     await valueEquals(DUE_DATE, "2020-01-01")
     // Date-only stays date-only: the end-of-day default renders as a blank time.
-    expect(await $(DUE_TIME).getValue()).toBe("")
+    await valueEquals(DUE_TIME, "")
   })
 
   it("an explicit 11:59 PM time is kept, not swallowed as the date-only default", async () => {
@@ -104,6 +104,6 @@ describe("desktop scheduling", () => {
     await expect($(`span*=${email}`)).toBeDisplayed()
     await $(`span*=${title}`).click()
     await valueEquals(DUE_DATE, "2030-06-15")
-    expect(await $(DUE_TIME).getValue()).toBe("23:59")
+    await valueEquals(DUE_TIME, "23:59")
   })
 })
