@@ -12,7 +12,16 @@ import {
   View,
 } from "react-native"
 import { useToast } from "../toast"
-import { formatDate, fromDate, isOverdue, toDate } from "./dates"
+import {
+  combineDay,
+  combineTime,
+  DUE_FALLBACK,
+  formatDate,
+  formatTime,
+  isOverdue,
+  START_FALLBACK,
+  toDate,
+} from "./dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "./mutations"
 
 // The single-task view/editor. On mobile there's no navigation, so this
@@ -37,7 +46,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const db = usePowerSync()
   const toast = useToast()
   const { data: rows } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks WHERE id = ?",
+    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks WHERE id = ?",
     [id],
   )
   const task = rows[0]
@@ -67,38 +76,51 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
       void updateTask(db, id, { title: task.title, description })
   }
 
-  // Scheduling (P2-02). Dates read straight from the live row (no seeded state to
-  // clobber) and save on each pick. iOS shows a combined datetime spinner; Android
-  // has no "datetime" mode, so chain date → time imperatively.
+  // Scheduling (P2-02). Date + optional time (mirrors web). Dates read straight from
+  // the live row (no seeded state to clobber). A date always stores a full
+  // timestamp; *_has_time records whether a real time was picked. iOS shows a
+  // spinner in the chosen mode; Android opens the native dialog imperatively.
+  type Save = (iso: string | null, hasTime: boolean) => void
+  type Fallback = { hours: number; minutes: number }
+
   const [iosPicker, setIosPicker] = useState<{
-    field: "start_date" | "due_date"
+    mode: "date" | "time"
     value: Date
+    onPick: (picked?: Date) => void
   } | null>(null)
 
-  const setDate = (field: "start_date" | "due_date", value: string | null) => {
-    void updateTask(db, id, field === "start_date" ? { start_date: value } : { due_date: value })
-  }
-
-  const pickDate = (field: "start_date" | "due_date", current: string | null) => {
-    const base = toDate(current) ?? new Date()
+  const openPicker = (mode: "date" | "time", value: Date, onPick: (picked?: Date) => void) => {
     if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
-        value: base,
-        mode: "date",
-        onChange: (_e, picked) => {
-          if (!picked) return
-          DateTimePickerAndroid.open({
-            value: picked,
-            mode: "time",
-            onChange: (_e2, withTime) => {
-              if (withTime) setDate(field, fromDate(withTime))
-            },
-          })
-        },
+        value,
+        mode,
+        onChange: (_e, picked) => onPick(picked ?? undefined),
       })
     } else {
-      setIosPicker({ field, value: base })
+      setIosPicker({ mode, value, onPick })
     }
+  }
+
+  const saveStart: Save = (iso, hasTime) => {
+    void updateTask(db, id, { start_date: iso, start_has_time: hasTime ? 1 : 0 })
+  }
+  const saveDue: Save = (iso, hasTime) => {
+    void updateTask(db, id, { due_date: iso, due_has_time: hasTime ? 1 : 0 })
+  }
+
+  // Pick/replace the day (keeps an existing time); pick/replace the time (marks
+  // hasTime); clear just the time (back to date-only). Clearing the date is inline.
+  const pickDay = (current: string | null, hasTime: boolean, fallback: Fallback, save: Save) =>
+    openPicker("date", toDate(current) ?? new Date(), (picked) => {
+      if (picked) save(combineDay(picked, current, hasTime, fallback), hasTime)
+    })
+  const pickTime = (current: string | null, save: Save) =>
+    openPicker("time", toDate(current) ?? new Date(), (picked) => {
+      if (picked) save(combineTime(picked, current), true)
+    })
+  const clearTime = (current: string | null, fallback: Fallback, save: Save) => {
+    const day = toDate(current)
+    if (day) save(combineDay(day, current, false, fallback), false)
   }
 
   const overdue = !!task && isOverdue(task.due_date, task.completed)
@@ -153,21 +175,43 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             <Text style={styles.dateLabel}>Start</Text>
             <Pressable
               testID="detail-start"
-              onPress={() => pickDate("start_date", task.start_date)}
+              onPress={() =>
+                pickDay(task.start_date, !!task.start_has_time, START_FALLBACK, saveStart)
+              }
               style={styles.dateValueBtn}
             >
               <Text style={styles.dateValue}>
-                {task.start_date ? formatDate(task.start_date) : "Set…"}
+                {task.start_date ? formatDate(task.start_date, false) : "Set…"}
               </Text>
             </Pressable>
             {task.start_date ? (
-              <Pressable
-                testID="detail-start-clear"
-                onPress={() => setDate("start_date", null)}
-                hitSlop={8}
-              >
-                <Text style={styles.dateClear}>Clear</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  testID="detail-start-time"
+                  onPress={() => pickTime(task.start_date, saveStart)}
+                  style={styles.timeChip}
+                >
+                  <Text style={task.start_has_time ? styles.timeText : styles.addTimeText}>
+                    {task.start_has_time ? formatTime(task.start_date) : "＋ time"}
+                  </Text>
+                </Pressable>
+                {task.start_has_time ? (
+                  <Pressable
+                    testID="detail-start-time-clear"
+                    onPress={() => clearTime(task.start_date, START_FALLBACK, saveStart)}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.dateClear}>✕</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  testID="detail-start-clear"
+                  onPress={() => saveStart(null, false)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.dateClear}>Clear</Text>
+                </Pressable>
+              </>
             ) : null}
           </View>
 
@@ -175,32 +219,53 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             <Text style={styles.dateLabel}>Due</Text>
             <Pressable
               testID="detail-due"
-              onPress={() => pickDate("due_date", task.due_date)}
+              onPress={() => pickDay(task.due_date, !!task.due_has_time, DUE_FALLBACK, saveDue)}
               style={styles.dateValueBtn}
             >
               <Text style={[styles.dateValue, overdue ? styles.dateOverdue : null]}>
-                {task.due_date ? formatDate(task.due_date) : "Set…"}
+                {task.due_date ? formatDate(task.due_date, false) : "Set…"}
               </Text>
             </Pressable>
-            {overdue ? <Text style={styles.overdueBadge}>Overdue</Text> : null}
             {task.due_date ? (
-              <Pressable
-                testID="detail-due-clear"
-                onPress={() => setDate("due_date", null)}
-                hitSlop={8}
-              >
-                <Text style={styles.dateClear}>Clear</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  testID="detail-due-time"
+                  onPress={() => pickTime(task.due_date, saveDue)}
+                  style={styles.timeChip}
+                >
+                  <Text style={task.due_has_time ? styles.timeText : styles.addTimeText}>
+                    {task.due_has_time ? formatTime(task.due_date) : "＋ time"}
+                  </Text>
+                </Pressable>
+                {task.due_has_time ? (
+                  <Pressable
+                    testID="detail-due-time-clear"
+                    onPress={() => clearTime(task.due_date, DUE_FALLBACK, saveDue)}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.dateClear}>✕</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  testID="detail-due-clear"
+                  onPress={() => saveDue(null, false)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.dateClear}>Clear</Text>
+                </Pressable>
+              </>
             ) : null}
+            {overdue ? <Text style={styles.overdueBadge}>Overdue</Text> : null}
           </View>
 
           {iosPicker ? (
             <DateTimePicker
               value={iosPicker.value}
-              mode="datetime"
+              mode={iosPicker.mode}
               onChange={(_e, picked) => {
+                const { onPick } = iosPicker
                 setIosPicker(null)
-                if (picked) setDate(iosPicker.field, fromDate(picked))
+                onPick(picked ?? undefined)
               }}
             />
           ) : null}
@@ -265,10 +330,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   deleteText: { color: "#a3a3a3", fontSize: 15 },
-  dateRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dateRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
   dateLabel: { color: "#a3a3a3", fontSize: 13, width: 44 },
   dateValueBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 120,
     borderWidth: 1,
     borderColor: "#262626",
     backgroundColor: "#0a0a0a",
@@ -280,4 +346,14 @@ const styles = StyleSheet.create({
   dateOverdue: { color: "#f87171" },
   overdueBadge: { color: "#f87171", fontSize: 11, fontWeight: "600" },
   dateClear: { color: "#737373", fontSize: 13 },
+  timeChip: {
+    borderWidth: 1,
+    borderColor: "#262626",
+    backgroundColor: "#0a0a0a",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  timeText: { color: "#e5e5e5", fontSize: 15 },
+  addTimeText: { color: "#737373", fontSize: 13 },
 })

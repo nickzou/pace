@@ -17,6 +17,10 @@ const tasks = new Table({
   // Optional schedule (P2-02): nullable ISO strings, like the other timestamps.
   start_date: column.text,
   due_date: column.text,
+  // Whether a real time-of-day was picked (0/1) — a date-only entry stores a
+  // fallback time, so this bit is what says to show/keep the time.
+  start_has_time: column.integer,
+  due_has_time: column.integer,
   created_at: column.text,
   updated_at: column.text,
 })

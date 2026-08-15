@@ -103,7 +103,7 @@ function Tasks() {
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: tasks, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks ORDER BY created_at DESC",
+    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks ORDER BY created_at DESC",
   )
 
   function add() {
@@ -176,7 +176,7 @@ function Tasks() {
                   numberOfLines={1}
                 >
                   {isOverdue(task.due_date, task.completed) ? "Overdue · " : "Due "}
-                  {formatDate(task.due_date)}
+                  {formatDate(task.due_date, !!task.due_has_time)}
                 </Text>
               ) : null}
             </Pressable>

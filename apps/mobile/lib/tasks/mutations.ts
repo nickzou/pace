@@ -10,6 +10,8 @@ export type Task = {
   completed: number
   start_date: string | null
   due_date: string | null
+  start_has_time: number
+  due_has_time: number
   created_at: string
   updated_at: string
 }
@@ -32,7 +34,12 @@ export function toggleTask(db: AbstractPowerSyncDatabase, task: Pick<Task, "id" 
 export function updateTask(
   db: AbstractPowerSyncDatabase,
   id: string,
-  fields: Partial<Pick<Task, "title" | "description" | "start_date" | "due_date">>,
+  fields: Partial<
+    Pick<
+      Task,
+      "title" | "description" | "start_date" | "due_date" | "start_has_time" | "due_has_time"
+    >
+  >,
 ) {
   const cols = Object.keys(fields) as (keyof typeof fields)[]
   if (cols.length === 0) return Promise.resolve()
@@ -54,7 +61,7 @@ export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, 
     label: "Undo",
     onClick: () => {
       void db.execute(
-        "INSERT INTO tasks (id, title, description, completed, start_date, due_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO tasks (id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           task.id,
           task.title,
@@ -62,6 +69,8 @@ export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, 
           task.completed,
           task.start_date,
           task.due_date,
+          task.start_has_time,
+          task.due_has_time,
           task.created_at,
           task.updated_at,
         ],

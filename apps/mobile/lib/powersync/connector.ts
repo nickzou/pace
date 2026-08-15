@@ -53,6 +53,8 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
                 completed: !!data.completed,
                 ...(data.start_date != null ? { startDate: String(data.start_date) } : {}),
                 ...(data.due_date != null ? { dueDate: String(data.due_date) } : {}),
+                ...(data.start_has_time != null ? { startHasTime: !!data.start_has_time } : {}),
+                ...(data.due_has_time != null ? { dueHasTime: !!data.due_has_time } : {}),
               })
               break
             case UpdateType.PATCH:
@@ -69,6 +71,10 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
                 ...(data.due_date !== undefined
                   ? { dueDate: data.due_date != null ? String(data.due_date) : null }
                   : {}),
+                ...(data.start_has_time !== undefined
+                  ? { startHasTime: !!data.start_has_time }
+                  : {}),
+                ...(data.due_has_time !== undefined ? { dueHasTime: !!data.due_has_time } : {}),
               })
               break
             case UpdateType.DELETE:
