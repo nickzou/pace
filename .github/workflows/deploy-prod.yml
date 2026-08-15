@@ -1,0 +1,142 @@
+name: Deploy Prod
+
+# Prod deploy, decoupled from the "Deploy" (CI + previews) workflow on purpose.
+# It runs AFTER "Deploy" completes on main, via workflow_run — which is NOT tied to
+# a PR's head branch. So deleting a merged PR's branch (even mid-deploy, via the UI
+# "Delete branch" button or `--delete-branch`) can no longer cancel the prod deploy,
+# the way it did when this job lived in the push-triggered workflow.
+# See the pace-merge-no-delete-branch note.
+on:
+  workflow_run:
+    workflows: ["Deploy"]
+    types: [completed]
+
+# Never cancel an in-flight prod deploy; a newer one queues behind it.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  # Prod runs on the shared platform + the per-env stack (deploy/stack) — the SAME
+  # machinery every pr-<n> preview uses, just with env name "prod" (apex host).
+  deploy:
+    # Deploy for a push that landed on main whose CI passed — OR was cancelled.
+    # workflow_run fires for EVERY "Deploy" completion (feature branches, PRs); this
+    # filters to main. Why accept 'cancelled': the ONLY thing that cancels a
+    # refs/heads/main CI run in this repo is the merge/branch-delete race (no
+    # competing concurrency on that ref), and by then the code already passed full
+    # CI + preview on the PR — so a cancelled main run means "merged & validated,
+    # ship it". A real CI 'failure' still blocks the deploy. (This whole workflow is
+    # workflow_run-triggered precisely so the branch-delete can't cancel IT.)
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      (github.event.workflow_run.conclusion == 'success' ||
+       github.event.workflow_run.conclusion == 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push to GHCR with the built-in GITHUB_TOKEN
+    env:
+      REG: ghcr.io/${{ github.repository }}
+      # CRITICAL: workflow_run runs against the default branch, so github.sha is
+      # main's tip — NOT necessarily the commit that triggered CI. Always use the
+      # triggering run's head_sha for checkout, image tags, and the deploy.
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The full stack needs three images.
+      - name: Build and push web
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.REG }}/web:${{ env.SHA }}
+
+      - name: Build and push api
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: runtime
+          push: true
+          tags: ${{ env.REG }}/api:${{ env.SHA }}
+
+      - name: Build and push api-migrate
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          target: migrate
+          push: true
+          tags: ${{ env.REG }}/api-migrate:${{ env.SHA }}
+
+      - name: Deploy prod over SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          # Must be the *wildcard* origin cert (*.paceproductivity.app + apex) so
+          # the apex (prod) AND every pr-<n>.* preview are covered by one cert.
+          ORIGIN_CERT: ${{ secrets.ORIGIN_CERT }}
+          ORIGIN_KEY: ${{ secrets.ORIGIN_KEY }}
+          BASE_DOMAIN: paceproductivity.app
+          POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          BETTER_AUTH_SECRET: ${{ secrets.PROD_BETTER_AUTH_SECRET }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          REG: ghcr.io/${{ github.repository }}
+        run: |
+          set -e
+
+          # SSH key + pin the host key
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -i $HOME/.ssh/deploy_key deploy@$DEPLOY_HOST"
+
+          # Ship the deploy machinery + PowerSync config to the box. up.sh runs ON
+          # the box against deploy/stack; that stack mounts ../../powersync for the
+          # PowerSync service config, so both trees must be present. tar keeps the
+          # scripts' +x bits.
+          tar czf - deploy powersync | $SSH "mkdir -p pace && tar xzf - -C pace"
+
+          # Wildcard origin cert/key from secrets → pace/deploy/certs, where the
+          # platform compose mounts them (../certs:/certs) and tls.yml serves the
+          # pair as Traefik's default cert for every env host.
+          printf '%s\n' "$ORIGIN_CERT" | $SSH "mkdir -p pace/deploy/certs && cat > pace/deploy/certs/origin.pem"
+          printf '%s\n' "$ORIGIN_KEY"  | $SSH "cat > pace/deploy/certs/origin-key.pem && chmod 600 pace/deploy/certs/origin-key.pem"
+
+          # Retire the legacy web-only stack (compose project "pace": its private
+          # Traefik + `app`). It binds :80/:443, so it MUST come down before the
+          # shared platform Traefik can bind them. Idempotent — a no-op once gone.
+          $SSH "cd pace \
+            && (docker compose -p pace down --remove-orphans 2>/dev/null || true) \
+            && (docker rm -f pace-traefik-1 pace-app-1 pace-web 2>/dev/null || true) \
+            && rm -f docker-compose.yml"
+
+          # Bring up the stateless shared platform (idempotent), then prod on the
+          # new per-env stack with this commit's images.
+          $SSH "cd pace \
+            && echo '$REGISTRY_TOKEN' | docker login ghcr.io -u '$ACTOR' --password-stdin \
+            && docker compose -f deploy/platform/docker-compose.yml up -d \
+            && BASE_DOMAIN='$BASE_DOMAIN' \
+               IMAGE_WEB='$REG/web:$SHA' \
+               IMAGE_API='$REG/api:$SHA' \
+               IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
+               POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
+               BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
+               bash deploy/bin/up.sh prod \
+            && docker image prune -f"
