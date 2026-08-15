@@ -69,10 +69,13 @@ export async function reconcileSchemaVersion(
     const { SCHEMA_VERSION } = await import("./schema")
     const stored = localStorage.getItem(SCHEMA_VERSION_KEY)
     if (stored === SCHEMA_VERSION) return
-    // First run under the guard (no stored version): assume the DB already matches
-    // the current schema (a fresh DB, or one cleared by hand) — just record it.
-    // Only a real version change forces a rebuild.
-    if (stored !== null) {
+    // Rebuild when this DB was built with a KNOWN older version, or when it predates
+    // the guard (no stored version) yet already holds rows — i.e. an existing user
+    // whose local schema is stale. A fresh/empty DB (no rows before the first sync)
+    // is already current, so just record the version without a needless clear.
+    const staleWithData =
+      stored === null && (await db.getAll("SELECT 1 FROM tasks LIMIT 1")).length > 0
+    if (stored !== null || staleWithData) {
       if (!(await flushPendingWrites(db, connector))) return // offline — defer, keep writes
       await db.disconnectAndClear()
     }
