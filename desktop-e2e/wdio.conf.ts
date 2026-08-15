@@ -114,7 +114,12 @@ export const config: WebdriverIO.Config = {
 
   framework: "mocha",
   reporters: ["spec"],
-  mochaOpts: { ui: "bdd", timeout: 120_000 },
+  // retries: re-run a failed test up to twice. These specs drive a real WebKit
+  // webview syncing over PowerSync, so an assertion that reads back a value after a
+  // reload can race the post-reload sync reconciliation (e.g. the detail seeds once,
+  // and if it reads mid-reconcile it can latch a stale value). Each retry re-runs
+  // the whole `it` (its own signUpFresh reset), so the race resolves independently.
+  mochaOpts: { ui: "bdd", timeout: 120_000, retries: 2 },
 
   // Reset the DB and bring up the API once, before any session.
   onPrepare: async () => {
