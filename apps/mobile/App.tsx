@@ -19,6 +19,7 @@ import { AuthScreen } from "./AuthScreen"
 import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
+import { formatDate, isOverdue } from "./lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask } from "./lib/tasks/mutations"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
 import { ToastProvider, useToast } from "./lib/toast"
@@ -102,7 +103,7 @@ function Tasks() {
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: tasks, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, created_at, updated_at FROM tasks ORDER BY created_at DESC",
+    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks ORDER BY created_at DESC",
   )
 
   function add() {
@@ -164,6 +165,18 @@ function Tasks() {
               {task.description ? (
                 <Text style={styles.taskDesc} numberOfLines={1}>
                   {task.description}
+                </Text>
+              ) : null}
+              {task.due_date ? (
+                <Text
+                  style={[
+                    styles.taskDue,
+                    isOverdue(task.due_date, task.completed) ? styles.taskDueOverdue : null,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {isOverdue(task.due_date, task.completed) ? "Overdue · " : "Due "}
+                  {formatDate(task.due_date)}
                 </Text>
               ) : null}
             </Pressable>
@@ -260,6 +273,8 @@ const styles = StyleSheet.create({
   taskBody: { flex: 1 },
   taskText: { color: "#e5e5e5", fontSize: 15 },
   taskDesc: { color: "#737373", fontSize: 13, marginTop: 2 },
+  taskDue: { color: "#737373", fontSize: 12, marginTop: 2 },
+  taskDueOverdue: { color: "#f87171" },
   taskTextDone: { color: "#737373", textDecorationLine: "line-through" },
   delete: { color: "#525252", fontSize: 16, paddingHorizontal: 4 },
   footer: { color: "#525252", fontSize: 12, marginTop: 12, lineHeight: 18 },

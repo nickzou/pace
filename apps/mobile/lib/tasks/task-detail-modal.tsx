@@ -1,7 +1,18 @@
 import { usePowerSync, useQuery } from "@powersync/react"
+import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
 import { useEffect, useRef, useState } from "react"
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native"
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native"
 import { useToast } from "../toast"
+import { formatDate, fromDate, isOverdue, toDate } from "./dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "./mutations"
 
 // The single-task view/editor. On mobile there's no navigation, so this
@@ -26,7 +37,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const db = usePowerSync()
   const toast = useToast()
   const { data: rows } = useQuery<Task>(
-    "SELECT id, title, description, completed, created_at, updated_at FROM tasks WHERE id = ?",
+    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks WHERE id = ?",
     [id],
   )
   const task = rows[0]
@@ -55,6 +66,42 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     if (task && description !== task.description)
       void updateTask(db, id, { title: task.title, description })
   }
+
+  // Scheduling (P2-02). Dates read straight from the live row (no seeded state to
+  // clobber) and save on each pick. iOS shows a combined datetime spinner; Android
+  // has no "datetime" mode, so chain date → time imperatively.
+  const [iosPicker, setIosPicker] = useState<{
+    field: "start_date" | "due_date"
+    value: Date
+  } | null>(null)
+
+  const setDate = (field: "start_date" | "due_date", value: string | null) => {
+    void updateTask(db, id, field === "start_date" ? { start_date: value } : { due_date: value })
+  }
+
+  const pickDate = (field: "start_date" | "due_date", current: string | null) => {
+    const base = toDate(current) ?? new Date()
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: base,
+        mode: "date",
+        onChange: (_e, picked) => {
+          if (!picked) return
+          DateTimePickerAndroid.open({
+            value: picked,
+            mode: "time",
+            onChange: (_e2, withTime) => {
+              if (withTime) setDate(field, fromDate(withTime))
+            },
+          })
+        },
+      })
+    } else {
+      setIosPicker({ field, value: base })
+    }
+  }
+
+  const overdue = !!task && isOverdue(task.due_date, task.completed)
 
   return (
     <ScrollView
@@ -101,6 +148,62 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             multiline
             style={styles.notes}
           />
+
+          <View style={styles.dateRow}>
+            <Text style={styles.dateLabel}>Start</Text>
+            <Pressable
+              testID="detail-start"
+              onPress={() => pickDate("start_date", task.start_date)}
+              style={styles.dateValueBtn}
+            >
+              <Text style={styles.dateValue}>
+                {task.start_date ? formatDate(task.start_date) : "Set…"}
+              </Text>
+            </Pressable>
+            {task.start_date ? (
+              <Pressable
+                testID="detail-start-clear"
+                onPress={() => setDate("start_date", null)}
+                hitSlop={8}
+              >
+                <Text style={styles.dateClear}>Clear</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.dateRow}>
+            <Text style={styles.dateLabel}>Due</Text>
+            <Pressable
+              testID="detail-due"
+              onPress={() => pickDate("due_date", task.due_date)}
+              style={styles.dateValueBtn}
+            >
+              <Text style={[styles.dateValue, overdue ? styles.dateOverdue : null]}>
+                {task.due_date ? formatDate(task.due_date) : "Set…"}
+              </Text>
+            </Pressable>
+            {overdue ? <Text style={styles.overdueBadge}>Overdue</Text> : null}
+            {task.due_date ? (
+              <Pressable
+                testID="detail-due-clear"
+                onPress={() => setDate("due_date", null)}
+                hitSlop={8}
+              >
+                <Text style={styles.dateClear}>Clear</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {iosPicker ? (
+            <DateTimePicker
+              value={iosPicker.value}
+              mode="datetime"
+              onChange={(_e, picked) => {
+                setIosPicker(null)
+                if (picked) setDate(iosPicker.field, fromDate(picked))
+              }}
+            />
+          ) : null}
 
           <Pressable
             testID="detail-delete"
@@ -162,4 +265,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   deleteText: { color: "#a3a3a3", fontSize: 15 },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dateLabel: { color: "#a3a3a3", fontSize: 13, width: 44 },
+  dateValueBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#262626",
+    backgroundColor: "#0a0a0a",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  dateValue: { color: "#e5e5e5", fontSize: 15 },
+  dateOverdue: { color: "#f87171" },
+  overdueBadge: { color: "#f87171", fontSize: 11, fontWeight: "600" },
+  dateClear: { color: "#737373", fontSize: 13 },
 })
