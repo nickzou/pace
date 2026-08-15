@@ -6,7 +6,7 @@ import {
   isOverdue,
   START_FALLBACK,
   toDateInput,
-  toOptionalTime,
+  toTimeInput,
 } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
 import { useToast } from "#/lib/toast"
@@ -19,7 +19,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const db = usePowerSync()
   const toast = useToast()
   const { data: rows, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks WHERE id = ?",
+    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks WHERE id = ?",
     [id],
   )
   const task = rows[0]
@@ -38,9 +38,9 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       setTitle(task.title)
       setDescription(task.description)
       setStartDay(toDateInput(task.start_date))
-      setStartTime(toOptionalTime(task.start_date, START_FALLBACK))
+      setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
       setDueDay(toDateInput(task.due_date))
-      setDueTime(toOptionalTime(task.due_date, DUE_FALLBACK))
+      setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
     }
   }, [task])
 
@@ -65,21 +65,23 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const saveStart = (day: string, time: string) => {
     setStartDay(day)
     setStartTime(time)
-    updateTask(db, id, { start_date: combineLocal(day, time, START_FALLBACK) }).catch((err) => {
+    const iso = combineLocal(day, time, START_FALLBACK)
+    updateTask(db, id, { start_date: iso, start_has_time: iso && time ? 1 : 0 }).catch((err) => {
       console.error("Failed to save start date", err)
       toast.show("Couldn't save the start date — try reloading")
       setStartDay(toDateInput(task.start_date))
-      setStartTime(toOptionalTime(task.start_date, START_FALLBACK))
+      setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
     })
   }
   const saveDue = (day: string, time: string) => {
     setDueDay(day)
     setDueTime(time)
-    updateTask(db, id, { due_date: combineLocal(day, time, DUE_FALLBACK) }).catch((err) => {
+    const iso = combineLocal(day, time, DUE_FALLBACK)
+    updateTask(db, id, { due_date: iso, due_has_time: iso && time ? 1 : 0 }).catch((err) => {
       console.error("Failed to save due date", err)
       toast.show("Couldn't save the due date — try reloading")
       setDueDay(toDateInput(task.due_date))
-      setDueTime(toOptionalTime(task.due_date, DUE_FALLBACK))
+      setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
     })
   }
 

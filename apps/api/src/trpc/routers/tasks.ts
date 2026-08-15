@@ -16,6 +16,8 @@ function toTask(row: typeof tasks.$inferSelect): Task {
     completed: row.completed,
     startDate: row.startDate ? row.startDate.toISOString() : null,
     dueDate: row.dueDate ? row.dueDate.toISOString() : null,
+    startHasTime: row.startHasTime,
+    dueHasTime: row.dueHasTime,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
@@ -58,6 +60,8 @@ export const tasksRouter = router({
       completed: input.completed,
       startDate,
       dueDate,
+      startHasTime: input.startHasTime ?? false,
+      dueHasTime: input.dueHasTime ?? false,
     }
     const [row] = input.id
       ? await ctx.db
@@ -71,6 +75,8 @@ export const tasksRouter = router({
               completed: input.completed,
               startDate,
               dueDate,
+              startHasTime: input.startHasTime ?? false,
+              dueHasTime: input.dueHasTime ?? false,
               deletedAt: null,
             },
             setWhere: eq(tasks.userId, ctx.userId),

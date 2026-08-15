@@ -80,3 +80,29 @@ test("set a past due DATE only (no time) → it saves, is flagged Overdue, and r
   // is a durable unset rather than reappearing as 23:59 on reload.
   await expect(page.getByLabel("Due time")).toHaveValue("")
 })
+
+test("an explicit time equal to the no-time default (11:59 PM) is kept, not swallowed", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+
+  const title = `Time me ${Date.now()}`
+  await page.getByPlaceholder("Add a task…").fill(title)
+  await page.getByRole("button", { name: "Add" }).click()
+  await expect(page.getByText(title)).toBeVisible()
+
+  // Set a due date AND an explicit 23:59 — the same wall-clock a date-only entry
+  // defaults to. The hasTime flag must keep it distinct from "no time".
+  await page.getByText(title).click()
+  await page.getByLabel("Due date").fill("2030-06-15")
+  await page.getByLabel("Due time").fill("23:59")
+  await expect(page.getByLabel("Due time")).toHaveValue("23:59")
+
+  // After a reload the time survives (not blanked as if it were the default).
+  await page.reload()
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await page.getByText(title).click()
+  await expect(page.getByLabel("Due date")).toHaveValue("2030-06-15")
+  await expect(page.getByLabel("Due time")).toHaveValue("23:59")
+})

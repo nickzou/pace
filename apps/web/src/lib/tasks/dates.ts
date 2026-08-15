@@ -26,14 +26,6 @@ export function toTimeInput(iso: string | null): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// The time to show in the OPTIONAL time field: blank when it's exactly the caller's
-// fallback (i.e. a date-only entry). This makes clearing the time a durable unset —
-// it round-trips as blank instead of reappearing as the default on the next load.
-export function toOptionalTime(iso: string | null, fallback: string): string {
-  const time = toTimeInput(iso)
-  return time === fallback ? "" : time
-}
-
 // A local date (required) + optional local time → UTC ISO to store. No date → null
 // (cleared). No time → the caller's fallback, so a date-only pick still saves as a
 // full timestamp. new Date("YYYY-MM-DDTHH:mm") parses as LOCAL, so toISOString is UTC.
@@ -43,15 +35,14 @@ export function combineLocal(day: string, time: string, fallback: string): strin
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-// UTC ISO → a friendly local string, e.g. "Aug 15, 1:00 PM". Pass the field's
-// no-time fallback to render date-only entries without a time, e.g. just "Aug 15".
-export function formatDate(iso: string | null, noTimeAt?: string): string {
+// UTC ISO → a friendly local string. With a real time-of-day, includes it
+// ("Aug 15, 1:00 PM"); for a date-only entry (hasTime false), just "Aug 15".
+export function formatDate(iso: string | null, hasTime = false): string {
   if (!iso) return ""
-  const dateOnly = noTimeAt !== undefined && toTimeInput(iso) === noTimeAt
   return new Date(iso).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
-    ...(dateOnly ? {} : { hour: "numeric", minute: "2-digit" }),
+    ...(hasTime ? { hour: "numeric", minute: "2-digit" } : {}),
   })
 }
 

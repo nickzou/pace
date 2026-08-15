@@ -135,6 +135,24 @@ describe("tasks router", () => {
     expect(cleared.startDate).toBe(start) // still set
   })
 
+  // A date always stores a full timestamp; the hasTime flag records whether the
+  // user picked a real time-of-day, so an explicit 23:59 isn't read as "no time".
+  it("tracks whether a time-of-day was set (hasTime)", async () => {
+    const caller = appRouter.createCaller({ db, userId: await makeUser() })
+    const withTime = await caller.tasks.create({
+      title: "meeting",
+      dueDate: "2026-08-15T21:59:00.000Z",
+      dueHasTime: true,
+    })
+    expect(withTime.dueHasTime).toBe(true)
+    expect(withTime.startHasTime).toBe(false) // defaults false when unset
+
+    // Clearing the time (date-only) flips the flag off without touching the date.
+    const dateOnly = await caller.tasks.update({ id: withTime.id, dueHasTime: false })
+    expect(dateOnly.dueHasTime).toBe(false)
+    expect(dateOnly.dueDate).toBe("2026-08-15T21:59:00.000Z")
+  })
+
   it("refuses an unauthenticated caller", async () => {
     await expect(appRouter.createCaller({ db, userId: null }).tasks.list()).rejects.toMatchObject({
       code: "UNAUTHORIZED",

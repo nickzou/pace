@@ -14,10 +14,12 @@ const validTask = () => ({
 })
 
 describe("taskSchema", () => {
-  it("applies defaults for description and completed", () => {
+  it("applies defaults for description, completed, and the hasTime flags", () => {
     const t = taskSchema.parse(validTask())
     expect(t.description).toBe("")
     expect(t.completed).toBe(false)
+    expect(t.startHasTime).toBe(false)
+    expect(t.dueHasTime).toBe(false)
   })
 
   it("rejects an empty title and a non-uuid id", () => {
@@ -39,6 +41,8 @@ describe("newTaskSchema", () => {
       title: "x",
       description: "",
       completed: false,
+      startHasTime: false,
+      dueHasTime: false,
     })
   })
 })
