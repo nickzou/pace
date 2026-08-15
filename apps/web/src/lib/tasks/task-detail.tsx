@@ -97,6 +97,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           Start
           <input
             type="datetime-local"
+            aria-label="Start date"
             value={startDate}
             onChange={(event) => saveStart(event.target.value)}
             className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
@@ -113,6 +114,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </span>
           <input
             type="datetime-local"
+            aria-label="Due date"
             value={dueDate}
             onChange={(event) => saveDue(event.target.value)}
             className={`rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
