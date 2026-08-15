@@ -6,6 +6,8 @@ const iso = () => new Date().toISOString()
 const validTask = () => ({
   id: UUID,
   title: "x",
+  startDate: null,
+  dueDate: null,
   createdAt: iso(),
   updatedAt: iso(),
   deletedAt: null,
@@ -21,6 +23,13 @@ describe("taskSchema", () => {
   it("rejects an empty title and a non-uuid id", () => {
     expect(taskSchema.safeParse({ ...validTask(), title: "" }).success).toBe(false)
     expect(taskSchema.safeParse({ ...validTask(), id: "nope" }).success).toBe(false)
+  })
+
+  it("accepts nullable start/due datetimes and rejects a non-datetime", () => {
+    const t = taskSchema.parse({ ...validTask(), startDate: iso(), dueDate: iso() })
+    expect(t.startDate).not.toBeNull()
+    expect(t.dueDate).not.toBeNull()
+    expect(taskSchema.safeParse({ ...validTask(), dueDate: "not-a-date" }).success).toBe(false)
   })
 })
 
@@ -39,5 +48,10 @@ describe("updateTaskSchema", () => {
     const u = updateTaskSchema.parse({ id: UUID, completed: true })
     expect(u.description).toBeUndefined()
     expect(u.completed).toBe(true)
+  })
+
+  it("distinguishes clearing a date (null) from leaving it untouched (omitted)", () => {
+    expect(updateTaskSchema.parse({ id: UUID, dueDate: null }).dueDate).toBeNull()
+    expect(updateTaskSchema.parse({ id: UUID }).dueDate).toBeUndefined()
   })
 })
