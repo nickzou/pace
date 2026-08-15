@@ -6,6 +6,12 @@
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
+// When only a date is picked, fall back to a sensible wall-clock time: end-of-day
+// for a due date (so "due today" isn't overdue at 12:01am), start-of-day for start.
+// These times also mean "no specific time" for display — see toOptionalTime/formatDate.
+export const START_FALLBACK = "00:00"
+export const DUE_FALLBACK = "23:59"
+
 // UTC ISO → the local date a <input type="date"> expects. "" clears.
 export function toDateInput(iso: string | null): string {
   if (!iso) return ""
@@ -37,14 +43,15 @@ export function combineLocal(day: string, time: string, fallback: string): strin
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-// UTC ISO → a friendly local string, e.g. "Aug 15, 1:00 PM".
-export function formatDate(iso: string | null): string {
+// UTC ISO → a friendly local string, e.g. "Aug 15, 1:00 PM". Pass the field's
+// no-time fallback to render date-only entries without a time, e.g. just "Aug 15".
+export function formatDate(iso: string | null, noTimeAt?: string): string {
   if (!iso) return ""
+  const dateOnly = noTimeAt !== undefined && toTimeInput(iso) === noTimeAt
   return new Date(iso).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+    ...(dateOnly ? {} : { hour: "numeric", minute: "2-digit" }),
   })
 }
 

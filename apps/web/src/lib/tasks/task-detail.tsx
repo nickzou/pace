@@ -1,13 +1,15 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { useEffect, useRef, useState } from "react"
-import { combineLocal, isOverdue, toDateInput, toOptionalTime } from "#/lib/tasks/dates"
+import {
+  combineLocal,
+  DUE_FALLBACK,
+  isOverdue,
+  START_FALLBACK,
+  toDateInput,
+  toOptionalTime,
+} from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
 import { useToast } from "#/lib/toast"
-
-// When only a date is picked, fall back to a sensible wall-clock time: end-of-day
-// for a due date (so "due today" isn't overdue at 12:01am), start-of-day for start.
-const START_FALLBACK = "00:00"
-const DUE_FALLBACK = "23:59"
 
 // The single-task view/editor shared by the quick modal and the dedicated
 // /tasks/$taskId route. Reads the task live from local SQLite; title/notes edits

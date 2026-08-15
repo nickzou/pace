@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { type FormEvent, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
 import { RequireLocalDb } from "#/lib/powersync/require-db"
-import { formatDate, isOverdue } from "#/lib/tasks/dates"
+import { DUE_FALLBACK, formatDate, isOverdue } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask } from "#/lib/tasks/mutations"
 import { TaskModal } from "#/lib/tasks/task-modal"
 import { useToast } from "#/lib/toast"
@@ -137,7 +137,7 @@ function TaskList() {
                     }`}
                   >
                     {isOverdue(task.due_date, task.completed) ? "Overdue · " : "Due "}
-                    {formatDate(task.due_date)}
+                    {formatDate(task.due_date, DUE_FALLBACK)}
                   </span>
                 ) : null}
               </button>
