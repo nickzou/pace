@@ -15,6 +15,9 @@ const tasks = new Table({
   title: column.text,
   description: column.text,
   completed: column.integer,
+  // Optional schedule (P2-02): nullable ISO strings, like the other timestamps.
+  start_date: column.text,
+  due_date: column.text,
   created_at: column.text,
   updated_at: column.text,
 })

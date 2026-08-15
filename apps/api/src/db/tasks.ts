@@ -20,6 +20,10 @@ export const tasks = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     completed: boolean("completed").notNull().default(false),
+    // Optional scheduling (P2-02): nullable timestamptz, stored UTC, rendered in
+    // the viewer's local zone. start ≤ due is a UI convention, not a DB constraint.
+    startDate: timestamp("start_date", { withTimezone: true }),
+    dueDate: timestamp("due_date", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()

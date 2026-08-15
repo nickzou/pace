@@ -14,6 +14,8 @@ function toTask(row: typeof tasks.$inferSelect): Task {
     title: row.title,
     description: row.description,
     completed: row.completed,
+    startDate: row.startDate ? row.startDate.toISOString() : null,
+    dueDate: row.dueDate ? row.dueDate.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
@@ -46,11 +48,16 @@ export const tasksRouter = router({
   // (same id) un-tombstones it. That's what powers Undo — the client re-inserts a
   // just-deleted task locally, which replays as a create and restores the row.
   create: protectedProcedure.input(newTaskSchema).mutation(async ({ ctx, input }) => {
+    // Wire dates are ISO strings; the timestamptz columns want Date | null.
+    const startDate = input.startDate ? new Date(input.startDate) : null
+    const dueDate = input.dueDate ? new Date(input.dueDate) : null
     const values = {
       userId: ctx.userId,
       title: input.title,
       description: input.description,
       completed: input.completed,
+      startDate,
+      dueDate,
     }
     const [row] = input.id
       ? await ctx.db
@@ -62,6 +69,8 @@ export const tasksRouter = router({
               title: input.title,
               description: input.description,
               completed: input.completed,
+              startDate,
+              dueDate,
               deletedAt: null,
             },
             setWhere: eq(tasks.userId, ctx.userId),
@@ -73,10 +82,16 @@ export const tasksRouter = router({
   }),
 
   update: protectedProcedure.input(updateTaskSchema).mutation(async ({ ctx, input }) => {
-    const { id, ...fields } = input
+    const { id, startDate, dueDate, ...fields } = input
     const [row] = await ctx.db
       .update(tasks)
-      .set(fields)
+      .set({
+        ...fields,
+        // Convert ISO → Date only when the field was sent; omit = unchanged,
+        // explicit null = clear the date.
+        ...(startDate !== undefined ? { startDate: startDate ? new Date(startDate) : null } : {}),
+        ...(dueDate !== undefined ? { dueDate: dueDate ? new Date(dueDate) : null } : {}),
+      })
       .where(and(eq(tasks.id, id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
       .returning()
     if (!row) throw new TRPCError({ code: "NOT_FOUND" })

@@ -13,6 +13,9 @@ export const taskSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().default(""),
   completed: z.boolean().default(false),
+  // Optional scheduling (P2-02): UTC ISO datetimes, null when unset.
+  startDate: z.iso.datetime().nullable(),
+  dueDate: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
@@ -30,7 +33,12 @@ export const newTaskSchema = taskSchema
     description: true,
     completed: true,
   })
-  .extend({ id: taskSchema.shape.id.optional() })
+  .extend({
+    id: taskSchema.shape.id.optional(),
+    // Optional on create; both nullable (a task may start with no schedule).
+    startDate: taskSchema.shape.startDate.optional(),
+    dueDate: taskSchema.shape.dueDate.optional(),
+  })
 
 export type NewTask = z.infer<typeof newTaskSchema>
 
@@ -42,6 +50,9 @@ export const updateTaskSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().optional(),
   completed: z.boolean().optional(),
+  // nullable + optional: omit = unchanged, null = clear the date.
+  startDate: z.iso.datetime().nullable().optional(),
+  dueDate: z.iso.datetime().nullable().optional(),
 })
 
 export type UpdateTask = z.infer<typeof updateTaskSchema>
