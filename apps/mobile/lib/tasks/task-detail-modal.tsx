@@ -180,7 +180,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               }
               style={styles.dateValueBtn}
             >
-              <Text style={styles.dateValue}>
+              <Text testID="detail-start-value" style={styles.dateValue}>
                 {task.start_date ? formatDate(task.start_date, false) : "Set…"}
               </Text>
             </Pressable>
@@ -191,7 +191,10 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                   onPress={() => pickTime(task.start_date, saveStart)}
                   style={styles.timeChip}
                 >
-                  <Text style={task.start_has_time ? styles.timeText : styles.addTimeText}>
+                  <Text
+                    testID="detail-start-time-value"
+                    style={task.start_has_time ? styles.timeText : styles.addTimeText}
+                  >
                     {task.start_has_time ? formatTime(task.start_date) : "＋ time"}
                   </Text>
                 </Pressable>
@@ -222,7 +225,10 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               onPress={() => pickDay(task.due_date, !!task.due_has_time, DUE_FALLBACK, saveDue)}
               style={styles.dateValueBtn}
             >
-              <Text style={[styles.dateValue, overdue ? styles.dateOverdue : null]}>
+              <Text
+                testID="detail-due-value"
+                style={[styles.dateValue, overdue ? styles.dateOverdue : null]}
+              >
                 {task.due_date ? formatDate(task.due_date, false) : "Set…"}
               </Text>
             </Pressable>
@@ -233,7 +239,10 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                   onPress={() => pickTime(task.due_date, saveDue)}
                   style={styles.timeChip}
                 >
-                  <Text style={task.due_has_time ? styles.timeText : styles.addTimeText}>
+                  <Text
+                    testID="detail-due-time-value"
+                    style={task.due_has_time ? styles.timeText : styles.addTimeText}
+                  >
                     {task.due_has_time ? formatTime(task.due_date) : "＋ time"}
                   </Text>
                 </Pressable>
