@@ -1,6 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { useEffect, useRef, useState } from "react"
-import { combineLocal, isOverdue, toDateInput, toTimeInput } from "#/lib/tasks/dates"
+import { combineLocal, isOverdue, toDateInput, toOptionalTime } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
 import { useToast } from "#/lib/toast"
 
@@ -36,9 +36,9 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       setTitle(task.title)
       setDescription(task.description)
       setStartDay(toDateInput(task.start_date))
-      setStartTime(toTimeInput(task.start_date))
+      setStartTime(toOptionalTime(task.start_date, START_FALLBACK))
       setDueDay(toDateInput(task.due_date))
-      setDueTime(toTimeInput(task.due_date))
+      setDueTime(toOptionalTime(task.due_date, DUE_FALLBACK))
     }
   }, [task])
 
@@ -67,7 +67,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       console.error("Failed to save start date", err)
       toast.show("Couldn't save the start date — try reloading")
       setStartDay(toDateInput(task.start_date))
-      setStartTime(toTimeInput(task.start_date))
+      setStartTime(toOptionalTime(task.start_date, START_FALLBACK))
     })
   }
   const saveDue = (day: string, time: string) => {
@@ -77,7 +77,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       console.error("Failed to save due date", err)
       toast.show("Couldn't save the due date — try reloading")
       setDueDay(toDateInput(task.due_date))
-      setDueTime(toTimeInput(task.due_date))
+      setDueTime(toOptionalTime(task.due_date, DUE_FALLBACK))
     })
   }
 

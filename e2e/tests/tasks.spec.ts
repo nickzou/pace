@@ -76,4 +76,7 @@ test("set a past due DATE only (no time) → it saves, is flagged Overdue, and r
   await expect(page.getByText(/signed in as/i)).toBeVisible()
   await page.getByText(title).click()
   await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01")
+  // Date-only stays date-only: the end-of-day default reads as blank, so the time
+  // is a durable unset rather than reappearing as 23:59 on reload.
+  await expect(page.getByLabel("Due time")).toHaveValue("")
 })

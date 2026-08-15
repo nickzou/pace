@@ -20,6 +20,14 @@ export function toTimeInput(iso: string | null): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+// The time to show in the OPTIONAL time field: blank when it's exactly the caller's
+// fallback (i.e. a date-only entry). This makes clearing the time a durable unset —
+// it round-trips as blank instead of reappearing as the default on the next load.
+export function toOptionalTime(iso: string | null, fallback: string): string {
+  const time = toTimeInput(iso)
+  return time === fallback ? "" : time
+}
+
 // A local date (required) + optional local time → UTC ISO to store. No date → null
 // (cleared). No time → the caller's fallback, so a date-only pick still saves as a
 // full timestamp. new Date("YYYY-MM-DDTHH:mm") parses as LOCAL, so toISOString is UTC.
