@@ -14,8 +14,22 @@ const tasks = new Table({
   title: column.text,
   description: column.text,
   completed: column.integer,
+  // Optional schedule (P2-02): nullable ISO strings, like the other timestamps.
+  start_date: column.text,
+  due_date: column.text,
+  // Whether a real time-of-day was picked (0/1) — a date-only entry stores a
+  // fallback time, so this bit is what says to show/keep the time.
+  start_has_time: column.integer,
+  due_has_time: column.integer,
   created_at: column.text,
   updated_at: column.text,
 })
 
 export const AppSchema = new Schema({ tasks })
+
+// Bump on ANY change above (add/remove/rename a table or column). On load,
+// reconcileSchemaVersion (./db) rebuilds the local DB when this differs from the
+// version it was last built with — because adding a column to a live DB leaves
+// PowerSync's upload/crud capture stale (the value syncs on read but is dropped on
+// upload). Keep in step with the web schema's SCHEMA_VERSION.
+export const SCHEMA_VERSION = "1"

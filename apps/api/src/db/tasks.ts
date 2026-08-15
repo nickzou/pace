@@ -20,6 +20,16 @@ export const tasks = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     completed: boolean("completed").notNull().default(false),
+    // Optional scheduling (P2-02): nullable timestamptz, stored UTC, rendered in
+    // the viewer's local zone. start ≤ due is a UI convention, not a DB constraint.
+    // *_has_time marks whether the user picked a real time of day (vs a date-only
+    // entry, which stores a fallback time) — so an explicit 00:00/23:59 isn't
+    // mistaken for "no time". A date is always a full timestamp; this is the bit
+    // that says whether to show/keep the time.
+    startDate: timestamp("start_date", { withTimezone: true }),
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    startHasTime: boolean("start_has_time").notNull().default(false),
+    dueHasTime: boolean("due_has_time").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()

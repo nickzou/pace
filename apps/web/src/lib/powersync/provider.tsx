@@ -23,12 +23,17 @@ function connectOnce(trpc: ReturnType<typeof useTRPCClient>): Promise<AbstractPo
   if (cached?.connected) return Promise.resolve(cached)
   if (!connecting) {
     connecting = (async () => {
-      const [{ getDb }, { createConnector }] = await Promise.all([
+      const [{ getDb, reconcileSchemaVersion }, { createConnector }] = await Promise.all([
         import("./db"),
         import("./connector"),
       ])
       const database = await getDb()
-      if (!database.connected) await database.connect(createConnector(trpc))
+      const connector = createConnector(trpc)
+      // Rebuild the local DB first if the client schema changed since it was last
+      // built (else new columns sync on read but drop on upload). Runs before the
+      // steady-state connect below.
+      await reconcileSchemaVersion(database, connector)
+      if (!database.connected) await database.connect(connector)
       cached = database
       return database
     })().finally(() => {

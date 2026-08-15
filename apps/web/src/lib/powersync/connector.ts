@@ -57,10 +57,15 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
                 title: String(data.title ?? ""),
                 description: String(data.description ?? ""),
                 completed: !!data.completed,
+                ...(data.start_date != null ? { startDate: String(data.start_date) } : {}),
+                ...(data.due_date != null ? { dueDate: String(data.due_date) } : {}),
+                ...(data.start_has_time != null ? { startHasTime: !!data.start_has_time } : {}),
+                ...(data.due_has_time != null ? { dueHasTime: !!data.due_has_time } : {}),
               })
               break
             case UpdateType.PATCH:
-              // A field change — send only what changed.
+              // A field change — send only what changed. A date can be cleared
+              // (set to null), so pass through null rather than dropping it.
               await trpc.tasks.update.mutate({
                 id: op.id,
                 ...(data.title !== undefined ? { title: String(data.title) } : {}),
@@ -68,6 +73,16 @@ export function createConnector(trpc: TrpcClient): PowerSyncBackendConnector {
                   ? { description: String(data.description) }
                   : {}),
                 ...(data.completed !== undefined ? { completed: !!data.completed } : {}),
+                ...(data.start_date !== undefined
+                  ? { startDate: data.start_date != null ? String(data.start_date) : null }
+                  : {}),
+                ...(data.due_date !== undefined
+                  ? { dueDate: data.due_date != null ? String(data.due_date) : null }
+                  : {}),
+                ...(data.start_has_time !== undefined
+                  ? { startHasTime: !!data.start_has_time }
+                  : {}),
+                ...(data.due_has_time !== undefined ? { dueHasTime: !!data.due_has_time } : {}),
               })
               break
             case UpdateType.DELETE:

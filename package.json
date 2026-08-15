@@ -14,8 +14,8 @@
     "dev:mobile": "pnpm --filter @pace/mobile start",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
-    "test": "turbo test --filter=@pace/api --filter=@pace/validation",
-    "check": "biome check . && turbo typecheck && turbo test --filter=@pace/api --filter=@pace/validation",
+    "test": "turbo test --filter=@pace/api --filter=@pace/validation --filter=@pace/web --filter=@pace/mobile",
+    "check": "biome check . && turbo typecheck && turbo test --filter=@pace/api --filter=@pace/validation --filter=@pace/web --filter=@pace/mobile",
     "format": "biome check --write .",
     "lint:actions": "actionlint",
     "prepare": "git config core.hooksPath .githooks || true"

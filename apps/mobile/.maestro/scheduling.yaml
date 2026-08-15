@@ -1,0 +1,87 @@
+# Mobile scheduling flow: sign up -> add a task -> set a due date (date-only) ->
+# add a time -> clear the time -> confirm the date persists -> clear the date.
+#
+# Parity note: the web/desktop Playwright specs type an exact past date to assert
+# "Overdue" and reload-round-trip. Maestro can't drive the native OS date/time
+# pickers to a specific value, so this accepts each picker's default and asserts the
+# UI STATE instead — the date-only vs with-time distinction (the has_time flag) and
+# that the date survives closing/reopening the detail (read back from local SQLite).
+# Assertions match the unique placeholder text (Maestro text matching is anchored,
+# so the copy is distinct per field: "Set due date" / "Add due time").
+appId: app.paceproductivity.mobile
+---
+# Reach a clean signed-out start — the session persists in secure-store.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user (unique email per run).
+- evalScript: ${output.email = 'maestro-sched-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Scheduling"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a task and open its detail.
+- evalScript: ${output.task = 'Schedule me ' + Date.now()}
+- tapOn:
+    id: "task-input"
+- inputText: ${output.task}
+- hideKeyboard
+- tapOn:
+    id: "add-task"
+- assertVisible: ${output.task}
+- tapOn:
+    id: "open-.*"
+
+# Due starts unset.
+- assertVisible: "Set due date"
+
+# Set a date — accept the native date picker's default via OK.
+- tapOn:
+    id: "detail-due"
+- tapOn: "OK"
+# Date-only now: the placeholder is gone and the time offers to be added.
+- assertNotVisible: "Set due date"
+- assertVisible: "Add due time"
+
+# Add a time — accept the native time picker's default via OK.
+- tapOn:
+    id: "detail-due-time"
+- tapOn: "OK"
+# The chip now shows a real time, so the "add time" affordance is gone.
+- assertNotVisible: "Add due time"
+
+# Clear just the time → back to date-only.
+- tapOn:
+    id: "detail-due-time-clear"
+- assertVisible: "Add due time"
+
+# The date persists across closing + reopening the detail (read from local SQLite).
+- tapOn:
+    id: "detail-close"
+- tapOn:
+    id: "open-.*"
+- assertNotVisible: "Set due date"
+
+# Clear the whole date → back to unset.
+- tapOn:
+    id: "detail-due-clear"
+- assertVisible: "Set due date"

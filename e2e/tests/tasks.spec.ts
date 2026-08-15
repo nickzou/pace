@@ -47,3 +47,62 @@ test("delete a task → the Undo toast restores it (offline-first round-trip)", 
   await expect(page.getByText(/signed in as/i)).toBeVisible()
   await expect(page.getByText(title)).toBeVisible()
 })
+
+test("set a past due DATE only (no time) → it saves, is flagged Overdue, and round-trips a reload", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+
+  const title = `Schedule me ${Date.now()}`
+  await page.getByPlaceholder("Add a task…").fill(title)
+  await page.getByRole("button", { name: "Add" }).click()
+  await expect(page.getByText(title)).toBeVisible()
+
+  // Open the detail and set only the DATE — no time. The regression this guards:
+  // a date-only entry must still save (it defaults to end-of-day), not silently
+  // no-op the way a single datetime-local input did when its time was left blank.
+  await page.getByText(title).click()
+  const due = page.getByLabel("Due date")
+  await due.fill("2020-01-01")
+
+  // The date is held, and the past due date flags the task Overdue.
+  await expect(due).toHaveValue("2020-01-01")
+  await expect(page.getByText(/Overdue/).first()).toBeVisible()
+
+  // Reload a fresh page and reopen: the date stored as a UTC timestamp round-trips
+  // back to the same local day — proving it reached the server and synced back.
+  await page.reload()
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await page.getByText(title).click()
+  await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01")
+  // Date-only stays date-only: the end-of-day default reads as blank, so the time
+  // is a durable unset rather than reappearing as 23:59 on reload.
+  await expect(page.getByLabel("Due time")).toHaveValue("")
+})
+
+test("an explicit time equal to the no-time default (11:59 PM) is kept, not swallowed", async ({
+  page,
+}) => {
+  await page.goto("/")
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+
+  const title = `Time me ${Date.now()}`
+  await page.getByPlaceholder("Add a task…").fill(title)
+  await page.getByRole("button", { name: "Add" }).click()
+  await expect(page.getByText(title)).toBeVisible()
+
+  // Set a due date AND an explicit 23:59 — the same wall-clock a date-only entry
+  // defaults to. The hasTime flag must keep it distinct from "no time".
+  await page.getByText(title).click()
+  await page.getByLabel("Due date").fill("2030-06-15")
+  await page.getByLabel("Due time").fill("23:59")
+  await expect(page.getByLabel("Due time")).toHaveValue("23:59")
+
+  // After a reload the time survives (not blanked as if it were the default).
+  await page.reload()
+  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await page.getByText(title).click()
+  await expect(page.getByLabel("Due date")).toHaveValue("2030-06-15")
+  await expect(page.getByLabel("Due time")).toHaveValue("23:59")
+})

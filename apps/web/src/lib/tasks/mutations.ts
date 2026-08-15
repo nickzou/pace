@@ -8,6 +8,10 @@ export type Task = {
   title: string
   description: string
   completed: number
+  start_date: string | null
+  due_date: string | null
+  start_has_time: number
+  due_has_time: number
   created_at: string
   updated_at: string
 }
@@ -24,17 +28,24 @@ export function toggleTask(db: AbstractPowerSyncDatabase, task: Pick<Task, "id" 
   ])
 }
 
+// A partial update: writes only the columns provided, so start/due dates can be
+// set or cleared (null) independently of title/notes. The keys come from the
+// typed Task columns (not user input), so building the SET list from them is safe.
 export function updateTask(
   db: AbstractPowerSyncDatabase,
   id: string,
-  fields: { title: string; description: string },
+  fields: Partial<
+    Pick<
+      Task,
+      "title" | "description" | "start_date" | "due_date" | "start_has_time" | "due_has_time"
+    >
+  >,
 ) {
-  return db.execute("UPDATE tasks SET title = ?, description = ?, updated_at = ? WHERE id = ?", [
-    fields.title,
-    fields.description,
-    new Date().toISOString(),
-    id,
-  ])
+  const cols = Object.keys(fields) as (keyof typeof fields)[]
+  if (cols.length === 0) return Promise.resolve()
+  const assignments = [...cols.map((c) => `${c} = ?`), "updated_at = ?"].join(", ")
+  const values = [...cols.map((c) => fields[c] ?? null), new Date().toISOString(), id]
+  return db.execute(`UPDATE tasks SET ${assignments} WHERE id = ?`, values)
 }
 
 type Toast = { show: (message: string, action?: { label: string; onClick: () => void }) => void }
@@ -50,8 +61,19 @@ export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, 
     label: "Undo",
     onClick: () => {
       void db.execute(
-        "INSERT INTO tasks (id, title, description, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        [task.id, task.title, task.description, task.completed, task.created_at, task.updated_at],
+        "INSERT INTO tasks (id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          task.id,
+          task.title,
+          task.description,
+          task.completed,
+          task.start_date,
+          task.due_date,
+          task.start_has_time,
+          task.due_has_time,
+          task.created_at,
+          task.updated_at,
+        ],
       )
     },
   })

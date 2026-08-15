@@ -69,9 +69,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Run tests
-        # Fast tests only — the e2e packages also have a `test` script but run in
-        # their own jobs/workflows (browsers, drivers, emulators).
-        run: pnpm turbo test --filter=@pace/api --filter=@pace/validation
+        # Fast unit + integration tests (Vitest). @pace/web and @pace/mobile expose
+        # a `test` script for their pure helpers; the browser/emulator e2e suites
+        # (@pace/e2e, mobile's test:e2e) run in their own jobs/workflows.
+        run: pnpm turbo test --filter=@pace/api --filter=@pace/validation --filter=@pace/web --filter=@pace/mobile
 
   # End-to-end tasks/auth flow (web → API → Postgres, synced via PowerSync) in a
   # real browser. The e2e infra — Postgres (wal_level=logical) + a PowerSync

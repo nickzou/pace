@@ -1,4 +1,4 @@
-import type { AbstractPowerSyncDatabase } from "@powersync/web"
+import type { AbstractPowerSyncDatabase, PowerSyncBackendConnector } from "@powersync/web"
 
 // Lazy, browser-only singleton. The dynamic import keeps @powersync/web (wa-sqlite:
 // WASM + web workers) out of SSR — this module is import-safe (type-only at the
@@ -48,4 +48,57 @@ export async function clearDb(): Promise<void> {
   if (!dbPromise) return
   const db = await dbPromise
   await db.disconnectAndClear()
+}
+
+const SCHEMA_VERSION_KEY = "pace.powersync.schemaVersion"
+
+// Rebuild the local DB when the client schema (./schema) has changed since it was
+// last built. PowerSync migrates read views on load, but NOT the upload/crud
+// capture — so after a column is added, its value syncs on read yet is dropped on
+// upload until the DB is rebuilt (what a manual sign-out did by hand). We run this
+// before connecting so returning users self-heal. Pending offline writes are
+// flushed first so an upgrade never discards them; if they can't flush (offline),
+// we defer the rebuild to a later load rather than lose them. Best-effort: any
+// failure leaves the existing DB in place and the app still starts.
+export async function reconcileSchemaVersion(
+  db: AbstractPowerSyncDatabase,
+  connector: PowerSyncBackendConnector,
+): Promise<void> {
+  if (typeof localStorage === "undefined") return
+  try {
+    const { SCHEMA_VERSION } = await import("./schema")
+    const stored = localStorage.getItem(SCHEMA_VERSION_KEY)
+    if (stored === SCHEMA_VERSION) return
+    // Rebuild when this DB was built with a KNOWN older version, or when it predates
+    // the guard (no stored version) yet already holds rows — i.e. an existing user
+    // whose local schema is stale. A fresh/empty DB (no rows before the first sync)
+    // is already current, so just record the version without a needless clear.
+    const staleWithData =
+      stored === null && (await db.getAll("SELECT 1 FROM tasks LIMIT 1")).length > 0
+    if (stored !== null || staleWithData) {
+      if (!(await flushPendingWrites(db, connector))) return // offline — defer, keep writes
+      await db.disconnectAndClear()
+    }
+    localStorage.setItem(SCHEMA_VERSION_KEY, SCHEMA_VERSION)
+  } catch (err) {
+    console.error("PowerSync schema reconcile failed; keeping the existing local DB", err)
+  }
+}
+
+// Drain the local write queue before a rebuild so no un-uploaded edit is lost.
+// Returns false if it can't empty within the timeout (e.g. offline), so the caller
+// can defer clearing. No-op fast path when the queue is already empty.
+async function flushPendingWrites(
+  db: AbstractPowerSyncDatabase,
+  connector: PowerSyncBackendConnector,
+  timeoutMs = 15000,
+): Promise<boolean> {
+  if ((await db.getUploadQueueStats()).count === 0) return true
+  if (!db.connected) await db.connect(connector)
+  const deadline = Date.now() + timeoutMs
+  while ((await db.getUploadQueueStats()).count > 0) {
+    if (Date.now() > deadline) return false
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
+  return true
 }
