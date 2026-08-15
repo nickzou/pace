@@ -38,6 +38,9 @@ async function valueEquals(selector: string, expected: string, timeout = 10_000)
 }
 
 async function signUpFresh(name: string, email: string) {
+  // Reset any leftover SPA state from a prior test — notably an open detail modal,
+  // whose overlay would intercept the sign-out click. A reload clears selectedId.
+  await browser.refresh()
   // The packaged app's localStorage (bearer token) persists across WebDriver
   // sessions, so a prior spec can leave us signed in — settle, then sign out.
   await browser.waitUntil(

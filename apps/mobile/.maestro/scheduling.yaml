@@ -6,6 +6,8 @@
 # pickers to a specific value, so this accepts each picker's default and asserts the
 # UI STATE instead — the date-only vs with-time distinction (the has_time flag) and
 # that the date survives closing/reopening the detail (read back from local SQLite).
+# Assertions match the unique placeholder text (Maestro text matching is anchored,
+# so the copy is distinct per field: "Set due date" / "Add due time").
 appId: app.paceproductivity.mobile
 ---
 # Reach a clean signed-out start — the session persists in secure-store.
@@ -49,51 +51,37 @@ appId: app.paceproductivity.mobile
 - tapOn:
     id: "open-.*"
 
-# Due starts unset ("Set…").
-- assertVisible:
-    id: "detail-due-value"
-    text: "Set"
+# Due starts unset.
+- assertVisible: "Set due date"
 
 # Set a date — accept the native date picker's default via OK.
 - tapOn:
     id: "detail-due"
 - tapOn: "OK"
-# Date-only now: the value is no longer "Set…", and the time offers to be added.
-- assertNotVisible:
-    id: "detail-due-value"
-    text: "Set"
-- assertVisible:
-    id: "detail-due-time-value"
-    text: "time"
+# Date-only now: the placeholder is gone and the time offers to be added.
+- assertNotVisible: "Set due date"
+- assertVisible: "Add due time"
 
 # Add a time — accept the native time picker's default via OK.
 - tapOn:
     id: "detail-due-time"
 - tapOn: "OK"
-# The chip now shows a real time, so the "＋ time" affordance is gone.
-- assertNotVisible:
-    id: "detail-due-time-value"
-    text: "time"
+# The chip now shows a real time, so the "add time" affordance is gone.
+- assertNotVisible: "Add due time"
 
 # Clear just the time → back to date-only.
 - tapOn:
     id: "detail-due-time-clear"
-- assertVisible:
-    id: "detail-due-time-value"
-    text: "time"
+- assertVisible: "Add due time"
 
 # The date persists across closing + reopening the detail (read from local SQLite).
 - tapOn:
     id: "detail-close"
 - tapOn:
     id: "open-.*"
-- assertNotVisible:
-    id: "detail-due-value"
-    text: "Set"
+- assertNotVisible: "Set due date"
 
-# Clear the whole date → back to "Set…".
+# Clear the whole date → back to unset.
 - tapOn:
     id: "detail-due-clear"
-- assertVisible:
-    id: "detail-due-value"
-    text: "Set"
+- assertVisible: "Set due date"

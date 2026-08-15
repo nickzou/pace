@@ -181,7 +181,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               style={styles.dateValueBtn}
             >
               <Text testID="detail-start-value" style={styles.dateValue}>
-                {task.start_date ? formatDate(task.start_date, false) : "Set…"}
+                {task.start_date ? formatDate(task.start_date, false) : "Set start date"}
               </Text>
             </Pressable>
             {task.start_date ? (
@@ -195,7 +195,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                     testID="detail-start-time-value"
                     style={task.start_has_time ? styles.timeText : styles.addTimeText}
                   >
-                    {task.start_has_time ? formatTime(task.start_date) : "＋ time"}
+                    {task.start_has_time ? formatTime(task.start_date) : "Add start time"}
                   </Text>
                 </Pressable>
                 {task.start_has_time ? (
@@ -229,7 +229,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                 testID="detail-due-value"
                 style={[styles.dateValue, overdue ? styles.dateOverdue : null]}
               >
-                {task.due_date ? formatDate(task.due_date, false) : "Set…"}
+                {task.due_date ? formatDate(task.due_date, false) : "Set due date"}
               </Text>
             </Pressable>
             {task.due_date ? (
@@ -243,7 +243,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                     testID="detail-due-time-value"
                     style={task.due_has_time ? styles.timeText : styles.addTimeText}
                   >
-                    {task.due_has_time ? formatTime(task.due_date) : "＋ time"}
+                    {task.due_has_time ? formatTime(task.due_date) : "Add due time"}
                   </Text>
                 </Pressable>
                 {task.due_has_time ? (
