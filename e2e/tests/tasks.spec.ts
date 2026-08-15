@@ -48,7 +48,9 @@ test("delete a task → the Undo toast restores it (offline-first round-trip)", 
   await expect(page.getByText(title)).toBeVisible()
 })
 
-test("set a past due date → the task is flagged Overdue and it persists", async ({ page }) => {
+test("set a past due date → it's stored exactly (round-trips a reload) and flagged Overdue", async ({
+  page,
+}) => {
   await page.goto("/")
   await expect(page.getByText(/signed in as/i)).toBeVisible()
 
@@ -57,16 +59,20 @@ test("set a past due date → the task is flagged Overdue and it persists", asyn
   await page.getByRole("button", { name: "Add" }).click()
   await expect(page.getByText(title)).toBeVisible()
 
-  // Open the detail modal (clicking the title) and set a due date in the past.
-  // datetime-local is local wall-clock; a past value → overdue after the UTC store.
+  // Open the detail and set a due date in the past (datetime-local = local wall-clock).
   await page.getByText(title).click()
-  await page.getByLabel("Due date").fill("2020-01-01T08:00")
+  const due = page.getByLabel("Due date")
+  await due.fill("2020-01-01T08:00")
 
-  // The Overdue affordance shows (in the detail, and the list once closed).
+  // Confirm the value is actually held, AND the task is now flagged Overdue.
+  await expect(due).toHaveValue("2020-01-01T08:00")
   await expect(page.getByText(/Overdue/).first()).toBeVisible()
 
-  // Reload proves the due date reached the server and synced back, not a UI blip.
+  // Reload a fresh page and reopen the task: the value stored as UTC round-trips
+  // back to the same local wall-clock — proving it reached the server and synced,
+  // and that the timezone conversion is lossless (not just "some past date").
   await page.reload()
   await expect(page.getByText(/signed in as/i)).toBeVisible()
-  await expect(page.getByText(/Overdue/).first()).toBeVisible()
+  await page.getByText(title).click()
+  await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01T08:00")
 })
