@@ -26,3 +26,10 @@ const tasks = new Table({
 })
 
 export const AppSchema = new Schema({ tasks })
+
+// Bump on ANY change above (add/remove/rename a table or column). On load,
+// reconcileSchemaVersion (./db) rebuilds the local DB when this differs from the
+// version it was last built with — because adding a column to a live DB leaves
+// PowerSync's upload/crud capture stale (the value syncs on read but is dropped on
+// upload). Keep in step with the web schema's SCHEMA_VERSION.
+export const SCHEMA_VERSION = "1"
