@@ -1,5 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { useEffect, useRef, useState } from "react"
+import { fromLocalInput, isOverdue, toLocalInput } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
 import { useToast } from "#/lib/toast"
 
@@ -11,13 +12,15 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const db = usePowerSync()
   const toast = useToast()
   const { data: rows, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, created_at, updated_at FROM tasks WHERE id = ?",
+    "SELECT id, title, description, completed, start_date, due_date, created_at, updated_at FROM tasks WHERE id = ?",
     [id],
   )
   const task = rows[0]
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
+  const [startDate, setStartDate] = useState("")
+  const [dueDate, setDueDate] = useState("")
   const seededFor = useRef<string | null>(null)
 
   useEffect(() => {
@@ -25,6 +28,8 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       seededFor.current = task.id
       setTitle(task.title)
       setDescription(task.description)
+      setStartDate(toLocalInput(task.start_date))
+      setDueDate(toLocalInput(task.due_date))
     }
   }, [task])
 
@@ -41,6 +46,18 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     if (description !== task.description)
       void updateTask(db, id, { title: task.title, description })
   }
+
+  // Dates save immediately on pick/clear (the input is discrete, not typed).
+  const saveStart = (value: string) => {
+    setStartDate(value)
+    void updateTask(db, id, { start_date: fromLocalInput(value) })
+  }
+  const saveDue = (value: string) => {
+    setDueDate(value)
+    void updateTask(db, id, { due_date: fromLocalInput(value) })
+  }
+
+  const overdue = isOverdue(task.due_date, task.completed)
 
   return (
     <div className="space-y-4">
@@ -74,6 +91,36 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         rows={5}
         className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-sky-500"
       />
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+          Start
+          <input
+            type="datetime-local"
+            value={startDate}
+            onChange={(event) => saveStart(event.target.value)}
+            className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+          <span className="flex items-center gap-2">
+            Due
+            {overdue ? (
+              <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
+                Overdue
+              </span>
+            ) : null}
+          </span>
+          <input
+            type="datetime-local"
+            value={dueDate}
+            onChange={(event) => saveDue(event.target.value)}
+            className={`rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
+              overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
+            }`}
+          />
+        </label>
+      </div>
 
       <div className="flex justify-end">
         <button
