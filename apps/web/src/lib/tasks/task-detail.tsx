@@ -47,14 +47,24 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       void updateTask(db, id, { title: task.title, description })
   }
 
-  // Dates save immediately on pick/clear (the input is discrete, not typed).
+  // Dates save immediately on pick/clear (the input is discrete, not typed). If the
+  // local write throws — e.g. an out-of-date on-device schema missing the column —
+  // surface it and revert the field, rather than showing a value that never saved.
   const saveStart = (value: string) => {
     setStartDate(value)
-    void updateTask(db, id, { start_date: fromLocalInput(value) })
+    updateTask(db, id, { start_date: fromLocalInput(value) }).catch((err) => {
+      console.error("Failed to save start date", err)
+      toast.show("Couldn't save the start date — try reloading")
+      setStartDate(toLocalInput(task.start_date))
+    })
   }
   const saveDue = (value: string) => {
     setDueDate(value)
-    void updateTask(db, id, { due_date: fromLocalInput(value) })
+    updateTask(db, id, { due_date: fromLocalInput(value) }).catch((err) => {
+      console.error("Failed to save due date", err)
+      toast.show("Couldn't save the due date — try reloading")
+      setDueDate(toLocalInput(task.due_date))
+    })
   }
 
   const overdue = isOverdue(task.due_date, task.completed)
