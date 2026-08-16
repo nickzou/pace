@@ -29,7 +29,7 @@ function TaskDetailPage() {
 
       <div className="flex-1 overflow-auto px-8 py-6">
         <div className="mx-auto max-w-2xl">
-          <div className="rounded-xl border border-border bg-card p-6">
+          <div className="rounded-xl border border-border bg-card p-6 shadow-glow">
             <TaskDetail id={taskId} onDeleted={() => navigate({ to: "/" })} />
           </div>
         </div>

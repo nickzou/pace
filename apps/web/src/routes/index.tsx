@@ -112,7 +112,7 @@ function TaskListView() {
                   : `Nothing ${currentLabel.toLowerCase()}.`}
             </p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-glow">
               {visible.map((task, i) => (
                 <TaskRow
                   key={task.id}

@@ -100,4 +100,11 @@ export const fontWeight = {
   bold: "700",
 } as const
 
-export const tokens = { palette, color, space, radius, fontSize, fontWeight } as const
+// Shadows. The Aurora "underglow" — a hairline top ring plus a soft, primary-tinted
+// drop shadow — is what lifts cards/buttons off the dark background. The tint mirrors
+// `color.primary` (#60a5fa → rgb 96,165,250); keep it in sync when re-theming.
+export const shadow = {
+  glow: "0 0 0 1px rgba(255,255,255,0.04), 0 10px 34px rgba(96,165,250,0.20)",
+} as const
+
+export const tokens = { palette, color, space, radius, fontSize, fontWeight, shadow } as const

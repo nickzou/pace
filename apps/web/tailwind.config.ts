@@ -1,4 +1,4 @@
-import { color } from "@pace/tokens"
+import { color, shadow } from "@pace/tokens"
 
 // Loaded by Tailwind v4 via `@config` in src/styles.css. Maps @pace/tokens onto the
 // colour names shadcn/ui components expect (background/foreground/primary/
@@ -31,6 +31,10 @@ export default {
         // Pace extras beyond shadcn's set:
         success: color.success,
         warning: color.warning,
+      },
+      boxShadow: {
+        // Aurora underglow (see @pace/tokens `shadow`); use as `shadow-glow`.
+        glow: shadow.glow,
       },
     },
   },
