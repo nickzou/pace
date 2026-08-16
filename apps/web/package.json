@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@pace/api-client": "workspace:*",
+    "@pace/tokens": "workspace:*",
     "@powersync/react": "^2.0.0",
     "@powersync/web": "^2.1.1",
     "@tailwindcss/vite": "^4.1.18",
