@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConceptAuroraRouteImport } from './routes/concept-aurora'
+import { Route as ConceptAuroraLightRouteImport } from './routes/concept-aurora-light'
 import { Route as ConceptBoardRouteImport } from './routes/concept-board'
 import { Route as ConceptCompactRouteImport } from './routes/concept-compact'
 import { Route as ConceptSplitRouteImport } from './routes/concept-split'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const ConceptAuroraRoute = ConceptAuroraRouteImport.update({
   id: '/concept-aurora',
   path: '/concept-aurora',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConceptAuroraLightRoute = ConceptAuroraLightRouteImport.update({
+  id: '/concept-aurora-light',
+  path: '/concept-aurora-light',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConceptBoardRoute = ConceptBoardRouteImport.update({
@@ -86,6 +92,7 @@ const TasksTaskIdRoute = TasksTaskIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/concept-aurora': typeof ConceptAuroraRoute
+  '/concept-aurora-light': typeof ConceptAuroraLightRoute
   '/concept-board': typeof ConceptBoardRoute
   '/concept-compact': typeof ConceptCompactRoute
   '/concept-split': typeof ConceptSplitRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/concept-aurora': typeof ConceptAuroraRoute
+  '/concept-aurora-light': typeof ConceptAuroraLightRoute
   '/concept-board': typeof ConceptBoardRoute
   '/concept-compact': typeof ConceptCompactRoute
   '/concept-split': typeof ConceptSplitRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/concept-aurora': typeof ConceptAuroraRoute
+  '/concept-aurora-light': typeof ConceptAuroraLightRoute
   '/concept-board': typeof ConceptBoardRoute
   '/concept-compact': typeof ConceptCompactRoute
   '/concept-split': typeof ConceptSplitRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/concept-aurora'
+    | '/concept-aurora-light'
     | '/concept-board'
     | '/concept-compact'
     | '/concept-split'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/concept-aurora'
+    | '/concept-aurora-light'
     | '/concept-board'
     | '/concept-compact'
     | '/concept-split'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/concept-aurora'
+    | '/concept-aurora-light'
     | '/concept-board'
     | '/concept-compact'
     | '/concept-split'
@@ -174,6 +186,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConceptAuroraRoute: typeof ConceptAuroraRoute
+  ConceptAuroraLightRoute: typeof ConceptAuroraLightRoute
   ConceptBoardRoute: typeof ConceptBoardRoute
   ConceptCompactRoute: typeof ConceptCompactRoute
   ConceptSplitRoute: typeof ConceptSplitRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/concept-aurora'
       fullPath: '/concept-aurora'
       preLoaderRoute: typeof ConceptAuroraRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/concept-aurora-light': {
+      id: '/concept-aurora-light'
+      path: '/concept-aurora-light'
+      fullPath: '/concept-aurora-light'
+      preLoaderRoute: typeof ConceptAuroraLightRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/concept-board': {
@@ -278,6 +298,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConceptAuroraRoute: ConceptAuroraRoute,
+  ConceptAuroraLightRoute: ConceptAuroraLightRoute,
   ConceptBoardRoute: ConceptBoardRoute,
   ConceptCompactRoute: ConceptCompactRoute,
   ConceptSplitRoute: ConceptSplitRoute,

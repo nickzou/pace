@@ -120,6 +120,7 @@ export function ConceptSwitcher({ current }: { current: string }) {
     { to: "/concept-split", label: "Split" },
     { to: "/concept-styles", label: "Styles" },
     { to: "/concept-aurora", label: "Aurora" },
+    { to: "/concept-aurora-light", label: "Aurora Light" },
   ] as const
   return (
     <div className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 gap-1 rounded-full border border-border bg-card/90 p-1 shadow-lg backdrop-blur">
