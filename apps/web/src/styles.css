@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* enter/exit animation utilities (animate-in, fade-in-0, zoom-in-95, …) for Radix
+   data-[state] transitions — used by the shadcn Dialog. */
+@import "tw-animate-css";
 /* Design tokens → Tailwind theme (@pace/tokens). See ../tailwind.config.ts. */
 @config "../tailwind.config.ts";
 
