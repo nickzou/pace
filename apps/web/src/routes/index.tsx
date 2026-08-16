@@ -112,7 +112,7 @@ function TaskListView() {
                   : `Nothing ${currentLabel.toLowerCase()}.`}
             </p>
           ) : (
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-glow">
+            <ul className="overflow-hidden rounded-xl border border-border bg-card shadow-glow">
               {visible.map((task, i) => (
                 <TaskRow
                   key={task.id}
@@ -123,7 +123,7 @@ function TaskListView() {
                   onDelete={() => void deleteWithUndo(db, task, toast)}
                 />
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>
@@ -148,7 +148,7 @@ function TaskRow({
 }) {
   const dueState = dueDayState(task.due_date, task.completed)
   return (
-    <div
+    <li
       className={cn(
         "group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40",
         !first && "border-t border-border",
@@ -195,6 +195,6 @@ function TaskRow({
       >
         <Trash2 />
       </button>
-    </div>
+    </li>
   )
 }
