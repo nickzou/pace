@@ -2,12 +2,18 @@ import { describe, expect, it } from "vitest"
 import {
   combineLocal,
   DUE_FALLBACK,
+  dueDayState,
   formatDate,
-  isOverdue,
   START_FALLBACK,
   toDateInput,
   toTimeInput,
 } from "./dates"
+
+const daysFromNow = (n: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString()
+}
 
 // These bridge stored UTC ISO ↔ the local wall-clock the pickers speak. The
 // assertions are timezone-independent on purpose: they round-trip a value back
@@ -71,14 +77,15 @@ describe("formatDate", () => {
   })
 })
 
-describe("isOverdue", () => {
-  const PAST = "2000-01-01T00:00:00.000Z"
-  const FUTURE = "2999-01-01T00:00:00.000Z"
+describe("dueDayState", () => {
+  it("is null with no date, and for a completed task (no urgency)", () => {
+    expect(dueDayState(null, 0)).toBeNull()
+    expect(dueDayState(daysFromNow(-1), 1)).toBeNull()
+  })
 
-  it("flags only a past due date on an incomplete task", () => {
-    expect(isOverdue(PAST, 0)).toBe(true)
-    expect(isOverdue(FUTURE, 0)).toBe(false)
-    expect(isOverdue(PAST, 1)).toBe(false) // completed
-    expect(isOverdue(null, 0)).toBe(false) // no due date
+  it("classifies by local calendar day: overdue / today / upcoming", () => {
+    expect(dueDayState(daysFromNow(-1), 0)).toBe("overdue")
+    expect(dueDayState(daysFromNow(0), 0)).toBe("today")
+    expect(dueDayState(daysFromNow(1), 0)).toBe("upcoming")
   })
 })

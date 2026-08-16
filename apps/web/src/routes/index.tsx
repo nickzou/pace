@@ -3,7 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router"
 import { type FormEvent, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
 import { RequireLocalDb } from "#/lib/powersync/require-db"
-import { formatDate, isOverdue } from "#/lib/tasks/dates"
+import { dueDayState, formatDate } from "#/lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask } from "#/lib/tasks/mutations"
 import { TaskModal } from "#/lib/tasks/task-modal"
 import { useToast } from "#/lib/toast"
@@ -100,57 +100,64 @@ function TaskList() {
         <p className="text-sm text-neutral-500">No tasks yet — add your first above.</p>
       ) : (
         <ul className="space-y-2">
-          {tasks.map((task) => (
-            <li
-              key={task.id}
-              className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3"
-            >
-              <button
-                type="button"
-                onClick={() => void toggleTask(db, task)}
-                aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
-                  task.completed
-                    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
-                    : "border-neutral-600"
-                }`}
+          {tasks.map((task) => {
+            const dueState = dueDayState(task.due_date, task.completed)
+            return (
+              <li
+                key={task.id}
+                className="flex items-center gap-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3"
               >
-                {task.completed ? "✓" : ""}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedId(task.id)}
-                className="min-w-0 flex-1 text-left"
-              >
-                <span className={task.completed ? "text-neutral-500 line-through" : ""}>
-                  {task.title}
-                </span>
-                {task.description ? (
-                  <span className="block truncate text-xs text-neutral-500">
-                    {task.description}
+                <button
+                  type="button"
+                  onClick={() => void toggleTask(db, task)}
+                  aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
+                    task.completed
+                      ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                      : "border-neutral-600"
+                  }`}
+                >
+                  {task.completed ? "✓" : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(task.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className={task.completed ? "text-neutral-500 line-through" : ""}>
+                    {task.title}
                   </span>
-                ) : null}
-                {task.due_date ? (
-                  <span
-                    className={`block text-xs ${
-                      isOverdue(task.due_date, task.completed) ? "text-red-400" : "text-neutral-500"
-                    }`}
-                  >
-                    {isOverdue(task.due_date, task.completed) ? "Overdue · " : "Due "}
-                    {formatDate(task.due_date, !!task.due_has_time)}
-                  </span>
-                ) : null}
-              </button>
-              <button
-                type="button"
-                onClick={() => void deleteWithUndo(db, task, toast)}
-                aria-label="Delete task"
-                className="shrink-0 text-neutral-600 transition hover:text-red-400"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
+                  {task.description ? (
+                    <span className="block truncate text-xs text-neutral-500">
+                      {task.description}
+                    </span>
+                  ) : null}
+                  {task.due_date ? (
+                    <span
+                      className={`block text-xs ${
+                        dueState === "overdue"
+                          ? "text-red-400"
+                          : dueState === "today"
+                            ? "text-yellow-400"
+                            : "text-neutral-500"
+                      }`}
+                    >
+                      {dueState === "overdue" ? "Overdue · " : "Due "}
+                      {formatDate(task.due_date, !!task.due_has_time)}
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteWithUndo(db, task, toast)}
+                  aria-label="Delete task"
+                  className="shrink-0 text-neutral-600 transition hover:text-red-400"
+                >
+                  ✕
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
 
