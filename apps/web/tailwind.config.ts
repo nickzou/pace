@@ -1,29 +1,36 @@
 import { color } from "@pace/tokens"
 
-// Loaded by Tailwind v4 via `@config` in src/styles.css. Maps @pace/tokens into the
-// theme so semantic utilities (bg-surface, text-foreground, border-border, …) come
-// from the tokens — the single source shared with mobile. `extend` (not replace)
-// keeps Tailwind's default neutral-*/sky-* utilities working during the migration.
+// Loaded by Tailwind v4 via `@config` in src/styles.css. Maps @pace/tokens onto the
+// colour names shadcn/ui components expect (background/foreground/primary/
+// muted-foreground/border/ring/destructive/…), so shadcn works with plain Tailwind
+// utilities — no CSS-variable layer (the app is dark-only, one theme). `extend` (not
+// replace) keeps Tailwind's default neutral-*/sky-* utilities during the migration.
 export default {
   theme: {
     extend: {
       colors: {
         background: color.background,
-        surface: color.surface,
-        "surface-input": color.surfaceInput,
-        border: color.border,
-        "border-strong": color.borderStrong,
         foreground: color.textPrimary,
-        "foreground-muted": color.textSecondary,
-        "foreground-subtle": color.textMuted,
-        "foreground-faint": color.textFaint,
+        card: color.surface,
+        "card-foreground": color.textPrimary,
+        popover: color.surface,
+        "popover-foreground": color.textPrimary,
         primary: color.primary,
-        "primary-hover": color.primaryHover,
-        "on-primary": color.onPrimary,
+        "primary-foreground": color.onPrimary,
+        secondary: color.surface,
+        "secondary-foreground": color.textPrimary,
+        muted: color.surface,
+        "muted-foreground": color.textSecondary,
+        accent: color.border,
+        "accent-foreground": color.textPrimary,
+        destructive: color.danger,
+        "destructive-foreground": color.textPrimary,
+        border: color.border,
+        input: color.borderStrong,
+        ring: color.primary,
+        // Pace extras beyond shadcn's set:
         success: color.success,
-        danger: color.danger,
         warning: color.warning,
-        brand: { from: color.brandFrom, to: color.brandTo },
       },
     },
   },

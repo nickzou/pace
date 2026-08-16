@@ -1,6 +1,20 @@
 import { color, fontSize, fontWeight, palette, radius, space } from "@pace/tokens"
 import { createFileRoute, notFound } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import { Button } from "#/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "#/components/ui/card"
+import { Checkbox } from "#/components/ui/checkbox"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog"
+import { Input } from "#/components/ui/input"
 
 // A live view of @pace/tokens — the design-system reference page (P2-10). Renders
 // straight from the token values (inline styles), so it's a faithful picture of the
@@ -221,6 +235,73 @@ function Design() {
                 {name} — The quick brown fox ({val})
               </div>
             ))}
+          </div>
+        </Section>
+
+        <Section title="Components (shadcn)">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[6] }}>
+            <div style={{ display: "flex", gap: space[2], flexWrap: "wrap", alignItems: "center" }}>
+              <Button>Default</Button>
+              <Button variant="secondary">Secondary</Button>
+              <Button variant="outline">Outline</Button>
+              <Button variant="ghost">Ghost</Button>
+              <Button variant="destructive">Destructive</Button>
+              <Button variant="link">Link</Button>
+              <Button size="sm">Small</Button>
+              <Button size="lg">Large</Button>
+              <Button disabled>Disabled</Button>
+            </div>
+
+            <div style={{ display: "flex", gap: space[4], flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ width: 240 }}>
+                <Input placeholder="Add a task…" />
+              </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: space[2],
+                  fontSize: fontSize.sm,
+                }}
+              >
+                <Checkbox defaultChecked /> Completed
+              </label>
+            </div>
+
+            <Card style={{ maxWidth: 360 }}>
+              <CardHeader>
+                <CardTitle>Card title</CardTitle>
+                <CardDescription>A surface for grouped content.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p style={{ fontSize: fontSize.sm, color: color.textSecondary, margin: 0 }}>
+                  Body content goes here.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">Open dialog</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Dialog title</DialogTitle>
+                  <DialogDescription>A modal built on Radix Dialog.</DialogDescription>
+                </DialogHeader>
+                <p style={{ fontSize: fontSize.sm, color: color.textSecondary, margin: 0 }}>
+                  Dialog body content.
+                </p>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="ghost">Cancel</Button>
+                  </DialogClose>
+                  <DialogClose asChild>
+                    <Button>Confirm</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </Section>
       </div>

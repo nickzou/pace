@@ -105,7 +105,7 @@ function TaskList() {
             return (
               <li
                 key={task.id}
-                className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3"
+                className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3"
               >
                 <button
                   type="button"
