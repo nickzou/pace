@@ -10,6 +10,12 @@ on:
   workflow_run:
     workflows: ["Deploy"]
     types: [completed]
+    # Only when the triggering "Deploy" run was on main. Without this, EVERY Deploy
+    # completion (feature-branch pushes, and the pull_request:closed teardown that
+    # fires on a merge) spawns a Deploy Prod run whose job just skips — noise, and
+    # the "runs twice on merge" (push-to-main + the teardown). The push-to-main run
+    # (incl. the branch-delete "cancelled" case) is on main, so it still fires.
+    branches: [main]
 
 # Never cancel an in-flight prod deploy; a newer one queues behind it.
 concurrency:
