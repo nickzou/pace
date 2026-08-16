@@ -44,8 +44,8 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     }
   }, [task])
 
-  if (isLoading) return <p className="text-sm text-neutral-500">Loading…</p>
-  if (!task) return <p className="text-sm text-neutral-400">This task no longer exists.</p>
+  if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (!task) return <p className="text-sm text-muted-foreground">This task no longer exists.</p>
 
   const saveTitle = () => {
     const trimmed = title.trim()
@@ -88,10 +88,10 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const dueState = dueDayState(task.due_date, task.completed)
   const dueFieldClass =
     dueState === "overdue"
-      ? "border-red-500/50 text-red-300"
+      ? "border-destructive/50 text-destructive"
       : dueState === "today"
-        ? "border-yellow-500/50 text-yellow-300"
-        : "border-neutral-800 text-neutral-200"
+        ? "border-warning/50 text-warning"
+        : "border-border text-foreground"
 
   return (
     <div className="space-y-4">
@@ -101,9 +101,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           onClick={() => void toggleTask(db, task)}
           aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
           className={`mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
-            task.completed
-              ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
-              : "border-neutral-600"
+            task.completed ? "border-success bg-success/20 text-success" : "border-input"
           }`}
         >
           {task.completed ? "✓" : ""}
@@ -113,7 +111,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           onChange={(event) => setTitle(event.target.value)}
           onBlur={saveTitle}
           placeholder="Task title"
-          className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-medium text-neutral-100 outline-none focus:border-neutral-700 focus:bg-neutral-950"
+          className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-medium text-foreground outline-none focus:border-ring focus:bg-background"
         />
       </div>
 
@@ -123,11 +121,11 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         onBlur={saveDescription}
         placeholder="Add notes…"
         rows={5}
-        className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none focus:border-sky-500"
+        className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Start
           <div className="flex gap-2">
             <input
@@ -135,26 +133,26 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               aria-label="Start date"
               value={startDay}
               onChange={(event) => saveStart(event.target.value, startTime)}
-              className="min-w-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
             />
             <input
               type="time"
               aria-label="Start time"
               value={startTime}
               onChange={(event) => saveStart(startDay, event.target.value)}
-              className="w-28 shrink-0 rounded-lg border border-neutral-800 bg-neutral-950 px-2 py-2 text-sm text-neutral-200 outline-none [color-scheme:dark] focus:border-sky-500"
+              className="w-28 shrink-0 rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-ring"
             />
           </div>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-500">
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
             Due
             {dueState === "overdue" ? (
-              <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
+              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
                 Overdue
               </span>
             ) : dueState === "today" ? (
-              <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-medium text-yellow-400">
+              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
                 Today
               </span>
             ) : null}
@@ -165,14 +163,14 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               aria-label="Due date"
               value={dueDay}
               onChange={(event) => saveDue(event.target.value, dueTime)}
-              className={`min-w-0 flex-1 rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${dueFieldClass}`}
+              className={`min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
             />
             <input
               type="time"
               aria-label="Due time"
               value={dueTime}
               onChange={(event) => saveDue(dueDay, event.target.value)}
-              className={`w-28 shrink-0 rounded-lg border bg-neutral-950 px-2 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${dueFieldClass}`}
+              className={`w-28 shrink-0 rounded-lg border bg-background px-2 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
             />
           </div>
         </label>
@@ -185,7 +183,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
             await deleteWithUndo(db, task, toast)
             onDeleted?.()
           }}
-          className="rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-neutral-400 transition hover:border-red-500/50 hover:text-red-400"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
         >
           Delete
         </button>

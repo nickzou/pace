@@ -29,7 +29,7 @@ function SignIn() {
     <AuthShell
       title="Sign in"
       footer={
-        <Link to="/sign-up" className="text-sky-400 hover:underline">
+        <Link to="/sign-up" className="text-primary hover:underline">
           Need an account? Sign up
         </Link>
       }
@@ -44,7 +44,7 @@ function SignIn() {
           autoComplete="current-password"
         />
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}

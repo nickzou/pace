@@ -20,10 +20,10 @@ export function TaskModal({ id, onClose }: { id: string; onClose: () => void }) 
         type="button"
         aria-label="Close"
         onClick={onClose}
-        className="fixed inset-0 bg-black/60"
+        className="fixed inset-0 bg-black/60 animate-in fade-in-0 duration-200"
       />
       <div
-        className="relative w-full max-w-lg rounded-xl border border-neutral-800 bg-neutral-900 p-5 shadow-xl"
+        className="relative w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-xl animate-in fade-in-0 slide-in-from-top-4 duration-200"
         role="dialog"
         aria-modal="true"
       >
@@ -31,7 +31,7 @@ export function TaskModal({ id, onClose }: { id: string; onClose: () => void }) 
           <Link
             to="/tasks/$taskId"
             params={{ taskId: id }}
-            className="text-sm text-sky-400 hover:underline"
+            className="text-sm text-primary hover:underline"
           >
             Open full view →
           </Link>
@@ -39,7 +39,7 @@ export function TaskModal({ id, onClose }: { id: string; onClose: () => void }) 
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="text-neutral-500 transition hover:text-neutral-200"
+            className="text-muted-foreground transition hover:text-foreground"
           >
             ✕
           </button>

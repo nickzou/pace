@@ -29,7 +29,7 @@ function SignUp() {
     <AuthShell
       title="Create your account"
       footer={
-        <Link to="/sign-in" className="text-sky-400 hover:underline">
+        <Link to="/sign-in" className="text-primary hover:underline">
           Already have an account? Sign in
         </Link>
       }
@@ -45,7 +45,7 @@ function SignUp() {
           autoComplete="new-password"
         />
         {error && (
-          <p role="alert" className="text-sm text-red-400">
+          <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
@@ -65,17 +65,17 @@ export function AuthShell({
   footer: React.ReactNode
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-6 text-neutral-100">
+    <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
       <div className="w-full max-w-sm">
         <Link
           to="/"
-          className="text-xs uppercase tracking-widest text-neutral-500 hover:text-neutral-300"
+          className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
         >
           ← Pace
         </Link>
         <h1 className="mt-4 mb-6 text-2xl font-semibold">{title}</h1>
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-6">{children}</div>
-        <p className="mt-4 text-sm text-neutral-400">{footer}</p>
+        <div className="rounded-xl border border-border bg-card p-6">{children}</div>
+        <p className="mt-4 text-sm text-muted-foreground">{footer}</p>
       </div>
     </main>
   )
@@ -96,14 +96,14 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm text-neutral-400">{label}</span>
+      <span className="mb-1 block text-sm text-muted-foreground">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type={type}
         autoComplete={autoComplete}
         required
-        className="w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 outline-none focus:border-sky-500"
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
       />
     </label>
   )
@@ -120,7 +120,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-sky-500 px-3 py-2 font-medium text-neutral-950 transition hover:bg-sky-400 disabled:opacity-50"
+      className="w-full rounded-lg bg-primary px-3 py-2 font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
     >
       {pending ? "…" : children}
     </button>

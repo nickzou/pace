@@ -68,7 +68,7 @@ export function PowerSyncProvider({ children }: { children: ReactNode }) {
   }, [db, trpc])
 
   if (!db) {
-    return <p className="text-sm text-neutral-500">Starting local database…</p>
+    return <p className="text-sm text-muted-foreground">Starting local database…</p>
   }
 
   return <PowerSyncContext.Provider value={db}>{children}</PowerSyncContext.Provider>
