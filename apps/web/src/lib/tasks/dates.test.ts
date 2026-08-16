@@ -4,7 +4,6 @@ import {
   DUE_FALLBACK,
   dueDayState,
   formatDate,
-  isOverdue,
   START_FALLBACK,
   toDateInput,
   toTimeInput,
@@ -75,18 +74,6 @@ describe("formatDate", () => {
     expect(dateOnly).not.toBe("")
     expect(withTime).not.toBe(dateOnly)
     expect(withTime.length).toBeGreaterThan(dateOnly.length)
-  })
-})
-
-describe("isOverdue", () => {
-  const PAST = "2000-01-01T00:00:00.000Z"
-  const FUTURE = "2999-01-01T00:00:00.000Z"
-
-  it("flags only a past due date on an incomplete task", () => {
-    expect(isOverdue(PAST, 0)).toBe(true)
-    expect(isOverdue(FUTURE, 0)).toBe(false)
-    expect(isOverdue(PAST, 1)).toBe(false) // completed
-    expect(isOverdue(null, 0)).toBe(false) // no due date
   })
 })
 

@@ -16,9 +16,9 @@ import {
   combineDay,
   combineTime,
   DUE_FALLBACK,
+  dueDayState,
   formatDate,
   formatTime,
-  isOverdue,
   START_FALLBACK,
   toDate,
 } from "./dates"
@@ -123,7 +123,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     if (day) save(combineDay(day, current, false, fallback), false)
   }
 
-  const overdue = !!task && isOverdue(task.due_date, task.completed)
+  const dueState = task ? dueDayState(task.due_date, task.completed) : null
 
   return (
     <ScrollView
@@ -222,7 +222,16 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               onPress={() => pickDay(task.due_date, !!task.due_has_time, DUE_FALLBACK, saveDue)}
               style={styles.dateValueBtn}
             >
-              <Text style={[styles.dateValue, overdue ? styles.dateOverdue : null]}>
+              <Text
+                style={[
+                  styles.dateValue,
+                  dueState === "overdue"
+                    ? styles.dateOverdue
+                    : dueState === "today"
+                      ? styles.dateToday
+                      : null,
+                ]}
+              >
                 {task.due_date ? formatDate(task.due_date, false) : "Set due date"}
               </Text>
             </Pressable>
@@ -255,7 +264,11 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                 </Pressable>
               </>
             ) : null}
-            {overdue ? <Text style={styles.overdueBadge}>Overdue</Text> : null}
+            {dueState === "overdue" ? (
+              <Text style={styles.overdueBadge}>Overdue</Text>
+            ) : dueState === "today" ? (
+              <Text style={styles.todayBadge}>Today</Text>
+            ) : null}
           </View>
 
           {iosPicker ? (
@@ -344,7 +357,9 @@ const styles = StyleSheet.create({
   },
   dateValue: { color: "#e5e5e5", fontSize: 15 },
   dateOverdue: { color: "#f87171" },
+  dateToday: { color: "#facc15" },
   overdueBadge: { color: "#f87171", fontSize: 11, fontWeight: "600" },
+  todayBadge: { color: "#facc15", fontSize: 11, fontWeight: "600" },
   dateClear: { color: "#737373", fontSize: 13 },
   timeChip: {
     borderWidth: 1,

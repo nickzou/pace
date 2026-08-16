@@ -6,7 +6,6 @@ import {
   dueDayState,
   formatDate,
   formatTime,
-  isOverdue,
   START_FALLBACK,
   toDate,
 } from "./dates"
@@ -81,18 +80,6 @@ describe("formatDate / formatTime", () => {
 
   it("formatTime renders a non-empty local time", () => {
     expect(formatTime(new Date(2026, 7, 15, 13, 0).toISOString())).not.toBe("")
-  })
-})
-
-describe("isOverdue", () => {
-  const PAST = "2000-01-01T00:00:00.000Z"
-  const FUTURE = "2999-01-01T00:00:00.000Z"
-
-  it("flags only a past due date on an incomplete task", () => {
-    expect(isOverdue(PAST, 0)).toBe(true)
-    expect(isOverdue(FUTURE, 0)).toBe(false)
-    expect(isOverdue(PAST, 1)).toBe(false) // completed
-    expect(isOverdue(null, 0)).toBe(false) // no due date
   })
 })
 

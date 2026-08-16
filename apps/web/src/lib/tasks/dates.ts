@@ -46,13 +46,6 @@ export function formatDate(iso: string | null, hasTime = false): string {
   })
 }
 
-// Overdue = a due date in the past on a task that isn't done. `completed` is the
-// SQLite 0/1 int.
-export function isOverdue(dueIso: string | null, completed: number): boolean {
-  if (!dueIso || completed) return false
-  return new Date(dueIso).getTime() < Date.now()
-}
-
 // The due date's state relative to TODAY, by local CALENDAR DAY (not clock time):
 // "overdue" before today, "today" on today, "upcoming" in the future — used to
 // colour the list (red / yellow / neutral). null when there's no date or the task

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import {
   combineLocal,
   DUE_FALLBACK,
-  isOverdue,
+  dueDayState,
   START_FALLBACK,
   toDateInput,
   toTimeInput,
@@ -85,7 +85,13 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     })
   }
 
-  const overdue = isOverdue(task.due_date, task.completed)
+  const dueState = dueDayState(task.due_date, task.completed)
+  const dueFieldClass =
+    dueState === "overdue"
+      ? "border-red-500/50 text-red-300"
+      : dueState === "today"
+        ? "border-yellow-500/50 text-yellow-300"
+        : "border-neutral-800 text-neutral-200"
 
   return (
     <div className="space-y-4">
@@ -143,9 +149,13 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         <label className="flex flex-col gap-1 text-xs text-neutral-500">
           <span className="flex items-center gap-2">
             Due
-            {overdue ? (
+            {dueState === "overdue" ? (
               <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-400">
                 Overdue
+              </span>
+            ) : dueState === "today" ? (
+              <span className="rounded bg-yellow-500/15 px-1.5 py-0.5 text-[10px] font-medium text-yellow-400">
+                Today
               </span>
             ) : null}
           </span>
@@ -155,18 +165,14 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               aria-label="Due date"
               value={dueDay}
               onChange={(event) => saveDue(event.target.value, dueTime)}
-              className={`min-w-0 flex-1 rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
-                overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
-              }`}
+              className={`min-w-0 flex-1 rounded-lg border bg-neutral-950 px-3 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${dueFieldClass}`}
             />
             <input
               type="time"
               aria-label="Due time"
               value={dueTime}
               onChange={(event) => saveDue(dueDay, event.target.value)}
-              className={`w-28 shrink-0 rounded-lg border bg-neutral-950 px-2 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${
-                overdue ? "border-red-500/50 text-red-300" : "border-neutral-800 text-neutral-200"
-              }`}
+              className={`w-28 shrink-0 rounded-lg border bg-neutral-950 px-2 py-2 text-sm outline-none [color-scheme:dark] focus:border-sky-500 ${dueFieldClass}`}
             />
           </div>
         </label>
