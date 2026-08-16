@@ -88,7 +88,7 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
             Signed in as <Text style={styles.authBarEmail}>{email}</Text>
           </Text>
           <View style={styles.authBarActions}>
-            <Pressable testID="open-settings" onPress={() => setSettingsOpen(true)} hitSlop={8}>
+            <Pressable testID="settings-open" onPress={() => setSettingsOpen(true)} hitSlop={8}>
               <Text style={styles.authBarBtn}>Settings</Text>
             </Pressable>
             <Pressable testID="sign-out" onPress={onSignOut} hitSlop={8}>
