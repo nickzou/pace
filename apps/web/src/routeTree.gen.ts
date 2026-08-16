@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConceptsRouteImport } from './routes/concepts'
 import { Route as DesignRouteImport } from './routes/design'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
@@ -18,6 +19,11 @@ import { Route as TasksTaskIdRouteImport } from './routes/tasks.$taskId'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConceptsRoute = ConceptsRouteImport.update({
+  id: '/concepts',
+  path: '/concepts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignRoute = DesignRouteImport.update({
@@ -43,6 +49,7 @@ const TasksTaskIdRoute = TasksTaskIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
@@ -65,14 +74,23 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/design' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
+  fullPaths:
+    '/' | '/concepts' | '/design' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
-  id: '__root__' | '/' | '/design' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
+  to: '/' | '/concepts' | '/design' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
+  id:
+    | '__root__'
+    | '/'
+    | '/concepts'
+    | '/design'
+    | '/sign-in'
+    | '/sign-up'
+    | '/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConceptsRoute: typeof ConceptsRoute
   DesignRoute: typeof DesignRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
@@ -86,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/concepts': {
+      id: '/concepts'
+      path: '/concepts'
+      fullPath: '/concepts'
+      preLoaderRoute: typeof ConceptsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design': {
@@ -121,6 +146,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConceptsRoute: ConceptsRoute,
   DesignRoute: DesignRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
