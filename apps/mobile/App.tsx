@@ -19,7 +19,7 @@ import { AuthScreen } from "./AuthScreen"
 import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
-import { formatDate, isOverdue } from "./lib/tasks/dates"
+import { dueDayState, formatDate } from "./lib/tasks/dates"
 import { deleteWithUndo, type Task, toggleTask } from "./lib/tasks/mutations"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
 import { ToastProvider, useToast } from "./lib/toast"
@@ -142,53 +142,60 @@ function Tasks() {
       ) : tasks.length === 0 ? (
         <Text style={styles.footer}>No tasks yet — add your first above.</Text>
       ) : (
-        tasks.map((task) => (
-          <View key={task.id} style={styles.task}>
-            <Pressable
-              testID={`toggle-${task.id}`}
-              onPress={() => void toggleTask(db, task)}
-              style={[styles.checkbox, task.completed ? styles.checkboxDone : null]}
-            >
-              {task.completed ? <Text style={styles.check}>✓</Text> : null}
-            </Pressable>
-            <Pressable
-              testID={`open-${task.id}`}
-              style={styles.taskBody}
-              onPress={() => setSelectedId(task.id)}
-            >
-              <Text
-                style={[styles.taskText, task.completed ? styles.taskTextDone : null]}
-                numberOfLines={1}
+        tasks.map((task) => {
+          const dueState = dueDayState(task.due_date, task.completed)
+          return (
+            <View key={task.id} style={styles.task}>
+              <Pressable
+                testID={`toggle-${task.id}`}
+                onPress={() => void toggleTask(db, task)}
+                style={[styles.checkbox, task.completed ? styles.checkboxDone : null]}
               >
-                {task.title}
-              </Text>
-              {task.description ? (
-                <Text style={styles.taskDesc} numberOfLines={1}>
-                  {task.description}
-                </Text>
-              ) : null}
-              {task.due_date ? (
+                {task.completed ? <Text style={styles.check}>✓</Text> : null}
+              </Pressable>
+              <Pressable
+                testID={`open-${task.id}`}
+                style={styles.taskBody}
+                onPress={() => setSelectedId(task.id)}
+              >
                 <Text
-                  style={[
-                    styles.taskDue,
-                    isOverdue(task.due_date, task.completed) ? styles.taskDueOverdue : null,
-                  ]}
+                  style={[styles.taskText, task.completed ? styles.taskTextDone : null]}
                   numberOfLines={1}
                 >
-                  {isOverdue(task.due_date, task.completed) ? "Overdue · " : "Due "}
-                  {formatDate(task.due_date, !!task.due_has_time)}
+                  {task.title}
                 </Text>
-              ) : null}
-            </Pressable>
-            <Pressable
-              testID={`delete-${task.id}`}
-              onPress={() => void deleteWithUndo(db, task, toast)}
-              hitSlop={8}
-            >
-              <Text style={styles.delete}>✕</Text>
-            </Pressable>
-          </View>
-        ))
+                {task.description ? (
+                  <Text style={styles.taskDesc} numberOfLines={1}>
+                    {task.description}
+                  </Text>
+                ) : null}
+                {task.due_date ? (
+                  <Text
+                    style={[
+                      styles.taskDue,
+                      dueState === "overdue"
+                        ? styles.taskDueOverdue
+                        : dueState === "today"
+                          ? styles.taskDueToday
+                          : null,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {dueState === "overdue" ? "Overdue · " : "Due "}
+                    {formatDate(task.due_date, !!task.due_has_time)}
+                  </Text>
+                ) : null}
+              </Pressable>
+              <Pressable
+                testID={`delete-${task.id}`}
+                onPress={() => void deleteWithUndo(db, task, toast)}
+                hitSlop={8}
+              >
+                <Text style={styles.delete}>✕</Text>
+              </Pressable>
+            </View>
+          )
+        })
       )}
 
       <TaskDetailModal id={selectedId} onClose={() => setSelectedId(null)} />
@@ -275,6 +282,7 @@ const styles = StyleSheet.create({
   taskDesc: { color: "#737373", fontSize: 13, marginTop: 2 },
   taskDue: { color: "#737373", fontSize: 12, marginTop: 2 },
   taskDueOverdue: { color: "#f87171" },
+  taskDueToday: { color: "#facc15" },
   taskTextDone: { color: "#737373", textDecorationLine: "line-through" },
   delete: { color: "#525252", fontSize: 16, paddingHorizontal: 4 },
   footer: { color: "#525252", fontSize: 12, marginTop: 12, lineHeight: 18 },

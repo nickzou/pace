@@ -61,3 +61,22 @@ export function isOverdue(dueIso: string | null, completed: number): boolean {
   if (!dueIso || completed) return false
   return new Date(dueIso).getTime() < Date.now()
 }
+
+// The due date's state relative to TODAY, by local CALENDAR DAY (not clock time):
+// "overdue" before today, "today" on today, "upcoming" in the future — used to
+// colour the list (red / yellow / neutral). null when there's no date or the task
+// is done. Day-based so a task due today stays "today" all day rather than
+// flipping to overdue at its due time.
+export function dueDayState(
+  dueIso: string | null,
+  completed: number,
+): "overdue" | "today" | "upcoming" | null {
+  if (!dueIso || completed) return null
+  const due = new Date(dueIso)
+  const now = new Date()
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  if (dueDay < today) return "overdue"
+  if (dueDay > today) return "upcoming"
+  return "today"
+}

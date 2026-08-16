@@ -3,12 +3,19 @@ import {
   combineDay,
   combineTime,
   DUE_FALLBACK,
+  dueDayState,
   formatDate,
   formatTime,
   isOverdue,
   START_FALLBACK,
   toDate,
 } from "./dates"
+
+const daysFromNow = (n: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return d.toISOString()
+}
 
 // The mobile helpers bridge stored UTC ISO ↔ JS Date (the native picker's currency).
 // Assertions read back the LOCAL components (getHours/getDate…), so they hold in
@@ -86,5 +93,18 @@ describe("isOverdue", () => {
     expect(isOverdue(FUTURE, 0)).toBe(false)
     expect(isOverdue(PAST, 1)).toBe(false) // completed
     expect(isOverdue(null, 0)).toBe(false) // no due date
+  })
+})
+
+describe("dueDayState", () => {
+  it("is null with no date, and for a completed task (no urgency)", () => {
+    expect(dueDayState(null, 0)).toBeNull()
+    expect(dueDayState(daysFromNow(-1), 1)).toBeNull()
+  })
+
+  it("classifies by local calendar day: overdue / today / upcoming", () => {
+    expect(dueDayState(daysFromNow(-1), 0)).toBe("overdue")
+    expect(dueDayState(daysFromNow(0), 0)).toBe("today")
+    expect(dueDayState(daysFromNow(1), 0)).toBe("upcoming")
   })
 })
