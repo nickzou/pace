@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { Moon, Sun } from "lucide-react"
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
 import { AppLayout } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { authClient, signOut, useSession, useTokens } from "#/lib/auth-client"
 import { getConfig } from "#/lib/config"
+import { type Theme, useTheme } from "#/lib/theme"
 import { useToast } from "#/lib/toast"
+import { cn } from "#/lib/utils"
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage })
 
@@ -100,10 +103,7 @@ function Settings() {
 
           <Section title="Appearance">
             <Row label="Theme">
-              <span className="flex items-center gap-2">
-                <span className="size-3 rounded-full bg-gradient-to-r from-brand-from to-brand-to" />
-                Aurora · Dark
-              </span>
+              <ThemeToggle />
             </Row>
           </Section>
 
@@ -138,6 +138,34 @@ function Settings() {
         </div>
       </div>
     </>
+  )
+}
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  const options: { key: Theme; label: string; icon: ReactNode }[] = [
+    { key: "dark", label: "Dark", icon: <Moon /> },
+    { key: "light", label: "Light", icon: <Sun /> },
+  ]
+  return (
+    <div className="flex gap-0.5 rounded-lg border border-border p-0.5">
+      {options.map((o) => (
+        <button
+          type="button"
+          key={o.key}
+          onClick={() => setTheme(o.key)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors [&_svg]:size-3.5",
+            theme === o.key
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {o.icon}
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
 }
 

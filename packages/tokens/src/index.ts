@@ -57,6 +57,36 @@ export const color = {
   brandTo: palette.indigo[500], // …end stop
 } as const
 
+// Light theme — the same Aurora identity inverted: a lavender-white ground, white
+// surfaces, dark-indigo text, and deeper accents/status colours that stay legible on
+// light. Same semantic keys as `color`, so the web maps both onto the same CSS vars
+// (dark is the default; light is applied by the theme provider). Web-only for now.
+export const colorLight = {
+  background: "#f4f5fb",
+  surface: "#ffffff",
+  surfaceInput: "#ffffff",
+  border: "rgba(30,27,75,0.10)",
+  borderStrong: "rgba(30,27,75,0.22)",
+
+  textPrimary: "#211f38",
+  textSecondary: "#4b4869",
+  textMuted: "#6b6890",
+  textFaint: "#9995b3",
+
+  primary: "#3b82f6",
+  primaryHover: "#2563eb",
+  onPrimary: "#ffffff",
+
+  success: "#059669",
+  successText: "#047857",
+  danger: "#dc2626",
+  dangerText: "#dc2626",
+  warning: "#d97706",
+
+  brandFrom: "#3b82f6",
+  brandTo: "#6366f1",
+} as const
+
 // Spacing — 4px base, matching the Tailwind scale the app uses (gap-2/3, px-3, py-2…).
 export const space = {
   0: 0,
@@ -107,4 +137,19 @@ export const shadow = {
   glow: "0 0 0 1px rgba(255,255,255,0.04), 0 10px 34px rgba(96,165,250,0.20)",
 } as const
 
-export const tokens = { palette, color, space, radius, fontSize, fontWeight, shadow } as const
+// Light-theme underglow: softer, with a faint dark hairline instead of the light ring.
+export const shadowLight = {
+  glow: "0 1px 2px rgba(30,27,75,0.06), 0 12px 30px rgba(59,130,246,0.16)",
+} as const
+
+export const tokens = {
+  palette,
+  color,
+  colorLight,
+  space,
+  radius,
+  fontSize,
+  fontWeight,
+  shadow,
+  shadowLight,
+} as const
