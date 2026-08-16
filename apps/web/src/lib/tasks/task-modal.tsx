@@ -1,51 +1,42 @@
 import { Link } from "@tanstack/react-router"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogTitle } from "#/components/ui/dialog"
 import { TaskDetail } from "#/lib/tasks/task-detail"
 
-// The quick task view/editor: TaskDetail in a modal overlay. Shares TaskDetail
-// with the dedicated /tasks/$taskId route; the header links through to it.
-// Closes on backdrop click, the ✕, or Escape.
-export function TaskModal({ id, onClose }: { id: string; onClose: () => void }) {
+// The quick task view/editor: TaskDetail inside a shadcn/Radix Dialog — centered,
+// with enter+exit animations, focus trapping, and Escape/overlay-to-close handled
+// by Radix. Driven by the list's selected task id; `null` closes it. The header
+// links through to the dedicated /tasks/$taskId route.
+export function TaskModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+  // Retain the last task id so the body stays rendered while the Dialog animates
+  // out (Radix keeps the content mounted through the close transition).
+  const [lastId, setLastId] = useState<string | null>(id)
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose()
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
+    if (id) setLastId(id)
+  }, [id])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center px-4 py-16">
-      <button
-        type="button"
-        aria-label="Close"
-        onClick={onClose}
-        className="fixed inset-0 bg-black/60 animate-in fade-in-0 duration-200"
-      />
-      <div
-        className="relative w-full max-w-lg rounded-xl border border-border bg-card p-5 shadow-xl animate-in fade-in-0 slide-in-from-top-4 duration-200"
-        role="dialog"
-        aria-modal="true"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <Link
-            to="/tasks/$taskId"
-            params={{ taskId: id }}
-            className="text-sm text-primary hover:underline"
-          >
-            Open full view →
-          </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="text-muted-foreground transition hover:text-foreground"
-          >
-            ✕
-          </button>
-        </div>
-        <TaskDetail id={id} onDeleted={onClose} />
-      </div>
-    </div>
+    <Dialog
+      open={id !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
+      <DialogContent aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Task details</DialogTitle>
+        {lastId ? (
+          <>
+            <Link
+              to="/tasks/$taskId"
+              params={{ taskId: lastId }}
+              className="text-sm text-primary hover:underline"
+            >
+              Open full view →
+            </Link>
+            <TaskDetail key={lastId} id={lastId} onDeleted={onClose} />
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   )
 }

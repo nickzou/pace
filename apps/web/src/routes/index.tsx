@@ -128,7 +128,7 @@ function TaskListView() {
         </div>
       </div>
 
-      {selectedId ? <TaskModal id={selectedId} onClose={() => setSelectedId(null)} /> : null}
+      <TaskModal id={selectedId} onClose={() => setSelectedId(null)} />
     </>
   )
 }
