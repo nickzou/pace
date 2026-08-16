@@ -81,8 +81,8 @@ function Design() {
           Pace — Design Tokens
         </h1>
         <p style={{ color: color.textSecondary, marginTop: space[2], marginBottom: space[12] }}>
-          <code style={{ fontFamily: mono }}>@pace/tokens</code>, rendered live — the single
-          source for web · desktop · mobile.
+          <code style={{ fontFamily: mono }}>@pace/tokens</code>, rendered live — the single source
+          for web · desktop · mobile.
         </p>
 
         <Section title="Semantic colours">
@@ -103,7 +103,9 @@ function Design() {
           <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
             {Object.entries(palette).map(([family, shades]) => (
               <div key={family}>
-                <div style={{ fontSize: fontSize.xs, color: color.textMuted, marginBottom: space[1] }}>
+                <div
+                  style={{ fontSize: fontSize.xs, color: color.textMuted, marginBottom: space[1] }}
+                >
                   {family}
                 </div>
                 <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
@@ -139,12 +141,22 @@ function Design() {
             {Object.entries(space).map(([name, val]) => (
               <div key={name} style={{ display: "flex", alignItems: "center", gap: space[3] }}>
                 <div
-                  style={{ width: 24, fontSize: fontSize.xs, color: color.textMuted, fontFamily: mono }}
+                  style={{
+                    width: 24,
+                    fontSize: fontSize.xs,
+                    color: color.textMuted,
+                    fontFamily: mono,
+                  }}
                 >
                   {name}
                 </div>
                 <div
-                  style={{ height: 12, width: val, background: color.primary, borderRadius: radius.sm }}
+                  style={{
+                    height: 12,
+                    width: val,
+                    background: color.primary,
+                    borderRadius: radius.sm,
+                  }}
                 />
                 <div style={{ fontSize: fontSize.xs, color: color.textMuted }}>{val}px</div>
               </div>
@@ -157,7 +169,12 @@ function Design() {
             {Object.entries(radius).map(([name, val]) => (
               <div
                 key={name}
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: space[1] }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: space[1],
+                }}
               >
                 <div
                   style={{
@@ -181,7 +198,12 @@ function Design() {
             {Object.entries(fontSize).map(([name, val]) => (
               <div key={name} style={{ display: "flex", alignItems: "baseline", gap: space[4] }}>
                 <div
-                  style={{ width: 32, fontSize: fontSize.xs, color: color.textMuted, fontFamily: mono }}
+                  style={{
+                    width: 32,
+                    fontSize: fontSize.xs,
+                    color: color.textMuted,
+                    fontFamily: mono,
+                  }}
                 >
                   {name}
                 </div>
