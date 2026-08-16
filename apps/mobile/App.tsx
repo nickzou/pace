@@ -2,6 +2,7 @@
 // APIs rely on Symbol.asyncIterator, which the RN runtime doesn't ship.
 import "@azure/core-asynciterator-polyfill"
 
+import { color } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react"
 import * as Crypto from "expo-crypto"
 import { StatusBar } from "expo-status-bar"
@@ -62,7 +63,7 @@ function Main() {
         <SignedIn email={session?.user.email ?? ""} onSignOut={handleSignOut} />
       ) : isPending ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#e5e5e5" />
+          <ActivityIndicator color={color.textPrimary} />
         </View>
       ) : (
         <AuthScreen />
@@ -128,7 +129,7 @@ function Tasks() {
           onChangeText={setTitle}
           onSubmitEditing={add}
           placeholder="Add a task…"
-          placeholderTextColor="#525252"
+          placeholderTextColor={color.textFaint}
           style={styles.input}
           returnKeyType="done"
         />
@@ -138,7 +139,7 @@ function Tasks() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator color="#e5e5e5" style={styles.tasksLoading} />
+        <ActivityIndicator color={color.textPrimary} style={styles.tasksLoading} />
       ) : tasks.length === 0 ? (
         <Text style={styles.footer}>No tasks yet — add your first above.</Text>
       ) : (
@@ -204,7 +205,7 @@ function Tasks() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0a0a0a" },
+  screen: { flex: 1, backgroundColor: color.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   container: { padding: 24, paddingTop: 72, gap: 8 },
   authBar: {
@@ -212,24 +213,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#262626",
-    backgroundColor: "#171717",
+    borderColor: color.border,
+    backgroundColor: color.surface,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
     marginBottom: 20,
   },
-  authBarText: { color: "#a3a3a3", fontSize: 13, flexShrink: 1 },
-  authBarEmail: { color: "#e5e5e5" },
-  signOut: { color: "#a3a3a3", fontSize: 13, marginLeft: 12 },
-  brand: { fontSize: 44, fontWeight: "700", color: "#e5e5e5" },
-  tag: { fontSize: 16, fontStyle: "italic", color: "#a3a3a3", marginTop: 4 },
+  authBarText: { color: color.textSecondary, fontSize: 13, flexShrink: 1 },
+  authBarEmail: { color: color.textPrimary },
+  signOut: { color: color.textSecondary, fontSize: 13, marginLeft: 12 },
+  brand: { fontSize: 44, fontWeight: "700", color: color.textPrimary },
+  tag: { fontSize: 16, fontStyle: "italic", color: color.textSecondary, marginTop: 4 },
   section: {
     fontSize: 13,
     fontWeight: "600",
     textTransform: "uppercase",
     letterSpacing: 1,
-    color: "#a3a3a3",
+    color: color.textSecondary,
     marginTop: 28,
     marginBottom: 12,
   },
@@ -237,30 +238,30 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#404040",
-    backgroundColor: "#0a0a0a",
+    borderColor: color.borderStrong,
+    backgroundColor: color.surfaceInput,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    color: "#e5e5e5",
+    color: color.textPrimary,
     fontSize: 15,
   },
   addBtn: {
-    backgroundColor: "#0ea5e9",
+    backgroundColor: color.primary,
     borderRadius: 10,
     paddingHorizontal: 18,
     alignItems: "center",
     justifyContent: "center",
   },
-  addBtnText: { color: "#0a0a0a", fontWeight: "600", fontSize: 15 },
+  addBtnText: { color: color.onPrimary, fontWeight: "600", fontSize: 15 },
   tasksLoading: { marginTop: 12, alignSelf: "flex-start" },
   task: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     borderWidth: 1,
-    borderColor: "#262626",
-    backgroundColor: "#171717",
+    borderColor: color.border,
+    backgroundColor: color.surface,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -271,19 +272,19 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: "#525252",
+    borderColor: color.textFaint,
     alignItems: "center",
     justifyContent: "center",
   },
-  checkboxDone: { borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.2)" },
-  check: { color: "#34d399", fontSize: 12 },
+  checkboxDone: { borderColor: color.success, backgroundColor: "rgba(16,185,129,0.2)" },
+  check: { color: color.successText, fontSize: 12 },
   taskBody: { flex: 1 },
-  taskText: { color: "#e5e5e5", fontSize: 15 },
-  taskDesc: { color: "#737373", fontSize: 13, marginTop: 2 },
-  taskDue: { color: "#737373", fontSize: 12, marginTop: 2 },
-  taskDueOverdue: { color: "#f87171" },
-  taskDueToday: { color: "#facc15" },
-  taskTextDone: { color: "#737373", textDecorationLine: "line-through" },
-  delete: { color: "#525252", fontSize: 16, paddingHorizontal: 4 },
-  footer: { color: "#525252", fontSize: 12, marginTop: 12, lineHeight: 18 },
+  taskText: { color: color.textPrimary, fontSize: 15 },
+  taskDesc: { color: color.textMuted, fontSize: 13, marginTop: 2 },
+  taskDue: { color: color.textMuted, fontSize: 12, marginTop: 2 },
+  taskDueOverdue: { color: color.dangerText },
+  taskDueToday: { color: color.warning },
+  taskTextDone: { color: color.textMuted, textDecorationLine: "line-through" },
+  delete: { color: color.textFaint, fontSize: 16, paddingHorizontal: 4 },
+  footer: { color: color.textFaint, fontSize: 12, marginTop: 12, lineHeight: 18 },
 })

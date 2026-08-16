@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Design tokens → Tailwind theme (@pace/tokens). See ../tailwind.config.ts. */
+@config "../tailwind.config.ts";
 
 * {
   box-sizing: border-box;

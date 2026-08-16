@@ -82,6 +82,9 @@ importers:
       '@pace/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@pace/tokens':
+        specifier: workspace:*
+        version: link:../../packages/tokens
       '@powersync/react':
         specifier: ^2.0.0
         version: 2.0.0(@powersync/common@2.0.0)(react@19.2.8)
