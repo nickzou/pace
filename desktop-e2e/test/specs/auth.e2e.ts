@@ -12,12 +12,14 @@ describe("desktop auth", () => {
   it("sign up → signed in → sign out → sign in", async () => {
     const email = uniqueEmail("desktop")
 
-    // Launches to the home screen, signed out. (`span*=` scopes the partial-text
-    // match to the span — bare `*=` maps to "partial link text", anchors only.)
-    await expect($("span*=not signed in")).toBeDisplayed()
+    // Launches to the home screen, signed out — RequireLocalDb renders
+    // "Sign in to see your tasks".
+    await expect($("p*=to see your tasks")).toBeDisplayed()
 
-    // Sign up.
-    await $("a=Sign up").click()
+    // Sign up. The signed-out home only links to "Sign in"; the sign-in page then
+    // links to sign-up. (Sign-out is now an icon button, labelled via aria-label.)
+    await $("a=Sign in").click()
+    await $("a*=Sign up").click()
     await $('input[autocomplete="name"]').setValue("Desktop User")
     await $('input[autocomplete="email"]').setValue(email)
     await $('input[autocomplete="new-password"]').setValue(PASSWORD)
@@ -25,11 +27,11 @@ describe("desktop auth", () => {
 
     // Redirected home, authenticated as the new user (bearer token stored).
     await expect($(`span*=${email}`)).toBeDisplayed()
-    await expect($("button=Sign out")).toBeDisplayed()
+    await expect($('button[aria-label="Sign out"]')).toBeDisplayed()
 
     // Sign out clears the token → back to the signed-out home.
-    await $("button=Sign out").click()
-    await expect($("span*=not signed in")).toBeDisplayed()
+    await $('button[aria-label="Sign out"]').click()
+    await expect($("p*=to see your tasks")).toBeDisplayed()
 
     // Sign back in with the same account — proves the token round-trip, not just
     // a lingering session.

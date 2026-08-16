@@ -13,16 +13,19 @@ describe("desktop sign out", () => {
     // leave us signed in — settle into either state, then sign out if needed.
     await browser.waitUntil(
       async () =>
-        (await $("button=Sign out").isExisting()) || (await $("span*=not signed in").isExisting()),
+        (await $('button[aria-label="Sign out"]').isExisting()) ||
+        (await $("p*=to see your tasks").isExisting()),
       { timeout: 15_000, timeoutMsg: "app never rendered a signed in/out state" },
     )
-    if (await $("button=Sign out").isExisting()) {
-      await $("button=Sign out").click()
+    if (await $('button[aria-label="Sign out"]').isExisting()) {
+      await $('button[aria-label="Sign out"]').click()
     }
-    await expect($("span*=not signed in")).toBeDisplayed()
+    await expect($("p*=to see your tasks")).toBeDisplayed()
 
-    // Sign up a fresh user so we're authenticated (bearer token stored).
-    await $("a=Sign up").click()
+    // Sign up a fresh user so we're authenticated (bearer token stored). The
+    // signed-out home only links to "Sign in"; the sign-in page links to sign-up.
+    await $("a=Sign in").click()
+    await $("a*=Sign up").click()
     await $('input[autocomplete="name"]').setValue("Desktop SignOut")
     await $('input[autocomplete="email"]').setValue(email)
     await $('input[autocomplete="new-password"]').setValue(PASSWORD)
@@ -30,12 +33,12 @@ describe("desktop sign out", () => {
     await expect($(`span*=${email}`)).toBeDisplayed()
 
     // Sign out → back to the signed-out home, signed-in affordances gone.
-    await $("button=Sign out").click()
-    await expect($("span*=not signed in")).toBeDisplayed()
-    await expect($("button=Sign out")).not.toBeDisplayed()
+    await $('button[aria-label="Sign out"]').click()
+    await expect($("p*=to see your tasks")).toBeDisplayed()
+    await expect($('button[aria-label="Sign out"]')).not.toBeDisplayed()
 
     // Reload the webview: the bearer token was cleared, so we don't re-auth.
     await browser.refresh()
-    await expect($("span*=not signed in")).toBeDisplayed()
+    await expect($("p*=to see your tasks")).toBeDisplayed()
   })
 })
