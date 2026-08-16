@@ -17,6 +17,7 @@ import { Route as ConceptSplitRouteImport } from './routes/concept-split'
 import { Route as ConceptStylesRouteImport } from './routes/concept-styles'
 import { Route as ConceptsRouteImport } from './routes/concepts'
 import { Route as DesignRouteImport } from './routes/design'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as TasksTaskIdRouteImport } from './routes/tasks.$taskId'
@@ -61,6 +62,11 @@ const DesignRoute = DesignRouteImport.update({
   path: '/design',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/concept-styles': typeof ConceptStylesRoute
   '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/concept-styles': typeof ConceptStylesRoute
   '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/concept-styles': typeof ConceptStylesRoute
   '/concepts': typeof ConceptsRoute
   '/design': typeof DesignRoute
+  '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/concept-styles'
     | '/concepts'
     | '/design'
+    | '/settings'
     | '/sign-in'
     | '/sign-up'
     | '/tasks/$taskId'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/concept-styles'
     | '/concepts'
     | '/design'
+    | '/settings'
     | '/sign-in'
     | '/sign-up'
     | '/tasks/$taskId'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/concept-styles'
     | '/concepts'
     | '/design'
+    | '/settings'
     | '/sign-in'
     | '/sign-up'
     | '/tasks/$taskId'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   ConceptStylesRoute: typeof ConceptStylesRoute
   ConceptsRoute: typeof ConceptsRoute
   DesignRoute: typeof DesignRoute
+  SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   TasksTaskIdRoute: typeof TasksTaskIdRoute
@@ -231,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sign-in': {
       id: '/sign-in'
       path: '/sign-in'
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConceptStylesRoute: ConceptStylesRoute,
   ConceptsRoute: ConceptsRoute,
   DesignRoute: DesignRoute,
+  SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   TasksTaskIdRoute: TasksTaskIdRoute,

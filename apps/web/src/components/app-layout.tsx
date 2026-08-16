@@ -69,7 +69,8 @@ function Shell({ children }: { children: ReactNode }) {
 
   const email = session?.user.email ?? ""
   const initials = email.slice(0, 2).toUpperCase() || "··"
-  const nav = { count, activeView, email, initials }
+  const settingsActive = loc.pathname === "/settings"
+  const nav = { count, activeView, email, initials, settingsActive }
 
   return (
     <div className="flex h-screen">
@@ -121,12 +122,14 @@ function SidebarNav({
   activeView,
   email,
   initials,
+  settingsActive,
   onNavigate,
 }: {
   count: (v: View) => number
   activeView: View | undefined
   email: string
   initials: string
+  settingsActive: boolean
   onNavigate?: () => void
 }) {
   return (
@@ -173,19 +176,29 @@ function SidebarNav({
         })}
       </nav>
 
-      <div className="mt-auto flex items-center gap-3 rounded-lg px-2 py-2 text-sm">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-          {initials}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-muted-foreground" title={email}>
-          {email || "Signed in"}
-        </span>
+      <div className="mt-auto flex items-center gap-1 text-sm">
+        <Link
+          to="/settings"
+          onClick={onNavigate}
+          title="Settings"
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors",
+            settingsActive
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-foreground",
+          )}
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+            {initials}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{email || "Account"}</span>
+        </Link>
         <button
           type="button"
           onClick={() => signOut()}
           aria-label="Sign out"
           title="Sign out"
-          className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+          className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <LogOut className="size-4" />
         </button>
