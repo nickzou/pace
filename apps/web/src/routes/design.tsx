@@ -1,11 +1,19 @@
 import { color, fontSize, fontWeight, palette, radius, space } from "@pace/tokens"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, notFound } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 // A live view of @pace/tokens — the design-system reference page (P2-10). Renders
 // straight from the token values (inline styles), so it's a faithful picture of the
 // package, not a Tailwind approximation. Grows to include components (subtasks 3–5).
-export const Route = createFileRoute("/design")({ component: Design })
+export const Route = createFileRoute("/design")({
+  // Dev-only: not reachable in any production build (prod, PR previews, or the
+  // packaged desktop app). Vite statically replaces import.meta.env.PROD, so in a
+  // built bundle this guard is a constant and the route just 404s.
+  beforeLoad: () => {
+    if (import.meta.env.PROD) throw notFound()
+  },
+  component: Design,
+})
 
 const mono = "ui-monospace, SFMono-Regular, monospace"
 
