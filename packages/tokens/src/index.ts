@@ -30,7 +30,8 @@ export const palette = {
 } as const
 
 // Semantic colours — the layer UI should reference. Names describe ROLE, not hue,
-// so a re-theme only changes values here. Dark theme (the app is dark-only for now).
+// so a re-theme only changes values here. This is the dark theme (the default on
+// every surface); `colorLight` below is the light counterpart.
 export const color = {
   background: palette.ink[950], // app background
   surface: palette.ink[850], // cards, bars, panels
@@ -59,8 +60,9 @@ export const color = {
 
 // Light theme — the same Aurora identity inverted: a lavender-white ground, white
 // surfaces, dark-indigo text, and deeper accents/status colours that stay legible on
-// light. Same semantic keys as `color`, so the web maps both onto the same CSS vars
-// (dark is the default; light is applied by the theme provider). Web-only for now.
+// light. Same semantic keys as `color`, so every surface can swap the two: the web
+// maps both onto the same CSS vars, and mobile picks the palette at runtime (see
+// apps/mobile/lib/theme.tsx). Dark is the default; light is opt-in per user.
 export const colorLight = {
   background: "#f4f5fb",
   surface: "#ffffff",

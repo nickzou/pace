@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native"
+import { type Palette, useTheme, useThemedStyles } from "../theme"
 import { useToast } from "../toast"
 import {
   combineDay,
@@ -30,6 +31,7 @@ import { deleteWithUndo, type Task, toggleTask, updateTask } from "./mutations"
 // context (PowerSync, toast) flows into RN Modal children, so the editor reads the
 // live task and raises the Undo toast just like the list does.
 export function TaskDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const styles = useThemedStyles(makeStyles)
   return (
     <Modal
       visible={id !== null}
@@ -45,6 +47,8 @@ export function TaskDetailModal({ id, onClose }: { id: string | null; onClose: (
 function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const db = usePowerSync()
   const toast = useToast()
+  const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
   const { data: rows } = useQuery<Task>(
     "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks WHERE id = ?",
     [id],
@@ -155,7 +159,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               onChangeText={setTitle}
               onBlur={saveTitle}
               placeholder="Task title"
-              placeholderTextColor="#525252"
+              placeholderTextColor={colors.textFaint}
               style={styles.titleInput}
             />
           </View>
@@ -166,7 +170,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             onChangeText={setDescription}
             onBlur={saveDescription}
             placeholder="Add notes…"
-            placeholderTextColor="#525252"
+            placeholderTextColor={colors.textFaint}
             multiline
             style={styles.notes}
           />
@@ -302,73 +306,80 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   }
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0a0a0a" },
-  container: { padding: 24, paddingTop: 64, gap: 16 },
-  header: { flexDirection: "row", justifyContent: "flex-end" },
-  done: { color: "#0ea5e9", fontSize: 15, fontWeight: "600" },
-  gone: { color: "#a3a3a3", fontSize: 15, marginTop: 12 },
-  titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  checkbox: {
-    marginTop: 6,
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: "#525252",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxDone: { borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.2)" },
-  check: { color: "#34d399", fontSize: 12 },
-  titleInput: { flex: 1, color: "#e5e5e5", fontSize: 20, fontWeight: "600", paddingVertical: 2 },
-  notes: {
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: "#262626",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    color: "#e5e5e5",
-    fontSize: 15,
-    textAlignVertical: "top",
-  },
-  deleteBtn: {
-    alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: "#262626",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  deleteText: { color: "#a3a3a3", fontSize: 15 },
-  dateRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
-  dateLabel: { color: "#a3a3a3", fontSize: 13, width: 44 },
-  dateValueBtn: {
-    flexGrow: 1,
-    flexBasis: 120,
-    borderWidth: 1,
-    borderColor: "#262626",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  dateValue: { color: "#e5e5e5", fontSize: 15 },
-  dateOverdue: { color: "#f87171" },
-  dateToday: { color: "#facc15" },
-  overdueBadge: { color: "#f87171", fontSize: 11, fontWeight: "600" },
-  todayBadge: { color: "#facc15", fontSize: 11, fontWeight: "600" },
-  dateClear: { color: "#737373", fontSize: 13 },
-  timeChip: {
-    borderWidth: 1,
-    borderColor: "#262626",
-    backgroundColor: "#0a0a0a",
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  timeText: { color: "#e5e5e5", fontSize: 15 },
-  addTimeText: { color: "#737373", fontSize: 13 },
-})
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.background },
+    container: { padding: 24, paddingTop: 64, gap: 16 },
+    header: { flexDirection: "row", justifyContent: "flex-end" },
+    done: { color: c.primary, fontSize: 15, fontWeight: "600" },
+    gone: { color: c.textSecondary, fontSize: 15, marginTop: 12 },
+    titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+    checkbox: {
+      marginTop: 6,
+      width: 20,
+      height: 20,
+      borderRadius: 5,
+      borderWidth: 1,
+      borderColor: c.textFaint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxDone: { borderColor: c.success, backgroundColor: "rgba(16,185,129,0.2)" },
+    check: { color: c.successText, fontSize: 12 },
+    titleInput: {
+      flex: 1,
+      color: c.textPrimary,
+      fontSize: 20,
+      fontWeight: "600",
+      paddingVertical: 2,
+    },
+    notes: {
+      minHeight: 120,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surfaceInput,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      color: c.textPrimary,
+      fontSize: 15,
+      textAlignVertical: "top",
+    },
+    deleteBtn: {
+      alignSelf: "flex-start",
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+    },
+    deleteText: { color: c.textSecondary, fontSize: 15 },
+    dateRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
+    dateLabel: { color: c.textSecondary, fontSize: 13, width: 44 },
+    dateValueBtn: {
+      flexGrow: 1,
+      flexBasis: 120,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surfaceInput,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    dateValue: { color: c.textPrimary, fontSize: 15 },
+    dateOverdue: { color: c.dangerText },
+    dateToday: { color: c.warning },
+    overdueBadge: { color: c.dangerText, fontSize: 11, fontWeight: "600" },
+    todayBadge: { color: c.warning, fontSize: 11, fontWeight: "600" },
+    dateClear: { color: c.textMuted, fontSize: 13 },
+    timeChip: {
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surfaceInput,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+    },
+    timeText: { color: c.textPrimary, fontSize: 15 },
+    addTimeText: { color: c.textMuted, fontSize: 13 },
+  })

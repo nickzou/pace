@@ -8,6 +8,7 @@ import {
   useState,
 } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
+import { type Palette, useThemedStyles } from "./theme"
 
 // A single-slot toast with an optional action button (used for Undo) — the mobile
 // twin of apps/web's toast. Lives above the whole app so a toast raised from
@@ -22,6 +23,7 @@ const ToastContext = createContext<ToastContextValue | null>(null)
 const TOAST_MS = 5000
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const styles = useThemedStyles(makeStyles)
   const [toast, setToast] = useState<Toast | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -77,20 +79,21 @@ export function useToast(): ToastContextValue {
   return ctx
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  wrap: { position: "absolute", left: 0, right: 0, bottom: 40, alignItems: "center" },
-  toast: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    borderWidth: 1,
-    borderColor: "#404040",
-    backgroundColor: "#171717",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  text: { color: "#e5e5e5", fontSize: 14 },
-  action: { color: "#0ea5e9", fontSize: 14, fontWeight: "600" },
-})
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    root: { flex: 1 },
+    wrap: { position: "absolute", left: 0, right: 0, bottom: 40, alignItems: "center" },
+    toast: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      backgroundColor: c.surface,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    text: { color: c.textPrimary, fontSize: 14 },
+    action: { color: c.primary, fontSize: 14, fontWeight: "600" },
+  })

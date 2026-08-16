@@ -1,10 +1,13 @@
 import { useState } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { signIn, signUp } from "./lib/auth-client"
+import { type Palette, useTheme, useThemedStyles } from "./lib/theme"
 
 type Mode = "sign-in" | "sign-up"
 
 export function AuthScreen() {
+  const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
   const [mode, setMode] = useState<Mode>("sign-in")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -37,7 +40,7 @@ export function AuthScreen() {
           testID="name-input"
           style={styles.input}
           placeholder="Name"
-          placeholderTextColor="#525252"
+          placeholderTextColor={colors.textFaint}
           autoCapitalize="words"
           value={name}
           onChangeText={setName}
@@ -47,7 +50,7 @@ export function AuthScreen() {
         testID="email-input"
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#525252"
+        placeholderTextColor={colors.textFaint}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="email-address"
@@ -58,7 +61,7 @@ export function AuthScreen() {
         testID="password-input"
         style={styles.input}
         placeholder="Password"
-        placeholderTextColor="#525252"
+        placeholderTextColor={colors.textFaint}
         secureTextEntry
         value={password}
         onChangeText={setPassword}
@@ -72,7 +75,7 @@ export function AuthScreen() {
 
       <Pressable testID="submit-button" style={styles.button} onPress={submit} disabled={pending}>
         {pending ? (
-          <ActivityIndicator color="#0a0a0a" />
+          <ActivityIndicator color={colors.onPrimary} />
         ) : (
           <Text style={styles.buttonText}>{isSignUp ? "Sign up" : "Sign in"}</Text>
         )}
@@ -98,28 +101,29 @@ export function AuthScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
-  brand: { fontSize: 40, fontWeight: "700", color: "#e5e5e5" },
-  tag: { fontSize: 15, color: "#a3a3a3", marginBottom: 12 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#404040",
-    backgroundColor: "#171717",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    color: "#e5e5e5",
-    fontSize: 15,
-  },
-  error: { color: "#f87171", fontSize: 14 },
-  button: {
-    backgroundColor: "#0ea5e9",
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 4,
-  },
-  buttonText: { color: "#0a0a0a", fontSize: 15, fontWeight: "600" },
-  switch: { color: "#38bdf8", fontSize: 14, textAlign: "center", marginTop: 8 },
-})
+const makeStyles = (c: Palette) =>
+  StyleSheet.create({
+    container: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
+    brand: { fontSize: 40, fontWeight: "700", color: c.textPrimary },
+    tag: { fontSize: 15, color: c.textSecondary, marginBottom: 12 },
+    input: {
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      backgroundColor: c.surfaceInput,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      color: c.textPrimary,
+      fontSize: 15,
+    },
+    error: { color: c.dangerText, fontSize: 14 },
+    button: {
+      backgroundColor: c.primary,
+      borderRadius: 10,
+      paddingVertical: 14,
+      alignItems: "center",
+      marginTop: 4,
+    },
+    buttonText: { color: c.onPrimary, fontSize: 15, fontWeight: "600" },
+    switch: { color: c.primary, fontSize: 14, textAlign: "center", marginTop: 8 },
+  })
