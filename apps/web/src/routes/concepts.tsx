@@ -12,6 +12,7 @@ import {
   Sun,
 } from "lucide-react"
 import { type ReactNode, useState } from "react"
+import { ConceptSwitcher } from "#/components/concept-kit"
 import { Button } from "#/components/ui/button"
 import { Checkbox } from "#/components/ui/checkbox"
 import { Input } from "#/components/ui/input"
@@ -179,6 +180,7 @@ function Concepts() {
           </div>
         </div>
       </main>
+      <ConceptSwitcher current="/concepts" />
     </div>
   )
 }
