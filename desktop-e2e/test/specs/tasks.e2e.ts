@@ -15,14 +15,16 @@ describe("desktop tasks", () => {
     // Wait for the app to settle into either state, then sign out if needed.
     await browser.waitUntil(
       async () =>
-        (await $("button=Sign out").isExisting()) || (await $("span*=not signed in").isExisting()),
+        (await $('button[aria-label="Sign out"]').isExisting()) ||
+        (await $("p*=to see your tasks").isExisting()),
       { timeout: 15_000, timeoutMsg: "app never rendered a signed in/out state" },
     )
-    if (await $("button=Sign out").isExisting()) {
-      await $("button=Sign out").click()
+    if (await $('button[aria-label="Sign out"]').isExisting()) {
+      await $('button[aria-label="Sign out"]').click()
     }
-    await expect($("span*=not signed in")).toBeDisplayed()
-    await $("a=Sign up").click()
+    await expect($("p*=to see your tasks")).toBeDisplayed()
+    await $("a=Sign in").click()
+    await $("a*=Sign up").click()
     await $('input[autocomplete="name"]').setValue("Desktop Tasks")
     await $('input[autocomplete="email"]').setValue(email)
     await $('input[autocomplete="new-password"]').setValue(PASSWORD)

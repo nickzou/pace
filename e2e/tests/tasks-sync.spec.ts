@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { PASSWORD, uniqueEmail } from "./helpers"
+import { expectSignedIn, PASSWORD, uniqueEmail } from "./helpers"
 
 // The real round-trip proof: a task added on one "device" (browser context)
 // appears on a SECOND, fresh context signed in as the same user. Context B starts
@@ -18,7 +18,7 @@ test("a task syncs to a second device (round-trip through the server)", async ({
   await pageA.getByLabel("Email").fill(email)
   await pageA.getByLabel("Password").fill(PASSWORD)
   await pageA.getByRole("button", { name: "Sign up" }).click()
-  await expect(pageA.getByText(email)).toBeVisible()
+  await expectSignedIn(pageA, email)
 
   await pageA.getByPlaceholder("Add a task…").fill(title)
   await pageA.getByRole("button", { name: "Add" }).click()
@@ -29,7 +29,7 @@ test("a task syncs to a second device (round-trip through the server)", async ({
   const deviceB = await browser.newContext({ storageState: await deviceA.storageState() })
   const pageB = await deviceB.newPage()
   await pageB.goto("/")
-  await expect(pageB.getByText(email)).toBeVisible()
+  await expectSignedIn(pageB, email)
 
   // B never wrote this task, so it can only appear by syncing down from the
   // server. Generous timeout — sync is asynchronous (upload from A, download to B).

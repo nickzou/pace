@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test"
-import { PASSWORD, uniqueEmail } from "./helpers"
+import { expectSignedIn, expectSignedOut, PASSWORD, uniqueEmail } from "./helpers"
 
 // Regression guard for the sign-out bug (the signed-in gate once got stuck, so
 // tapping "Sign out" did nothing). Confirms sign-out actually leaves the signed-in
@@ -16,17 +16,15 @@ test("sign out → confirmed signed out, and stays out on reload", async ({ page
   await page.getByLabel("Email").fill(email)
   await page.getByLabel("Password").fill(PASSWORD)
   await page.getByRole("button", { name: "Sign up" }).click()
-  await expect(page.getByText(email)).toBeVisible()
+  await expectSignedIn(page, email)
 
   await page.getByRole("button", { name: "Sign out" }).click()
 
   // Confirmed out: the signed-out prompt shows and the signed-in UI is gone.
-  await expect(page.getByText(/you're not signed in/i)).toBeVisible()
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeHidden()
-  await expect(page.getByText(email)).toBeHidden()
+  await expectSignedOut(page)
+  await expect(page.getByRole("link", { name: email })).toBeHidden()
 
   // The cookie was actually cleared, so a fresh load stays signed out.
   await page.reload()
-  await expect(page.getByText(/you're not signed in/i)).toBeVisible()
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeHidden()
+  await expectSignedOut(page)
 })

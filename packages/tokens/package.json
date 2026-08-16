@@ -1,0 +1,15 @@
+{
+  "name": "@pace/tokens",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@pace/tsconfig": "workspace:*",
+    "typescript": "^6.0.2"
+  }
+}

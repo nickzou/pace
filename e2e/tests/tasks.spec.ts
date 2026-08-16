@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test"
+import { expectSignedIn } from "./helpers"
 
 // Reuses the session saved by auth.setup.ts — the tasks list is auth-gated.
 test.use({ storageState: "playwright/.auth/user.json" })
 
 test("add a task → it appears in the list and survives a reload", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
 
   const title = `Buy milk ${Date.now()}`
   await page.getByPlaceholder("Add a task…").fill(title)
@@ -17,13 +18,13 @@ test("add a task → it appears in the list and survives a reload", async ({ pag
   // Reload from scratch: proves it actually reached Postgres, not just the
   // optimistic cache (a failed create would have rolled back and vanished).
   await page.reload()
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
   await expect(page.getByText(title)).toBeVisible()
 })
 
 test("delete a task → the Undo toast restores it (offline-first round-trip)", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
 
   const title = `Undo me ${Date.now()}`
   await page.getByPlaceholder("Add a task…").fill(title)
@@ -44,7 +45,7 @@ test("delete a task → the Undo toast restores it (offline-first round-trip)", 
 
   // Reload proves the restore actually persisted (tombstone cleared), not a blip.
   await page.reload()
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
   await expect(page.getByText(title)).toBeVisible()
 })
 
@@ -52,7 +53,7 @@ test("set a past due DATE only (no time) → it saves, is flagged Overdue, and r
   page,
 }) => {
   await page.goto("/")
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
 
   const title = `Schedule me ${Date.now()}`
   await page.getByPlaceholder("Add a task…").fill(title)
@@ -73,7 +74,7 @@ test("set a past due DATE only (no time) → it saves, is flagged Overdue, and r
   // Reload a fresh page and reopen: the date stored as a UTC timestamp round-trips
   // back to the same local day — proving it reached the server and synced back.
   await page.reload()
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
   await page.getByText(title).click()
   await expect(page.getByLabel("Due date")).toHaveValue("2020-01-01")
   // Date-only stays date-only: the end-of-day default reads as blank, so the time
@@ -85,7 +86,7 @@ test("an explicit time equal to the no-time default (11:59 PM) is kept, not swal
   page,
 }) => {
   await page.goto("/")
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
 
   const title = `Time me ${Date.now()}`
   await page.getByPlaceholder("Add a task…").fill(title)
@@ -101,7 +102,7 @@ test("an explicit time equal to the no-time default (11:59 PM) is kept, not swal
 
   // After a reload the time survives (not blanked as if it were the default).
   await page.reload()
-  await expect(page.getByText(/signed in as/i)).toBeVisible()
+  await expectSignedIn(page)
   await page.getByText(title).click()
   await expect(page.getByLabel("Due date")).toHaveValue("2030-06-15")
   await expect(page.getByLabel("Due time")).toHaveValue("23:59")

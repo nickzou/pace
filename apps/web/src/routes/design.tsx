@@ -1,0 +1,310 @@
+import { color, fontSize, fontWeight, palette, radius, space } from "@pace/tokens"
+import { createFileRoute, notFound } from "@tanstack/react-router"
+import type { ReactNode } from "react"
+import { Button } from "#/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "#/components/ui/card"
+import { Checkbox } from "#/components/ui/checkbox"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "#/components/ui/dialog"
+import { Input } from "#/components/ui/input"
+
+// A live view of @pace/tokens — the design-system reference page (P2-10). Renders
+// straight from the token values (inline styles), so it's a faithful picture of the
+// package, not a Tailwind approximation. Grows to include components (subtasks 3–5).
+export const Route = createFileRoute("/design")({
+  // Dev-only: not reachable in any production build (prod, PR previews, or the
+  // packaged desktop app). Vite statically replaces import.meta.env.PROD, so in a
+  // built bundle this guard is a constant and the route just 404s.
+  beforeLoad: () => {
+    if (import.meta.env.PROD) throw notFound()
+  },
+  component: Design,
+})
+
+const mono = "ui-monospace, SFMono-Regular, monospace"
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section style={{ marginBottom: space[12] }}>
+      <h2
+        style={{
+          fontSize: fontSize.sm,
+          fontWeight: Number(fontWeight.semibold),
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: color.textSecondary,
+          marginBottom: space[4],
+        }}
+      >
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function Swatch({ name, value }: { name: string; value: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: space[1] }}>
+      <div
+        style={{
+          height: 56,
+          borderRadius: radius.md,
+          background: value,
+          border: `1px solid ${color.border}`,
+        }}
+      />
+      <div style={{ fontSize: fontSize.xs, color: color.textPrimary }}>{name}</div>
+      <div style={{ fontSize: fontSize.xs, color: color.textMuted, fontFamily: mono }}>{value}</div>
+    </div>
+  )
+}
+
+function Design() {
+  return (
+    <main
+      style={{
+        background: color.background,
+        color: color.textPrimary,
+        minHeight: "100vh",
+        padding: space[8],
+        fontFamily: "system-ui, -apple-system, sans-serif",
+      }}
+    >
+      <div style={{ maxWidth: 920, margin: "0 auto" }}>
+        <h1
+          style={{
+            fontSize: fontSize["3xl"],
+            fontWeight: Number(fontWeight.bold),
+            margin: 0,
+            backgroundImage: `linear-gradient(to right, ${color.brandFrom}, ${color.brandTo})`,
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+            width: "fit-content",
+          }}
+        >
+          Pace — Design Tokens
+        </h1>
+        <p style={{ color: color.textSecondary, marginTop: space[2], marginBottom: space[12] }}>
+          <code style={{ fontFamily: mono }}>@pace/tokens</code>, rendered live — the single source
+          for web · desktop · mobile.
+        </p>
+
+        <Section title="Semantic colours">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: space[4],
+            }}
+          >
+            {Object.entries(color).map(([name, value]) => (
+              <Swatch key={name} name={name} value={value} />
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Palette">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[4] }}>
+            {Object.entries(palette).map(([family, shades]) => (
+              <div key={family}>
+                <div
+                  style={{ fontSize: fontSize.xs, color: color.textMuted, marginBottom: space[1] }}
+                >
+                  {family}
+                </div>
+                <div style={{ display: "flex", gap: space[1], flexWrap: "wrap" }}>
+                  {Object.entries(shades).map(([shade, hex]) => (
+                    <div
+                      key={shade}
+                      title={`${family}-${shade} · ${hex}`}
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: radius.sm,
+                        background: hex,
+                        border: `1px solid ${color.border}`,
+                        display: "flex",
+                        alignItems: "flex-end",
+                        justifyContent: "center",
+                        fontSize: 10,
+                        color: color.textPrimary,
+                        paddingBottom: 3,
+                      }}
+                    >
+                      {shade}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Spacing">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            {Object.entries(space).map(([name, val]) => (
+              <div key={name} style={{ display: "flex", alignItems: "center", gap: space[3] }}>
+                <div
+                  style={{
+                    width: 24,
+                    fontSize: fontSize.xs,
+                    color: color.textMuted,
+                    fontFamily: mono,
+                  }}
+                >
+                  {name}
+                </div>
+                <div
+                  style={{
+                    height: 12,
+                    width: val,
+                    background: color.primary,
+                    borderRadius: radius.sm,
+                  }}
+                />
+                <div style={{ fontSize: fontSize.xs, color: color.textMuted }}>{val}px</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Radii">
+          <div style={{ display: "flex", gap: space[5], flexWrap: "wrap" }}>
+            {Object.entries(radius).map(([name, val]) => (
+              <div
+                key={name}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: space[1],
+                }}
+              >
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    background: color.surface,
+                    border: `1px solid ${color.borderStrong}`,
+                    borderRadius: val,
+                  }}
+                />
+                <div style={{ fontSize: fontSize.xs, color: color.textMuted }}>
+                  {name} · {val}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Type scale">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[3] }}>
+            {Object.entries(fontSize).map(([name, val]) => (
+              <div key={name} style={{ display: "flex", alignItems: "baseline", gap: space[4] }}>
+                <div
+                  style={{
+                    width: 32,
+                    fontSize: fontSize.xs,
+                    color: color.textMuted,
+                    fontFamily: mono,
+                  }}
+                >
+                  {name}
+                </div>
+                <div style={{ fontSize: val }}>The quick brown fox</div>
+                <div style={{ fontSize: fontSize.xs, color: color.textMuted }}>{val}px</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Font weights">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[2] }}>
+            {Object.entries(fontWeight).map(([name, val]) => (
+              <div key={name} style={{ fontSize: fontSize.lg, fontWeight: Number(val) }}>
+                {name} — The quick brown fox ({val})
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Components (shadcn)">
+          <div style={{ display: "flex", flexDirection: "column", gap: space[6] }}>
+            <div style={{ display: "flex", gap: space[2], flexWrap: "wrap", alignItems: "center" }}>
+              <Button>Default</Button>
+              <Button variant="secondary">Secondary</Button>
+              <Button variant="outline">Outline</Button>
+              <Button variant="ghost">Ghost</Button>
+              <Button variant="destructive">Destructive</Button>
+              <Button variant="link">Link</Button>
+              <Button size="sm">Small</Button>
+              <Button size="lg">Large</Button>
+              <Button disabled>Disabled</Button>
+            </div>
+
+            <div style={{ display: "flex", gap: space[4], flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ width: 240 }}>
+                <Input placeholder="Add a task…" />
+              </div>
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: space[2],
+                  fontSize: fontSize.sm,
+                }}
+              >
+                <Checkbox defaultChecked /> Completed
+              </span>
+            </div>
+
+            <Card style={{ maxWidth: 360 }}>
+              <CardHeader>
+                <CardTitle>Card title</CardTitle>
+                <CardDescription>A surface for grouped content.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p style={{ fontSize: fontSize.sm, color: color.textSecondary, margin: 0 }}>
+                  Body content goes here.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">Open dialog</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Dialog title</DialogTitle>
+                  <DialogDescription>A modal built on Radix Dialog.</DialogDescription>
+                </DialogHeader>
+                <p style={{ fontSize: fontSize.sm, color: color.textSecondary, margin: 0 }}>
+                  Dialog body content.
+                </p>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="ghost">Cancel</Button>
+                  </DialogClose>
+                  <DialogClose asChild>
+                    <Button>Confirm</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </Section>
+      </div>
+    </main>
+  )
+}

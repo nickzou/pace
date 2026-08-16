@@ -13,11 +13,11 @@ export function RequireLocalDb({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
-  if (isPending || !mounted) return <p className="text-sm text-neutral-500">…</p>
+  if (isPending || !mounted) return <p className="text-sm text-muted-foreground">…</p>
   if (!session) {
     return (
-      <p className="text-sm text-neutral-400">
-        <Link to="/sign-in" className="text-sky-400 hover:underline">
+      <p className="text-sm text-muted-foreground">
+        <Link to="/sign-in" className="text-primary hover:underline">
           Sign in
         </Link>{" "}
         to see your tasks.

@@ -4,6 +4,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 
 import { ApiProvider } from "../lib/api"
 import { getConfig } from "../lib/config"
+import { LIGHT_VARS, STORAGE_KEY, ThemeProvider } from "../lib/theme"
 import { ToastProvider } from "../lib/toast"
 import appCss from "../styles.css?url"
 
@@ -18,6 +19,21 @@ function ConfigScript() {
     <script
       // biome-ignore lint/security/noDangerouslySetInnerHtml: server-injected runtime config, escaped above
       dangerouslySetInnerHTML={{ __html: `window.__PACE_CONFIG__=${json}` }}
+    />
+  )
+}
+
+// Apply the stored theme's CSS vars to <html> BEFORE hydration and first paint, so a
+// user who picked light mode never sees a flash of the default dark theme. Mirrors the
+// runtime ThemeProvider, sharing LIGHT_VARS/STORAGE_KEY so the two can't drift.
+function ThemeScript() {
+  const vars = JSON.stringify(LIGHT_VARS).replace(/</g, "\\u003c")
+  const key = JSON.stringify(STORAGE_KEY)
+  const js = `(function(){try{var r=document.documentElement;if(localStorage.getItem(${key})==="light"){var v=${vars};for(var k in v)r.style.setProperty(k,v[k]);r.style.colorScheme="light"}else{r.style.colorScheme="dark"}}catch(e){}})()`
+  return (
+    <script
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: static theme tokens, no user input, "<" escaped above
+      dangerouslySetInnerHTML={{ __html: js }}
     />
   )
 }
@@ -52,11 +68,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
         <ConfigScript />
+        <ThemeScript />
       </head>
       <body>
-        <ApiProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </ApiProvider>
+        <ThemeProvider>
+          <ApiProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ApiProvider>
+        </ThemeProvider>
         <TanStackDevtools
           config={{
             position: "bottom-right",
