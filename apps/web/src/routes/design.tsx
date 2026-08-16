@@ -256,7 +256,7 @@ function Design() {
               <div style={{ width: 240 }}>
                 <Input placeholder="Add a task…" />
               </div>
-              <label
+              <span
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -265,7 +265,7 @@ function Design() {
                 }}
               >
                 <Checkbox defaultChecked /> Completed
-              </label>
+              </span>
             </div>
 
             <Card style={{ maxWidth: 360 }}>
