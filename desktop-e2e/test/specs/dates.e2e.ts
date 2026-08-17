@@ -38,31 +38,22 @@ async function valueEquals(selector: string, expected: string, timeout = 10_000)
 }
 
 async function signUpFresh(name: string, email: string) {
-  // Reset SPA state WITHOUT a page reload. browser.refresh() on a hot PowerSync webview
-  // (wa-sqlite + web workers over WebKitGTK's slow IndexedDB VFS) intermittently CRASHES
-  // it once the local DB holds a prior test's data — "session deleted because of page
-  // crash or hang". Instead close any open detail dialog (its overlay would swallow the
-  // sign-out click) via its Close (X) button, then sign out — which calls clearDb()/
-  // disconnectAndClear(), leaving the next test a fresh, empty local DB so that test's
-  // own mid-test reload stays low-state and reliable. We click Close rather than press
-  // Escape: key events aren't reliably delivered to the dialog in this webview, and the
-  // a11y bus is unavailable (AT-SPI errors), so aria/ selectors don't resolve either.
-  const dialog = await $('[role="dialog"]')
-  if (await dialog.isExisting()) {
-    // Close via the DialogContent X button. Query globally (scoping to the dialog
-    // element proved unreliable in this webview) and fall back to the button's stable
-    // position classes if the aria-label isn't forwarded — the "Close" label itself is
-    // a nested sr-only span, so a text selector can't match it.
-    const byAria = await $('button[aria-label="Close"]')
-    const close = (await byAria.isExisting()) ? byAria : await $("button.absolute.right-4.top-4")
-    await close.click()
-    await dialog.waitForExist({ reverse: true, timeout: 10_000 })
-  }
+  // Reset with a FRESH APP SESSION rather than a page reload. browser.refresh() on a hot
+  // PowerSync webview (wa-sqlite + workers over WebKitGTK's slow IndexedDB VFS)
+  // intermittently CRASHES it once the local DB holds a prior test's data — "session
+  // deleted because of page crash or hang". reloadSession() relaunches the Tauri app
+  // cold: a new webview with no open detail dialog (so no fragile in-webview dialog
+  // close) and no in-page teardown to crash. The bearer token persists in the app's
+  // on-disk localStorage, so we settle into the signed-in state, then sign out — which
+  // calls clearDb()/disconnectAndClear() — to hand the next test a fresh, empty local DB.
+  await browser.reloadSession()
   await browser.waitUntil(
     async () =>
       (await $('button[aria-label="Sign out"]').isExisting()) ||
       (await $("p*=to see your tasks").isExisting()),
-    { timeout: 30_000, timeoutMsg: "app never rendered a signed in/out state" },
+    // Generous: a cold launch re-opens the (populated) local DB behind PowerSync's
+    // "Starting local database…" gate on the slow WebKitGTK VFS — slow, but no crash.
+    { timeout: 60_000, timeoutMsg: "app never rendered a signed in/out state" },
   )
   if (await $('button[aria-label="Sign out"]').isExisting())
     await $('button[aria-label="Sign out"]').click()
