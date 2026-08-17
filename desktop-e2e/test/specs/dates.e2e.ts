@@ -49,7 +49,9 @@ async function signUpFresh(name: string, email: string) {
   // a11y bus is unavailable (AT-SPI errors), so aria/ selectors don't resolve either.
   const dialog = await $('[role="dialog"]')
   if (await dialog.isExisting()) {
-    await dialog.$("button=Close").click()
+    // CSS attribute selector (not a text/aria selector): the "Close" label lives in a
+    // nested sr-only span so text() doesn't match, and the a11y bus is unavailable.
+    await dialog.$('button[aria-label="Close"]').click()
     await dialog.waitForExist({ reverse: true, timeout: 10_000 })
   }
   await browser.waitUntil(
