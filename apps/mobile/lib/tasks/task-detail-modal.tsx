@@ -23,7 +23,8 @@ import {
   START_FALLBACK,
   toDate,
 } from "./dates"
-import { deleteWithUndo, type Task, toggleTask, updateTask } from "./mutations"
+import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "./mutations"
+import { StatusControl, type StatusOption } from "./status-control"
 
 // The single-task view/editor. On mobile there's no navigation, so this
 // full-screen Modal IS the detail view (the analogue of the web's /tasks/$taskId
@@ -44,14 +45,30 @@ export function TaskDetailModal({ id, onClose }: { id: string | null; onClose: (
   )
 }
 
+// A task joined with its status (P2-03).
+type DetailTask = Task & {
+  status_name: string
+  status_color: string
+  status_category: string
+  status_group_id: string
+}
+
 function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const db = usePowerSync()
   const toast = useToast()
   const styles = useThemedStyles(makeStyles)
   const { colors } = useTheme()
-  const { data: rows } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks WHERE id = ?",
+  const { data: rows } = useQuery<DetailTask>(
+    `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.created_at, t.updated_at,
+            s.name AS status_name, s.color AS status_color,
+            s.category AS status_category, s.group_id AS status_group_id
+     FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
     [id],
+  )
+  const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
+    "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
   )
   const task = rows[0]
 
@@ -127,7 +144,8 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     if (day) save(combineDay(day, current, false, fallback), false)
   }
 
-  const dueState = task ? dueDayState(task.due_date, task.completed) : null
+  const resolved = task ? task.status_category === "done" : false
+  const dueState = task ? dueDayState(task.due_date, resolved) : null
 
   return (
     <ScrollView
@@ -146,13 +164,17 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
       ) : (
         <>
           <View style={styles.titleRow}>
-            <Pressable
-              testID="detail-toggle"
-              onPress={() => void toggleTask(db, task)}
-              style={[styles.checkbox, task.completed ? styles.checkboxDone : null]}
-            >
-              {task.completed ? <Text style={styles.check}>✓</Text> : null}
-            </Pressable>
+            <StatusControl
+              current={{
+                id: task.status_id,
+                name: task.status_name,
+                color: task.status_color,
+                category: task.status_category,
+              }}
+              options={allStatuses.filter((s) => s.group_id === task.status_group_id)}
+              onSelect={(sid) => void setTaskStatus(db, id, sid)}
+              showLabel
+            />
             <TextInput
               testID="detail-title"
               value={title}

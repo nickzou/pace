@@ -17,7 +17,9 @@ describe("desktop tasks", () => {
       async () =>
         (await $('button[aria-label="Sign out"]').isExisting()) ||
         (await $("p*=to see your tasks").isExisting()),
-      { timeout: 15_000, timeoutMsg: "app never rendered a signed in/out state" },
+      // 30s: cold-boot the signed-in shell, which is gated behind PowerSync opening the
+      // local DB. P2-03's schema v2 + extra streams make that slower than the old 15s.
+      { timeout: 30_000, timeoutMsg: "app never rendered a signed in/out state" },
     )
     if (await $('button[aria-label="Sign out"]').isExisting()) {
       await $('button[aria-label="Sign out"]').click()
@@ -34,6 +36,10 @@ describe("desktop tasks", () => {
     // Add a task.
     const title = `Buy milk ${Date.now()}`
     await $('input[placeholder*="Add a task"]').setValue(title)
+    // The Add button is disabled until the seeded default status syncs down (P2-03) —
+    // a fresh signup's first PowerSync download in the desktop webview can take longer
+    // than the default action wait, so wait for the composer to be ready.
+    await $("button=Add").waitForEnabled({ timeout: 30_000 })
     await $("button=Add").click()
     await expect($(`span*=${title}`)).toBeDisplayed()
 

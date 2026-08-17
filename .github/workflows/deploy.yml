@@ -219,7 +219,12 @@ jobs:
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
                BASIC_AUTH_USERS='$BASIC_AUTH_USERS' \
                bash deploy/bin/up.sh pr-$PR \
-            && docker image prune -f"
+            && docker image prune -af"
+          # -af (all unused), not just dangling: each push pulls fresh SHA-tagged
+          # images, and the prior push's now-unreferenced-but-still-tagged images
+          # aren't dangling, so plain `prune -f` never reclaimed them and the box
+          # filled up over a PR's pushes. -af keeps images used by running containers
+          # (prod + live previews are restart:unless-stopped), so it's safe here.
 
       - name: Comment preview URL on the PR
         if: github.event.action == 'opened' || github.event.action == 'reopened'

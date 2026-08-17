@@ -58,7 +58,9 @@ services:
       POWERSYNC_CONFIG_PATH: /config/service.yaml
       PS_DATA_SOURCE_URI: postgresql://pace:pace@postgres:5432/pace_test
       PS_STORAGE_SOURCE_URI: postgresql://pace:pace@powersync-storage:5432/powersync
-      PS_JWKS_URL: http://host.docker.internal:3101/api/auth/jwks
+      # Playwright/desktop start the API on :3101; mobile-e2e runs it on :3001 (nitro
+      # dev). Default keeps the existing suites unchanged; mobile-e2e sets API_PORT=3001.
+      PS_JWKS_URL: http://host.docker.internal:${API_PORT:-3101}/api/auth/jwks
       PS_PORT: "8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"

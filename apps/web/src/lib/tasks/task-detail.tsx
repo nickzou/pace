@@ -8,8 +8,17 @@ import {
   toDateInput,
   toTimeInput,
 } from "#/lib/tasks/dates"
-import { deleteWithUndo, type Task, toggleTask, updateTask } from "#/lib/tasks/mutations"
+import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "#/lib/tasks/mutations"
+import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { useToast } from "#/lib/toast"
+
+// A task joined with its status (P2-03).
+type DetailTask = Task & {
+  status_name: string
+  status_color: string
+  status_category: string
+  status_group_id: string
+}
 
 // The single-task view/editor shared by the quick modal and the dedicated
 // /tasks/$taskId route. Reads the task live from local SQLite; title/notes edits
@@ -18,9 +27,17 @@ import { useToast } from "#/lib/toast"
 export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => void }) {
   const db = usePowerSync()
   const toast = useToast()
-  const { data: rows, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks WHERE id = ?",
+  const { data: rows, isLoading } = useQuery<DetailTask>(
+    `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.created_at, t.updated_at,
+            s.name AS status_name, s.color AS status_color,
+            s.category AS status_category, s.group_id AS status_group_id
+     FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
     [id],
+  )
+  const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
+    "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
   )
   const task = rows[0]
 
@@ -85,7 +102,9 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
     })
   }
 
-  const dueState = dueDayState(task.due_date, task.completed)
+  const resolved = task.status_category === "done"
+  const options = allStatuses.filter((s) => s.group_id === task.status_group_id)
+  const dueState = dueDayState(task.due_date, resolved)
   const dueFieldClass =
     dueState === "overdue"
       ? "border-destructive/50 text-destructive"
@@ -96,16 +115,18 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={() => void toggleTask(db, task)}
-          aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
-          className={`mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border text-xs ${
-            task.completed ? "border-success bg-success/20 text-success" : "border-input"
-          }`}
-        >
-          {task.completed ? "✓" : ""}
-        </button>
+        <div className="mt-1 shrink-0">
+          <StatusControl
+            current={{
+              id: task.status_id,
+              name: task.status_name,
+              color: task.status_color,
+              category: task.status_category,
+            }}
+            options={options}
+            onSelect={(sid) => void setTaskStatus(db, id, sid)}
+          />
+        </div>
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}

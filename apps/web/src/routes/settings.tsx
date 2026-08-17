@@ -6,6 +6,7 @@ import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { authClient, signOut, useSession, useTokens } from "#/lib/auth-client"
 import { getConfig } from "#/lib/config"
+import { StatusesSettings } from "#/lib/statuses/status-settings"
 import { type Theme, useTheme } from "#/lib/theme"
 import { useToast } from "#/lib/toast"
 import { cn } from "#/lib/utils"
@@ -106,6 +107,8 @@ function Settings() {
               <ThemeToggle />
             </Row>
           </Section>
+
+          <StatusesSettings />
 
           <Section title="About">
             <Row label="App">Pace</Row>

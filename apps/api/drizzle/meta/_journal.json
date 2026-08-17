@@ -43,6 +43,13 @@
       "when": 1786764826389,
       "tag": "0005_fuzzy_piledriver",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786925479179,
+      "tag": "0006_gifted_lilith",
+      "breakpoints": true
     }
   ]
 }

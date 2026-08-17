@@ -1,4 +1,5 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
+import { StatusesSection } from "../statuses/status-settings"
 import { type Palette, type ThemePref, useTheme, useThemedStyles } from "../theme"
 
 // The mobile settings screen — the twin of apps/web's /settings route. There's no
@@ -78,6 +79,8 @@ function SettingsBody({ email, onClose }: { email: string; onClose: () => void }
             </View>
           </View>
         </View>
+
+        <StatusesSection />
       </ScrollView>
     </View>
   )

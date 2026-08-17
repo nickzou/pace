@@ -144,6 +144,57 @@ export const shadowLight = {
   glow: "0 1px 2px rgba(30,27,75,0.06), 0 12px 30px rgba(59,130,246,0.16)",
 } as const
 
+// Status palette (P2-03) — the fixed set of 12 colours a user can assign to a custom
+// status. Theme-aware like `color`/`colorLight`: a status stores the KEY (e.g. "green")
+// and the app resolves the hex for the active theme. Dark values run brighter, light
+// values deeper, so each reads on its own ground. STATUS_COLORS is the source of truth
+// for the validation enum (`@pace/validation`).
+export const STATUS_COLORS = [
+  "slate",
+  "red",
+  "orange",
+  "amber",
+  "lime",
+  "green",
+  "teal",
+  "cyan",
+  "blue",
+  "indigo",
+  "violet",
+  "pink",
+] as const
+export type StatusColor = (typeof STATUS_COLORS)[number]
+
+export const statusColor: Record<StatusColor, string> = {
+  slate: "#94a3b8",
+  red: "#f87171",
+  orange: "#fb923c",
+  amber: "#fbbf24",
+  lime: "#a3e635",
+  green: "#4ade80",
+  teal: "#2dd4bf",
+  cyan: "#22d3ee",
+  blue: "#60a5fa",
+  indigo: "#818cf8",
+  violet: "#a78bfa",
+  pink: "#f472b6",
+} as const
+
+export const statusColorLight: Record<StatusColor, string> = {
+  slate: "#64748b",
+  red: "#ef4444",
+  orange: "#f97316",
+  amber: "#f59e0b",
+  lime: "#65a30d",
+  green: "#22c55e",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+  blue: "#3b82f6",
+  indigo: "#6366f1",
+  violet: "#8b5cf6",
+  pink: "#ec4899",
+} as const
+
 export const tokens = {
   palette,
   color,
@@ -154,4 +205,6 @@ export const tokens = {
   fontWeight,
   shadow,
   shadowLight,
+  statusColor,
+  statusColorLight,
 } as const

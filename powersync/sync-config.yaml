@@ -17,3 +17,18 @@ streams:
   tasks:
     auto_subscribe: true
     query: SELECT * FROM tasks WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+  # Custom statuses (P2-03) — the user's status library + the enable toggle. Same
+  # per-user scoping as tasks; groups/statuses are soft-deleted (tombstone falls out),
+  # user_settings is one durable row per user (never deleted).
+  status_groups:
+    auto_subscribe: true
+    query: SELECT * FROM status_groups WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+  statuses:
+    auto_subscribe: true
+    query: SELECT * FROM statuses WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+  user_settings:
+    auto_subscribe: true
+    query: SELECT * FROM user_settings WHERE user_id = auth.user_id()

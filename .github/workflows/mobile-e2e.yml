@@ -36,27 +36,22 @@ jobs:
   mobile-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: pace
-          POSTGRES_PASSWORD: pace
-          POSTGRES_DB: pace
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U pace"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
+    # Postgres (:5433) + PowerSync (:8180) come from docker-compose.e2e.yml, started
+    # in the "Start e2e infra" step below. P2-03 made task creation depend on the
+    # seeded statuses syncing to the device, so the app needs a real PowerSync backend
+    # — the same stack the Playwright/desktop suites use.
     env:
-      DATABASE_URL: postgresql://pace:pace@localhost:5432/pace
+      DATABASE_URL: postgresql://pace:pace@localhost:5433/pace_test
       BETTER_AUTH_SECRET: ci-mobile-secret-not-used-in-prod
       BETTER_AUTH_URL: http://localhost:3001
-      # The emulator reaches the runner's API via 10.0.2.2; this is baked into
-      # the APK at build time.
+      # PowerSync (in the compose) validates client JWTs against the API's JWKS. The
+      # API runs on the host at :3001 (nitro dev's hardcoded port), so point the compose
+      # there — it defaults to :3101 for the Playwright/desktop suites.
+      API_PORT: "3001"
+      # The emulator reaches the runner's host services via 10.0.2.2; baked into the
+      # APK at build time. PowerSync is the e2e stack's service published on 8180.
       EXPO_PUBLIC_API_URL: http://10.0.2.2:3001
+      EXPO_PUBLIC_POWERSYNC_URL: http://10.0.2.2:8180
       # Permit cleartext http in the debug APK — CI only (see app.config.ts).
       PACE_ALLOW_CLEARTEXT: "1"
       MAESTRO_CLI_NO_ANALYTICS: "1"
@@ -74,13 +69,22 @@ jobs:
           java-version: "17"
       - run: pnpm install --frozen-lockfile
 
+      - name: Start e2e infra (Postgres + PowerSync)
+        run: |
+          docker compose -f docker-compose.e2e.yml up -d --wait
+          # The API + PowerSync target pace_test (mirrors the Playwright global-setup);
+          # create it on the compose Postgres before migrating. PowerSync retries its
+          # replication connection until the DB + publication exist.
+          docker compose -f docker-compose.e2e.yml exec -T postgres \
+            psql -U pace -d pace -c "CREATE DATABASE pace_test"
+
       - name: Migrate database
         run: pnpm --filter @pace/api db:migrate
 
       - name: Start API (background, all interfaces)
         run: |
           pnpm --filter @pace/api dev > /tmp/api.log 2>&1 &
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -sf http://localhost:3001/health && break
             sleep 2
           done

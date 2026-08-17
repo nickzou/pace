@@ -4,6 +4,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { bearer, jwt } from "better-auth/plugins"
 import { db } from "./db"
 import * as schema from "./db/auth"
+import { seedUserStatuses } from "./db/seed"
 import { env } from "./env"
 
 // The mobile app (apps/mobile) authenticates via its deep-link scheme rather
@@ -16,6 +17,17 @@ export const auth = betterAuth({
   trustedOrigins: [...env.TRUSTED_ORIGINS.split(","), MOBILE_SCHEME],
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: { enabled: true },
+  // Seed each new user's default status library (P2-03) right after the account row is
+  // created, so their To Do/Done + settings exist before they ever create a task.
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await seedUserStatuses(user.id)
+        },
+      },
+    },
+  },
   // expo(): mobile token-in-header flow. bearer(): lets the packaged desktop app
   // (served from tauri://, where cross-site cookies aren't sent) authenticate
   // with an Authorization: Bearer token instead. Web stays on cookies.
