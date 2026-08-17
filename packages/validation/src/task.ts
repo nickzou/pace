@@ -12,7 +12,11 @@ export const taskSchema = z.object({
   id: z.uuid(),
   title: z.string().min(1).max(500),
   description: z.string().default(""),
-  completed: z.boolean().default(false),
+  // The task's current status — a row in `statuses` (P2-03). Replaces `completed`;
+  // done-ness is derived from the status's category (open/in_progress/done).
+  statusId: z.uuid(),
+  // Server-owned: set when the task enters a `done` status, cleared when it leaves.
+  resolvedAt: z.iso.datetime().nullable(),
   // Optional scheduling (P2-02): UTC ISO datetimes, null when unset. The *HasTime
   // flags say whether a real time-of-day was picked (vs a date-only entry, which
   // stores a fallback time) — so display can show a date alone.
@@ -35,10 +39,12 @@ export const newTaskSchema = taskSchema
   .pick({
     title: true,
     description: true,
-    completed: true,
   })
   .extend({
     id: taskSchema.shape.id.optional(),
+    // The task's status. Optional on create: clients set it from their default group;
+    // if omitted, the server assigns the user's default-group open status.
+    statusId: taskSchema.shape.statusId.optional(),
     // Optional on create; both nullable (a task may start with no schedule).
     startDate: taskSchema.shape.startDate.optional(),
     dueDate: taskSchema.shape.dueDate.optional(),
@@ -55,7 +61,7 @@ export const updateTaskSchema = z.object({
   id: z.uuid(),
   title: z.string().min(1).max(500).optional(),
   description: z.string().optional(),
-  completed: z.boolean().optional(),
+  statusId: z.uuid().optional(),
   // nullable + optional: omit = unchanged, null = clear the date.
   startDate: z.iso.datetime().nullable().optional(),
   dueDate: z.iso.datetime().nullable().optional(),

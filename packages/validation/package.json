@@ -15,6 +15,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
+    "@pace/tokens": "workspace:*",
     "zod": "^4.4.3"
   }
 }

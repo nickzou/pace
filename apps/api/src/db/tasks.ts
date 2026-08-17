@@ -1,5 +1,6 @@
 import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { user } from "./auth"
+import { statuses } from "./statuses"
 
 // The tasks table — the persistence mirror of @pace/validation's taskSchema
 // (M07), plus the DB-only `userId` owner (a row belongs to exactly one user).
@@ -19,7 +20,17 @@ export const tasks = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
+    // DEPRECATED (P2-03): kept only for the expand migration — done-ness now derives
+    // from status_id's category. Dropped in the follow-up contract migration once
+    // clients are on schema v2.
     completed: boolean("completed").notNull().default(false),
+    // The task's current status (P2-03). NOT NULL after backfill: every task has a
+    // status (the migration seeds a default group per user and backfills existing rows).
+    statusId: uuid("status_id")
+      .notNull()
+      .references(() => statuses.id),
+    // Set when the task enters a `done` status, cleared when it leaves. Server-owned.
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     // Optional scheduling (P2-02): nullable timestamptz, stored UTC, rendered in
     // the viewer's local zone. start ≤ due is a UI convention, not a DB constraint.
     // *_has_time marks whether the user picked a real time of day (vs a date-only
