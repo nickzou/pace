@@ -41,12 +41,17 @@ async function signUpFresh(name: string, email: string) {
   // Reset SPA state WITHOUT a page reload. browser.refresh() on a hot PowerSync webview
   // (wa-sqlite + web workers over WebKitGTK's slow IndexedDB VFS) intermittently CRASHES
   // it once the local DB holds a prior test's data — "session deleted because of page
-  // crash or hang". Instead: Escape closes any open detail dialog (its overlay would
-  // swallow the sign-out click), then sign out — which calls clearDb()/
-  // disconnectAndClear(), leaving the next test a fresh, empty local DB, so that test's
-  // own mid-test reload stays low-state and reliable.
-  await browser.keys("Escape")
-  await $('[role="dialog"]').waitForExist({ reverse: true, timeout: 10_000 })
+  // crash or hang". Instead close any open detail dialog (its overlay would swallow the
+  // sign-out click) via its Close (X) button, then sign out — which calls clearDb()/
+  // disconnectAndClear(), leaving the next test a fresh, empty local DB so that test's
+  // own mid-test reload stays low-state and reliable. We click Close rather than press
+  // Escape: key events aren't reliably delivered to the dialog in this webview, and the
+  // a11y bus is unavailable (AT-SPI errors), so aria/ selectors don't resolve either.
+  const dialog = await $('[role="dialog"]')
+  if (await dialog.isExisting()) {
+    await dialog.$("button=Close").click()
+    await dialog.waitForExist({ reverse: true, timeout: 10_000 })
+  }
   await browser.waitUntil(
     async () =>
       (await $('button[aria-label="Sign out"]').isExisting()) ||
