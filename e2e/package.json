@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@playwright/test": "1.59.1",
+    "@playwright/test": "1.62.1",
     "@pace/tsconfig": "workspace:*",
     "@types/node": "^22.10.2",
     "dotenv": "^17.0.0",
