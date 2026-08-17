@@ -17,11 +17,9 @@ describe("desktop tasks", () => {
       async () =>
         (await $('button[aria-label="Sign out"]').isExisting()) ||
         (await $("p*=to see your tasks").isExisting()),
-      // 60s: after a refresh the signed-in shell is gated behind PowerSync's cold
-      // re-open ("Starting local database…"). On desktop's slow WebKitGTK IndexedDB VFS,
-      // re-opening the now-larger P2-03 DB (4 tables/streams) can take well over 30s under
-      // CI load, so neither the Sign-out button nor the signed-out marker renders yet.
-      { timeout: 60_000, timeoutMsg: "app never rendered a signed in/out state" },
+      // 30s: cold-boot the signed-in shell, which is gated behind PowerSync opening the
+      // local DB. P2-03's schema v2 + extra streams make that slower than the old 15s.
+      { timeout: 30_000, timeoutMsg: "app never rendered a signed in/out state" },
     )
     if (await $('button[aria-label="Sign out"]').isExisting()) {
       await $('button[aria-label="Sign out"]').click()

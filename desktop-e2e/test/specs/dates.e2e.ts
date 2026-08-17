@@ -38,20 +38,20 @@ async function valueEquals(selector: string, expected: string, timeout = 10_000)
 }
 
 async function signUpFresh(name: string, email: string) {
-  // Reset any leftover SPA state from a prior test — notably an open detail modal,
-  // whose overlay would intercept the sign-out click. A reload clears selectedId.
-  await browser.refresh()
-  // The packaged app's localStorage (bearer token) persists across WebDriver
-  // sessions, so a prior spec can leave us signed in — settle, then sign out.
+  // Reset SPA state WITHOUT a page reload. browser.refresh() on a hot PowerSync webview
+  // (wa-sqlite + web workers over WebKitGTK's slow IndexedDB VFS) intermittently CRASHES
+  // it once the local DB holds a prior test's data — "session deleted because of page
+  // crash or hang". Instead: Escape closes any open detail dialog (its overlay would
+  // swallow the sign-out click), then sign out — which calls clearDb()/
+  // disconnectAndClear(), leaving the next test a fresh, empty local DB, so that test's
+  // own mid-test reload stays low-state and reliable.
+  await browser.keys("Escape")
+  await $('[role="dialog"]').waitForExist({ reverse: true, timeout: 10_000 })
   await browser.waitUntil(
     async () =>
       (await $('button[aria-label="Sign out"]').isExisting()) ||
       (await $("p*=to see your tasks").isExisting()),
-    // 60s: after a refresh the signed-in shell is gated behind PowerSync's cold
-    // re-open ("Starting local database…"). On desktop's slow WebKitGTK IndexedDB VFS,
-    // re-opening the now-larger P2-03 DB (4 tables/streams) can take well over 30s under
-    // CI load, so neither the Sign-out button nor the signed-out marker renders yet.
-    { timeout: 60_000, timeoutMsg: "app never rendered a signed in/out state" },
+    { timeout: 30_000, timeoutMsg: "app never rendered a signed in/out state" },
   )
   if (await $('button[aria-label="Sign out"]').isExisting())
     await $('button[aria-label="Sign out"]').click()
