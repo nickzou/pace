@@ -50,4 +50,12 @@ fi
 # 3. Start / update the app (api waits on healthy postgres; powersync on both).
 docker compose "${CF[@]}" up -d --remove-orphans
 
+# 3b. PowerSync reads its sync rules (sync-config.yaml) only at startup, and that file
+# is a bind-mount — changing its contents doesn't change the container spec, so the
+# `up -d` above won't restart it. Force-recreate so sync-rule changes (a new synced
+# table, a query tweak) actually take effect on deploy instead of silently shipping
+# stale. Replication is resumable (resumes from the last WAL checkpoint), so this is a
+# few seconds of reconnect, not a re-snapshot.
+docker compose "${CF[@]}" up -d --force-recreate powersync
+
 echo "→ $ENV_NAME up at https://$HOST"
