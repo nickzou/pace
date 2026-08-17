@@ -12,10 +12,12 @@ export function setCustomStatusesEnabled(
   settingsId: string,
   enabled: boolean,
 ) {
-  return db.execute(
-    "UPDATE user_settings SET custom_statuses_enabled = ?, updated_at = ? WHERE id = ?",
-    [enabled ? 1 : 0, now(), settingsId],
-  )
+  // Only custom_statuses_enabled — the client user_settings table doesn't carry
+  // updated_at, and the connector's settings.set ignores timestamps anyway.
+  return db.execute("UPDATE user_settings SET custom_statuses_enabled = ? WHERE id = ?", [
+    enabled ? 1 : 0,
+    settingsId,
+  ])
 }
 
 export function createGroup(db: AbstractPowerSyncDatabase, name: string, position: number) {
