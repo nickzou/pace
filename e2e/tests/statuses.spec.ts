@@ -17,9 +17,13 @@ test("create a custom done status, assign it in the list → task reads as done 
   // 1. Settings — enable custom statuses (the management UI is gated behind the
   //    toggle), then add a DONE status to the seeded default group.
   await page.goto("/settings")
-  await expectSignedIn(page)
 
+  // Not expectSignedIn here: /settings has its own account "Sign out" button in
+  // addition to the shell's, so that shared helper (which asserts a single "Sign out")
+  // hits a strict-mode violation. The toggle being visible confirms both that we're
+  // signed in (storageState) and that the Statuses section rendered.
   const toggle = page.getByRole("switch", { name: "Enable custom statuses" })
+  await expect(toggle).toBeVisible()
   if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
   await expect(toggle).toHaveAttribute("aria-checked", "true")
 
