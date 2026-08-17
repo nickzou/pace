@@ -82,32 +82,34 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
   const styles = useThemedStyles(makeStyles)
   const [settingsOpen, setSettingsOpen] = useState(false)
   return (
-    <>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.authBar}>
-          <Text testID="signed-in" style={styles.authBarText} numberOfLines={1}>
-            Signed in as <Text style={styles.authBarEmail}>{email}</Text>
-          </Text>
-          <View style={styles.authBarActions}>
-            <Pressable testID="settings-open" onPress={() => setSettingsOpen(true)} hitSlop={8}>
-              <Text style={styles.authBarBtn}>Settings</Text>
-            </Pressable>
-            <Pressable testID="sign-out" onPress={onSignOut} hitSlop={8}>
-              <Text style={styles.signOut}>Sign out</Text>
-            </Pressable>
-          </View>
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.authBar}>
+        <Text testID="signed-in" style={styles.authBarText} numberOfLines={1}>
+          Signed in as <Text style={styles.authBarEmail}>{email}</Text>
+        </Text>
+        <View style={styles.authBarActions}>
+          <Pressable testID="settings-open" onPress={() => setSettingsOpen(true)} hitSlop={8}>
+            <Text style={styles.authBarBtn}>Settings</Text>
+          </Pressable>
+          <Pressable testID="sign-out" onPress={onSignOut} hitSlop={8}>
+            <Text style={styles.signOut}>Sign out</Text>
+          </Pressable>
         </View>
+      </View>
 
-        <Text style={styles.brand}>Pace</Text>
-        <Text style={styles.tag}>set your own pace</Text>
+      <Text style={styles.brand}>Pace</Text>
+      <Text style={styles.tag}>set your own pace</Text>
 
-        <PowerSyncProvider>
-          <Tasks />
-          {/* Inside the provider so the settings status-management can query the local DB. */}
-          <SettingsModal visible={settingsOpen} email={email} onClose={() => setSettingsOpen(false)} />
-        </PowerSyncProvider>
-      </ScrollView>
-    </>
+      <PowerSyncProvider>
+        <Tasks />
+        {/* Inside the provider so the settings status-management can query the local DB. */}
+        <SettingsModal
+          visible={settingsOpen}
+          email={email}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </PowerSyncProvider>
+    </ScrollView>
   )
 }
 

@@ -63,7 +63,11 @@ export function StatusesSection() {
       {enabled ? (
         <View style={styles.groups}>
           {groups.map((g) => (
-            <GroupBlock key={g.id} group={g} statuses={statuses.filter((s) => s.group_id === g.id)} />
+            <GroupBlock
+              key={g.id}
+              group={g}
+              statuses={statuses.filter((s) => s.group_id === g.id)}
+            />
           ))}
           <NewGroup nextPosition={groups.length} />
         </View>
@@ -214,7 +218,13 @@ const makeStyles = (c: Palette) =>
       textTransform: "uppercase",
       letterSpacing: 1,
     },
-    switch: { width: 44, height: 26, borderRadius: 13, backgroundColor: c.borderStrong, padding: 2 },
+    switch: {
+      width: 44,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: c.borderStrong,
+      padding: 2,
+    },
     switchOn: { backgroundColor: c.primary },
     knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: c.background },
     knobOff: { alignSelf: "flex-start" },
