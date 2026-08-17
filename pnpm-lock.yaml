@@ -90,7 +90,7 @@ importers:
         version: 2.0.0(@powersync/common@2.0.0)(react@19.2.8)
       '@powersync/react-native':
         specifier: ^2.0.2
-        version: 2.0.2(@op-engineering/op-sqlite@17.1.5(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(@powersync/common@2.0.0)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
+        version: 2.1.0(@op-engineering/op-sqlite@17.1.5(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
       '@react-native-community/datetimepicker':
         specifier: 9.1.0
         version: 9.1.0(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
@@ -1975,11 +1975,11 @@ packages:
   '@powersync/common@2.0.0':
     resolution: {integrity: sha512-GuWmk0w0Y6I1HDwX4uGFzzw1e4E4bkvDSSCpVikdTEIk1xcW5NNnqTX8xfDheZdoQZunm/XushrR/LsIp1Yc/g==}
 
-  '@powersync/react-native@2.0.2':
-    resolution: {integrity: sha512-W34xQWrLTtVO98oGONGqGPER21v1GUfwNNFvXsR3EzxbSUXyEtcm/Ni/XmWTPVoNIuDxVlrHvvoHoeCajKCXKw==}
+  '@powersync/react-native@2.1.0':
+    resolution: {integrity: sha512-IMpCgExjA9AwrJXa9FZ0iraD8AZlmu0pqq0riwow3pZiJV+V+MfrS1oJmXMcrexJfQYI4Mrg6kdbLiRfqp79WQ==}
     peerDependencies:
       '@op-engineering/op-sqlite': ^17.1.0
-      '@powersync/common': ^2.0.0
+      '@powersync/common': ^2.1.0
       react: 19.2.8
       react-native: '*'
 
@@ -8853,10 +8853,9 @@ snapshots:
 
   '@powersync/common@2.0.0': {}
 
-  '@powersync/react-native@2.0.2(@op-engineering/op-sqlite@17.1.5(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(@powersync/common@2.0.0)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
+  '@powersync/react-native@2.1.0(@op-engineering/op-sqlite@17.1.5(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@op-engineering/op-sqlite': 17.1.5(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
-      '@powersync/common': 2.0.0
       '@powersync/react': 2.0.0(@powersync/common@2.0.0)(react@19.2.8)
       '@powersync/shared-internals': 1.1.1(@powersync/common@2.0.0)
       react: 19.2.8
