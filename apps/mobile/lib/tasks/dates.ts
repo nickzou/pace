@@ -57,14 +57,14 @@ export function formatTime(iso: string | null): string {
 
 // The due date's state relative to TODAY, by local CALENDAR DAY (not clock time):
 // "overdue" before today, "today" on today, "upcoming" in the future — used to
-// colour the list (red / yellow / neutral). null when there's no date or the task
-// is done. Day-based so a task due today stays "today" all day rather than
-// flipping to overdue at its due time.
+// colour the list (red / yellow / neutral). null when there's no date or the task is
+// resolved (a done-category task carries no urgency; P2-03 — `resolved` replaces the
+// old `completed`). Day-based so a task due today stays "today" all day.
 export function dueDayState(
   dueIso: string | null,
-  completed: number,
+  resolved: boolean,
 ): "overdue" | "today" | "upcoming" | null {
-  if (!dueIso || completed) return null
+  if (!dueIso || resolved) return null
   const due = new Date(dueIso)
   const now = new Date()
   const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()

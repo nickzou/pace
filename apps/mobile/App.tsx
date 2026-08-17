@@ -5,7 +5,7 @@ import "@azure/core-asynciterator-polyfill"
 import { usePowerSync, useQuery } from "@powersync/react"
 import * as Crypto from "expo-crypto"
 import { StatusBar } from "expo-status-bar"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   Pressable,
@@ -21,7 +21,8 @@ import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
 import { SettingsModal } from "./lib/settings/settings-modal"
 import { dueDayState, formatDate } from "./lib/tasks/dates"
-import { deleteWithUndo, type Task, toggleTask } from "./lib/tasks/mutations"
+import { deleteWithUndo, setTaskStatus, type Task } from "./lib/tasks/mutations"
+import { StatusControl, type StatusOption } from "./lib/tasks/status-control"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
 import { type Palette, ThemeProvider, useTheme, useThemedStyles } from "./lib/theme"
 import { ToastProvider, useToast } from "./lib/toast"
@@ -110,6 +111,14 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
   )
 }
 
+// A task joined with its status (P2-03).
+type ListTask = Task & {
+  status_name: string
+  status_color: string
+  status_category: string
+  status_group_id: string
+}
+
 // Reads/writes go straight to local SQLite. useQuery is live — it re-runs on any
 // change to the tasks table (a local write or a row synced down), so there's no
 // cache to invalidate and no optimistic bookkeeping. PowerSync uploads local
@@ -121,17 +130,39 @@ function Tasks() {
   const { colors } = useTheme()
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const { data: tasks, isLoading } = useQuery<Task>(
-    "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks ORDER BY created_at DESC",
+  const { data: tasks, isLoading } = useQuery<ListTask>(
+    `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.created_at, t.updated_at,
+            s.name AS status_name, s.color AS status_color,
+            s.category AS status_category, s.group_id AS status_group_id
+     FROM tasks t JOIN statuses s ON s.id = t.status_id ORDER BY t.created_at DESC`,
   )
+  const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
+    "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
+  )
+  const { data: defaults } = useQuery<{ id: string }>(
+    "SELECT s.id FROM statuses s JOIN status_groups g ON g.id = s.group_id WHERE g.is_default = 1 AND s.category = 'open' ORDER BY s.position LIMIT 1",
+  )
+  const defaultStatusId = defaults[0]?.id
+
+  const statusesByGroup = useMemo(() => {
+    const map = new Map<string, StatusOption[]>()
+    for (const s of allStatuses) {
+      const arr = map.get(s.group_id) ?? []
+      arr.push({ id: s.id, name: s.name, color: s.color, category: s.category })
+      map.set(s.group_id, arr)
+    }
+    return map
+  }, [allStatuses])
 
   function add() {
     const trimmed = title.trim()
-    if (!trimmed) return
+    if (!trimmed || !defaultStatusId) return
     const now = new Date().toISOString()
     void db.execute(
-      "INSERT INTO tasks (id, title, description, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [Crypto.randomUUID(), trimmed, "", 0, now, now],
+      "INSERT INTO tasks (id, title, description, status_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [Crypto.randomUUID(), trimmed, "", defaultStatusId, now, now],
     )
     setTitle("")
   }
@@ -162,23 +193,27 @@ function Tasks() {
         <Text style={styles.footer}>No tasks yet — add your first above.</Text>
       ) : (
         tasks.map((task) => {
-          const dueState = dueDayState(task.due_date, task.completed)
+          const resolved = task.status_category === "done"
+          const dueState = dueDayState(task.due_date, resolved)
           return (
             <View key={task.id} style={styles.task}>
-              <Pressable
-                testID={`toggle-${task.id}`}
-                onPress={() => void toggleTask(db, task)}
-                style={[styles.checkbox, task.completed ? styles.checkboxDone : null]}
-              >
-                {task.completed ? <Text style={styles.check}>✓</Text> : null}
-              </Pressable>
+              <StatusControl
+                current={{
+                  id: task.status_id,
+                  name: task.status_name,
+                  color: task.status_color,
+                  category: task.status_category,
+                }}
+                options={statusesByGroup.get(task.status_group_id) ?? []}
+                onSelect={(sid) => void setTaskStatus(db, task.id, sid)}
+              />
               <Pressable
                 testID={`open-${task.id}`}
                 style={styles.taskBody}
                 onPress={() => setSelectedId(task.id)}
               >
                 <Text
-                  style={[styles.taskText, task.completed ? styles.taskTextDone : null]}
+                  style={[styles.taskText, resolved ? styles.taskTextDone : null]}
                   numberOfLines={1}
                 >
                   {task.title}
