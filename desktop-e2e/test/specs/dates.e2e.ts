@@ -47,7 +47,9 @@ async function signUpFresh(name: string, email: string) {
     async () =>
       (await $('button[aria-label="Sign out"]').isExisting()) ||
       (await $("p*=to see your tasks").isExisting()),
-    { timeout: 15_000, timeoutMsg: "app never rendered a signed in/out state" },
+    // 30s: P2-03's signed-in boot re-inits PowerSync with schema v2 + three extra
+    // sync streams, which after a refresh can render slower than 15s under CI load.
+    { timeout: 30_000, timeoutMsg: "app never rendered a signed in/out state" },
   )
   if (await $('button[aria-label="Sign out"]').isExisting())
     await $('button[aria-label="Sign out"]').click()
