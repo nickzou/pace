@@ -4,6 +4,7 @@ import { Trash2, X } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
+import { Switch } from "#/components/ui/switch"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
 import { cn } from "#/lib/utils"
@@ -66,25 +67,14 @@ export function StatusesSettings() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Statuses
         </h2>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
+        <Switch
           aria-label="Enable custom statuses"
           disabled={!settings}
-          onClick={() => settings && void setCustomStatusesEnabled(db, settings.id, !enabled)}
-          className={cn(
-            "relative h-6 w-11 shrink-0 rounded-full transition-colors",
-            enabled ? "bg-primary" : "bg-input",
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-0.5 size-5 rounded-full bg-background transition-transform",
-              enabled ? "translate-x-5" : "translate-x-0.5",
-            )}
-          />
-        </button>
+          checked={enabled}
+          onCheckedChange={(next) =>
+            settings && void setCustomStatusesEnabled(db, settings.id, next)
+          }
+        />
       </div>
 
       {enabled ? (

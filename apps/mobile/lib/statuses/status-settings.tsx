@@ -1,7 +1,7 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react-native"
 import { useState } from "react"
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native"
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native"
 import { statusHex } from "../tasks/status-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
 import {
@@ -34,6 +34,7 @@ const CATEGORIES = [
 export function StatusesSection() {
   const db = usePowerSync()
   const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
   const { data: settingsRows } = useQuery<{ id: string; custom_statuses_enabled: number }>(
     "SELECT id, custom_statuses_enabled FROM user_settings LIMIT 1",
   )
@@ -50,14 +51,13 @@ export function StatusesSection() {
     <View style={styles.section}>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>Statuses</Text>
-        <Pressable
+        <Switch
           testID="statuses-toggle"
           disabled={!settings}
-          onPress={() => settings && void setCustomStatusesEnabled(db, settings.id, !enabled)}
-          style={[styles.switch, enabled ? styles.switchOn : null]}
-        >
-          <View style={[styles.knob, enabled ? styles.knobOn : styles.knobOff]} />
-        </Pressable>
+          value={enabled}
+          onValueChange={(next) => settings && void setCustomStatusesEnabled(db, settings.id, next)}
+          trackColor={{ true: colors.primary }}
+        />
       </View>
 
       {enabled ? (
@@ -218,17 +218,6 @@ const makeStyles = (c: Palette) =>
       textTransform: "uppercase",
       letterSpacing: 1,
     },
-    switch: {
-      width: 44,
-      height: 26,
-      borderRadius: 13,
-      backgroundColor: c.borderStrong,
-      padding: 2,
-    },
-    switchOn: { backgroundColor: c.primary },
-    knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: c.background },
-    knobOff: { alignSelf: "flex-start" },
-    knobOn: { alignSelf: "flex-end" },
     hint: { color: c.textSecondary, fontSize: 14 },
     groups: { gap: 16 },
     group: { borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 10, gap: 8 },
