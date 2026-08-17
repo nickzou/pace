@@ -1,13 +1,13 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { createFileRoute } from "@tanstack/react-router"
 import { Plus, Search, Trash2 } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useMemo, useState } from "react"
 import { AppLayout, VIEWS, type View } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
-import { Checkbox } from "#/components/ui/checkbox"
 import { Input } from "#/components/ui/input"
 import { dueDayState, formatDate } from "#/lib/tasks/dates"
-import { deleteWithUndo, type Task, toggleTask } from "#/lib/tasks/mutations"
+import { deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
+import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { TaskModal } from "#/lib/tasks/task-modal"
 import { useToast } from "#/lib/toast"
 import { cn } from "#/lib/utils"
@@ -23,8 +23,30 @@ export const Route = createFileRoute("/")({
   component: Home,
 })
 
-const TASKS_SQL =
-  "SELECT id, title, description, completed, start_date, due_date, start_has_time, due_has_time, created_at, updated_at FROM tasks ORDER BY created_at DESC"
+// A task joined with its status (P2-03) — the category drives done-ness, the colour +
+// name drive the status control.
+type ListTask = Task & {
+  status_name: string
+  status_color: string
+  status_category: string
+  status_group_id: string
+}
+
+const TASKS_SQL = `
+  SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
+         t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+         t.created_at, t.updated_at,
+         s.name AS status_name, s.color AS status_color,
+         s.category AS status_category, s.group_id AS status_group_id
+  FROM tasks t JOIN statuses s ON s.id = t.status_id
+  ORDER BY t.created_at DESC`
+
+const STATUSES_SQL = "SELECT id, group_id, name, color, category FROM statuses ORDER BY position"
+
+// A new task gets the default group's first open status (its "To Do").
+const DEFAULT_STATUS_SQL = `
+  SELECT s.id FROM statuses s JOIN status_groups g ON g.id = s.group_id
+  WHERE g.is_default = 1 AND s.category = 'open' ORDER BY s.position LIMIT 1`
 
 function Home() {
   return (
@@ -39,16 +61,32 @@ function Home() {
 function TaskListView() {
   const db = usePowerSync()
   const toast = useToast()
-  const { data: tasks, isLoading } = useQuery<Task>(TASKS_SQL)
+  const { data: tasks, isLoading } = useQuery<ListTask>(TASKS_SQL)
+  const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(STATUSES_SQL)
+  const { data: defaults } = useQuery<{ id: string }>(DEFAULT_STATUS_SQL)
+  const defaultStatusId = defaults[0]?.id
   const { view = "all" } = Route.useSearch()
 
   const [search, setSearch] = useState("")
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
+  // Statuses grouped by their group, so each row's control lists only its group's options.
+  const statusesByGroup = useMemo(() => {
+    const map = new Map<string, StatusOption[]>()
+    for (const s of allStatuses) {
+      const arr = map.get(s.group_id) ?? []
+      arr.push({ id: s.id, name: s.name, color: s.color, category: s.category })
+      map.set(s.group_id, arr)
+    }
+    return map
+  }, [allStatuses])
+
   const q = search.trim().toLowerCase()
   const visible = tasks
-    .filter((t) => (view === "all" ? true : dueDayState(t.due_date, t.completed) === view))
+    .filter((t) =>
+      view === "all" ? true : dueDayState(t.due_date, t.status_category === "done") === view,
+    )
     .filter((t) => (q ? t.title.toLowerCase().includes(q) : true))
 
   const currentLabel = VIEWS.find((v) => v.key === view)?.label ?? "All tasks"
@@ -56,11 +94,11 @@ function TaskListView() {
   async function add(event: FormEvent) {
     event.preventDefault()
     const trimmed = title.trim()
-    if (!trimmed) return
+    if (!trimmed || !defaultStatusId) return
     const now = new Date().toISOString()
     await db.execute(
-      "INSERT INTO tasks (id, title, description, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [crypto.randomUUID(), trimmed, "", 0, now, now],
+      "INSERT INTO tasks (id, title, description, status_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+      [crypto.randomUUID(), trimmed, "", defaultStatusId, now, now],
     )
     setTitle("")
   }
@@ -96,7 +134,7 @@ function TaskListView() {
               placeholder="Add a task…"
               className="flex-1"
             />
-            <Button type="submit" disabled={!title.trim()}>
+            <Button type="submit" disabled={!title.trim() || !defaultStatusId}>
               <Plus /> Add
             </Button>
           </form>
@@ -118,7 +156,8 @@ function TaskListView() {
                   key={task.id}
                   task={task}
                   first={i === 0}
-                  onToggle={() => void toggleTask(db, task)}
+                  options={statusesByGroup.get(task.status_group_id) ?? []}
+                  onSelectStatus={(sid) => void setTaskStatus(db, task.id, sid)}
                   onOpen={() => setSelectedId(task.id)}
                   onDelete={() => void deleteWithUndo(db, task, toast)}
                 />
@@ -136,17 +175,20 @@ function TaskListView() {
 function TaskRow({
   task,
   first,
-  onToggle,
+  options,
+  onSelectStatus,
   onOpen,
   onDelete,
 }: {
-  task: Task
+  task: ListTask
   first: boolean
-  onToggle: () => void
+  options: StatusOption[]
+  onSelectStatus: (statusId: string) => void
   onOpen: () => void
   onDelete: () => void
 }) {
-  const dueState = dueDayState(task.due_date, task.completed)
+  const resolved = task.status_category === "done"
+  const dueState = dueDayState(task.due_date, resolved)
   return (
     <li
       className={cn(
@@ -154,17 +196,19 @@ function TaskRow({
         !first && "border-t border-border",
       )}
     >
-      <Checkbox
-        checked={!!task.completed}
-        onCheckedChange={onToggle}
-        aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
+      <StatusControl
+        current={{
+          id: task.status_id,
+          name: task.status_name,
+          color: task.status_color,
+          category: task.status_category,
+        }}
+        options={options}
+        onSelect={onSelectStatus}
       />
       <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
         <span
-          className={cn(
-            "block truncate text-sm",
-            task.completed && "text-muted-foreground line-through",
-          )}
+          className={cn("block truncate text-sm", resolved && "text-muted-foreground line-through")}
         >
           {task.title}
         </span>

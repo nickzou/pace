@@ -78,14 +78,14 @@ describe("formatDate", () => {
 })
 
 describe("dueDayState", () => {
-  it("is null with no date, and for a completed task (no urgency)", () => {
-    expect(dueDayState(null, 0)).toBeNull()
-    expect(dueDayState(daysFromNow(-1), 1)).toBeNull()
+  it("is null with no date, and for a resolved task (no urgency)", () => {
+    expect(dueDayState(null, false)).toBeNull()
+    expect(dueDayState(daysFromNow(-1), true)).toBeNull()
   })
 
   it("classifies by local calendar day: overdue / today / upcoming", () => {
-    expect(dueDayState(daysFromNow(-1), 0)).toBe("overdue")
-    expect(dueDayState(daysFromNow(0), 0)).toBe("today")
-    expect(dueDayState(daysFromNow(1), 0)).toBe("upcoming")
+    expect(dueDayState(daysFromNow(-1), false)).toBe("overdue")
+    expect(dueDayState(daysFromNow(0), false)).toBe("today")
+    expect(dueDayState(daysFromNow(1), false)).toBe("upcoming")
   })
 })

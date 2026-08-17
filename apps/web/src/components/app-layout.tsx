@@ -25,7 +25,7 @@ export const VIEWS: { key: View; label: string; icon: ReactNode }[] = [
   { key: "all", label: "All tasks", icon: <ListTodo /> },
 ]
 
-type CountRow = { due_date: string | null; completed: number }
+type CountRow = { due_date: string | null; category: string }
 
 export function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -41,7 +41,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
 // query is safe here.
 function Shell({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
-  const { data: rows } = useQuery<CountRow>("SELECT due_date, completed FROM tasks")
+  const { data: rows } = useQuery<CountRow>(
+    "SELECT t.due_date, s.category FROM tasks t JOIN statuses s ON s.id = t.status_id",
+  )
   const loc = useRouterState({ select: (s) => s.location })
   const activeView: View | undefined =
     loc.pathname === "/" ? ((loc.search as { view?: View }).view ?? "all") : undefined
@@ -65,7 +67,7 @@ function Shell({ children }: { children: ReactNode }) {
   const count = (v: View) =>
     v === "all"
       ? rows.length
-      : rows.filter((r) => dueDayState(r.due_date, r.completed) === v).length
+      : rows.filter((r) => dueDayState(r.due_date, r.category === "done") === v).length
 
   const email = session?.user.email ?? ""
   const initials = email.slice(0, 2).toUpperCase() || "··"
