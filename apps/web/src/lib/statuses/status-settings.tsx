@@ -1,7 +1,7 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Trash2, X } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { Switch } from "#/components/ui/switch"
@@ -13,6 +13,9 @@ import {
   createStatus,
   deleteGroup,
   deleteStatus,
+  recolorStatus,
+  renameGroup,
+  renameStatus,
   setCustomStatusesEnabled,
 } from "./mutations"
 
@@ -95,14 +98,31 @@ export function StatusesSettings() {
 
 function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[] }) {
   const db = usePowerSync()
-  const { theme } = useTheme()
+  const [name, setName] = useState(group.name)
+  useEffect(() => setName(group.name), [group.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== group.name) void renameGroup(db, group.id, trimmed)
+    else setName(group.name)
+  }
+
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">
-          {group.name}
-          {group.is_default ? <span className="text-muted-foreground"> · default</span> : null}
-        </span>
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+            aria-label={`Rename ${group.name} list`}
+            className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium outline-none focus:border-ring focus:bg-background"
+          />
+          {group.is_default ? (
+            <span className="shrink-0 text-sm text-muted-foreground">· default</span>
+          ) : null}
+        </div>
         {group.is_default ? null : (
           <button
             type="button"
@@ -117,31 +137,88 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
 
       <ul className="flex flex-col gap-1.5">
         {statuses.map((s) => (
-          <li key={s.id} className="flex items-center gap-2 text-sm">
-            <span
-              className="size-3 shrink-0 rounded-full"
-              style={{ backgroundColor: statusHex(s.color, theme) }}
-            />
-            <span className="min-w-0 flex-1 truncate">{s.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {s.category.replace("_", " ")}
-            </span>
-            {s.is_system ? null : (
-              <button
-                type="button"
-                aria-label={`Delete ${s.name}`}
-                onClick={() => void deleteStatus(db, s.id)}
-                className="shrink-0 text-muted-foreground transition-colors hover:text-destructive [&_svg]:size-3.5"
-              >
-                <X />
-              </button>
-            )}
-          </li>
+          <EditableStatus key={s.id} status={s} />
         ))}
       </ul>
 
       <AddStatus groupId={group.id} nextPosition={statuses.length} />
     </div>
+  )
+}
+
+// A status row that can be recoloured and renamed in place (system statuses too — only
+// delete is protected). The colour dot toggles the same 12-swatch picker AddStatus uses;
+// the name is an inline input that saves on blur. Category isn't editable here: the server
+// enforces "≥1 open / ≥1 done per group" only on delete, so letting a category change slip
+// through would let a user break that invariant. (Recolour/rename can't.)
+function EditableStatus({ status }: { status: StatusRow }) {
+  const db = usePowerSync()
+  const { theme } = useTheme()
+  const [name, setName] = useState(status.name)
+  const [picking, setPicking] = useState(false)
+  // Re-seed if the row changes under us (e.g. a rename synced from another device) — but
+  // not mid-typing, since no local write lands until blur.
+  useEffect(() => setName(status.name), [status.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== status.name) void renameStatus(db, status.id, trimmed)
+    else setName(status.name)
+  }
+
+  return (
+    <li className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 text-sm">
+        <button
+          type="button"
+          aria-label={`Change ${status.name} colour`}
+          onClick={() => setPicking((p) => !p)}
+          className="size-3 shrink-0 rounded-full ring-ring ring-offset-2 ring-offset-card transition hover:ring-2"
+          style={{ backgroundColor: statusHex(status.color, theme) }}
+        />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          aria-label={`Rename ${status.name}`}
+          className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 outline-none focus:border-ring focus:bg-background"
+        />
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {status.category.replace("_", " ")}
+        </span>
+        {status.is_system ? null : (
+          <button
+            type="button"
+            aria-label={`Delete ${status.name}`}
+            onClick={() => void deleteStatus(db, status.id)}
+            className="shrink-0 text-muted-foreground transition-colors hover:text-destructive [&_svg]:size-3.5"
+          >
+            <X />
+          </button>
+        )}
+      </div>
+      {picking ? (
+        <div className="flex flex-wrap gap-1.5 pl-5">
+          {STATUS_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={c}
+              onClick={() => {
+                void recolorStatus(db, status.id, c)
+                setPicking(false)
+              }}
+              className={cn(
+                "size-5 rounded-full transition-transform hover:scale-110",
+                status.color === c && "ring-2 ring-ring ring-offset-2 ring-offset-card",
+              )}
+              style={{ backgroundColor: statusHex(c, theme) }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </li>
   )
 }
 

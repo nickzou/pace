@@ -1,6 +1,6 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react-native"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native"
 import { statusHex } from "../tasks/status-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
@@ -9,6 +9,9 @@ import {
   createStatus,
   deleteGroup,
   deleteStatus,
+  recolorStatus,
+  renameGroup,
+  renameStatus,
   setCustomStatusesEnabled,
 } from "./mutations"
 
@@ -81,14 +84,27 @@ export function StatusesSection() {
 function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[] }) {
   const db = usePowerSync()
   const styles = useThemedStyles(makeStyles)
-  const { scheme } = useTheme()
+  const [name, setName] = useState(group.name)
+  useEffect(() => setName(group.name), [group.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== group.name) void renameGroup(db, group.id, trimmed)
+    else setName(group.name)
+  }
+
   return (
     <View style={styles.group}>
       <View style={styles.groupHead}>
-        <Text style={styles.groupName}>
-          {group.name}
-          {group.is_default ? "  · default" : ""}
-        </Text>
+        <View style={styles.groupNameWrap}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            onBlur={saveName}
+            style={styles.groupName}
+          />
+          {group.is_default ? <Text style={styles.groupDefault}>· default</Text> : null}
+        </View>
         {group.is_default ? null : (
           <Pressable onPress={() => void deleteGroup(db, group.id)} hitSlop={6}>
             <Text style={styles.del}>Delete</Text>
@@ -96,20 +112,69 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
         )}
       </View>
       {statuses.map((s) => (
-        <View key={s.id} style={styles.statusRow}>
-          <View style={[styles.dot, { backgroundColor: statusHex(s.color, scheme) }]} />
-          <Text style={styles.statusName} numberOfLines={1}>
-            {s.name}
-          </Text>
-          <Text style={styles.cat}>{s.category.replace("_", " ")}</Text>
-          {s.is_system ? null : (
-            <Pressable onPress={() => void deleteStatus(db, s.id)} hitSlop={8}>
-              <Text style={styles.del}>✕</Text>
-            </Pressable>
-          )}
-        </View>
+        <EditableStatus key={s.id} status={s} />
       ))}
       <AddStatus groupId={group.id} nextPosition={statuses.length} />
+    </View>
+  )
+}
+
+// A status row that can be recoloured and renamed in place (system statuses too — only
+// delete is protected). Tapping the dot toggles the swatch picker; the name is an inline
+// input that saves on blur. Category isn't editable here: the server enforces "≥1 open /
+// ≥1 done per group" only on delete, so a category change could break that invariant.
+function EditableStatus({ status }: { status: StatusRow }) {
+  const db = usePowerSync()
+  const styles = useThemedStyles(makeStyles)
+  const { scheme, colors } = useTheme()
+  const [name, setName] = useState(status.name)
+  const [picking, setPicking] = useState(false)
+  useEffect(() => setName(status.name), [status.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== status.name) void renameStatus(db, status.id, trimmed)
+    else setName(status.name)
+  }
+
+  return (
+    <View style={styles.statusItem}>
+      <View style={styles.statusRow}>
+        <Pressable onPress={() => setPicking((p) => !p)} hitSlop={6}>
+          <View style={[styles.dot, { backgroundColor: statusHex(status.color, scheme) }]} />
+        </Pressable>
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          onBlur={saveName}
+          placeholderTextColor={colors.textFaint}
+          style={styles.statusNameInput}
+        />
+        <Text style={styles.cat}>{status.category.replace("_", " ")}</Text>
+        {status.is_system ? null : (
+          <Pressable onPress={() => void deleteStatus(db, status.id)} hitSlop={8}>
+            <Text style={styles.del}>✕</Text>
+          </Pressable>
+        )}
+      </View>
+      {picking ? (
+        <View style={styles.swatchRow}>
+          {STATUS_COLORS.map((cc) => (
+            <Pressable
+              key={cc}
+              onPress={() => {
+                void recolorStatus(db, status.id, cc)
+                setPicking(false)
+              }}
+              style={[
+                styles.swatch,
+                { backgroundColor: statusHex(cc, scheme) },
+                status.color === cc ? styles.swatchSel : null,
+              ]}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -222,11 +287,20 @@ const makeStyles = (c: Palette) =>
     groups: { gap: 16 },
     group: { borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 10, gap: 8 },
     groupHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-    groupName: { color: c.textPrimary, fontSize: 14, fontWeight: "600" },
+    groupNameWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+    groupName: {
+      flex: 1,
+      color: c.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+      paddingVertical: 2,
+    },
+    groupDefault: { color: c.textMuted, fontSize: 13 },
     del: { color: c.dangerText, fontSize: 13 },
+    statusItem: { gap: 6 },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     dot: { width: 12, height: 12, borderRadius: 6 },
-    statusName: { color: c.textPrimary, fontSize: 14, flex: 1 },
+    statusNameInput: { color: c.textPrimary, fontSize: 14, flex: 1, paddingVertical: 2 },
     cat: { color: c.textMuted, fontSize: 12 },
     addBox: { gap: 8, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 8 },
     addRow: { flexDirection: "row", gap: 8 },

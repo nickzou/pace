@@ -39,6 +39,9 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
     "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
   )
+  const { data: groups } = useQuery<{ id: string; name: string }>(
+    "SELECT id, name FROM status_groups ORDER BY position, created_at",
+  )
   const task = rows[0]
 
   const [title, setTitle] = useState("")
@@ -104,6 +107,17 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
 
   const resolved = task.status_category === "done"
   const options = allStatuses.filter((s) => s.group_id === task.status_group_id)
+
+  // Move the task to another status list. A task's group is derived from its status_id, so
+  // switching lists means pointing it at the target group's first open status (the design's
+  // "switching resets to the new group's open" rule). The ≥1-open invariant guarantees one.
+  const selectGroup = (groupId: string) => {
+    if (groupId === task.status_group_id) return
+    const target =
+      allStatuses.find((s) => s.group_id === groupId && s.category === "open") ??
+      allStatuses.find((s) => s.group_id === groupId)
+    if (target) void setTaskStatus(db, id, target.id)
+  }
   const dueState = dueDayState(task.due_date, resolved)
   const dueFieldClass =
     dueState === "overdue"
@@ -135,6 +149,24 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-medium text-foreground outline-none focus:border-ring focus:bg-background"
         />
       </div>
+
+      {groups.length > 1 ? (
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          List
+          <select
+            aria-label="Status list"
+            value={task.status_group_id}
+            onChange={(event) => selectGroup(event.target.value)}
+            className="rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <textarea
         value={description}
