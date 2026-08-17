@@ -103,10 +103,10 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
 
         <PowerSyncProvider>
           <Tasks />
+          {/* Inside the provider so the settings status-management can query the local DB. */}
+          <SettingsModal visible={settingsOpen} email={email} onClose={() => setSettingsOpen(false)} />
         </PowerSyncProvider>
       </ScrollView>
-
-      <SettingsModal visible={settingsOpen} email={email} onClose={() => setSettingsOpen(false)} />
     </>
   )
 }
