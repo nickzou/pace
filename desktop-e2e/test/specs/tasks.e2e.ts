@@ -34,6 +34,10 @@ describe("desktop tasks", () => {
     // Add a task.
     const title = `Buy milk ${Date.now()}`
     await $('input[placeholder*="Add a task"]').setValue(title)
+    // The Add button is disabled until the seeded default status syncs down (P2-03) —
+    // a fresh signup's first PowerSync download in the desktop webview can take longer
+    // than the default action wait, so wait for the composer to be ready.
+    await $("button=Add").waitForEnabled({ timeout: 30_000 })
     await $("button=Add").click()
     await expect($(`span*=${title}`)).toBeDisplayed()
 
