@@ -231,11 +231,13 @@ function TaskRow({
           </span>
         ) : null}
       </button>
+      {/* Always faintly visible so it's tappable on touch/no-hover browsers; brightens on
+          row hover or keyboard focus, so pointer devices still get the tidy reveal feel. */}
       <button
         type="button"
         onClick={onDelete}
         aria-label="Delete task"
-        className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 [&_svg]:size-4"
+        className="shrink-0 text-muted-foreground opacity-50 transition-all hover:text-destructive hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100 [&_svg]:size-4"
       >
         <Trash2 />
       </button>
