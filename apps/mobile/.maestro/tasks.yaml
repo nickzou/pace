@@ -43,6 +43,13 @@ appId: app.paceproductivity.mobile
     id: "task-input"
 - inputText: ${output.task}
 - hideKeyboard
+# Add is disabled until the seeded default status syncs down (P2-03) — wait for it to
+# enable so the tap actually creates the task instead of silently no-op'ing.
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
 - tapOn:
     id: "add-task"
 - assertVisible: ${output.task}

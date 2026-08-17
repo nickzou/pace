@@ -184,7 +184,12 @@ function Tasks() {
           style={styles.input}
           returnKeyType="done"
         />
-        <Pressable testID="add-task" onPress={add} disabled={!title.trim()} style={styles.addBtn}>
+        <Pressable
+          testID="add-task"
+          onPress={add}
+          disabled={!title.trim() || !defaultStatusId}
+          style={styles.addBtn}
+        >
           <Text style={styles.addBtnText}>Add</Text>
         </Pressable>
       </View>
