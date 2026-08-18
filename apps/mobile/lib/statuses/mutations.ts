@@ -28,6 +28,14 @@ export function createGroup(db: AbstractPowerSyncDatabase, name: string, positio
   )
 }
 
+export function renameGroup(db: AbstractPowerSyncDatabase, id: string, name: string) {
+  return db.execute("UPDATE status_groups SET name = ?, updated_at = ? WHERE id = ?", [
+    name,
+    now(),
+    id,
+  ])
+}
+
 export function deleteGroup(db: AbstractPowerSyncDatabase, id: string) {
   return db.execute("DELETE FROM status_groups WHERE id = ?", [id])
 }
@@ -45,6 +53,18 @@ export function createStatus(
     "INSERT INTO statuses (id, group_id, name, color, category, position, is_system, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)",
     [Crypto.randomUUID(), groupId, name, color, category, position, ts, ts],
   )
+}
+
+export function recolorStatus(db: AbstractPowerSyncDatabase, id: string, color: string) {
+  return db.execute("UPDATE statuses SET color = ?, updated_at = ? WHERE id = ?", [
+    color,
+    now(),
+    id,
+  ])
+}
+
+export function renameStatus(db: AbstractPowerSyncDatabase, id: string, name: string) {
+  return db.execute("UPDATE statuses SET name = ?, updated_at = ? WHERE id = ?", [name, now(), id])
 }
 
 export function deleteStatus(db: AbstractPowerSyncDatabase, id: string) {

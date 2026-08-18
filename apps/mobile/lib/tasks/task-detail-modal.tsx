@@ -25,6 +25,7 @@ import {
 } from "./dates"
 import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "./mutations"
 import { StatusControl, type StatusOption } from "./status-control"
+import { openStatusForGroup } from "./status-group"
 
 // The single-task view/editor. On mobile there's no navigation, so this
 // full-screen Modal IS the detail view (the analogue of the web's /tasks/$taskId
@@ -69,6 +70,9 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   )
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
     "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
+  )
+  const { data: groups } = useQuery<{ id: string; name: string }>(
+    "SELECT id, name FROM status_groups ORDER BY position, created_at",
   )
   const task = rows[0]
 
@@ -147,6 +151,14 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const resolved = task ? task.status_category === "done" : false
   const dueState = task ? dueDayState(task.due_date, resolved) : null
 
+  // Move the task to another status list. The group is derived from status_id, so switching
+  // points the task at the target group's first open status (see openStatusForGroup).
+  const selectGroup = (groupId: string) => {
+    if (!task || groupId === task.status_group_id) return
+    const target = openStatusForGroup(allStatuses, groupId)
+    if (target) void setTaskStatus(db, id, target.id)
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -185,6 +197,30 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               style={styles.titleInput}
             />
           </View>
+
+          {groups.length > 1 ? (
+            <View style={styles.listRow}>
+              <Text style={styles.listLabel}>List</Text>
+              <View style={styles.listChips}>
+                {groups.map((g) => {
+                  const active = g.id === task.status_group_id
+                  return (
+                    <Pressable
+                      key={g.id}
+                      onPress={() => selectGroup(g.id)}
+                      style={[styles.listChip, active ? styles.listChipActive : null]}
+                    >
+                      <Text
+                        style={[styles.listChipText, active ? styles.listChipTextActive : null]}
+                      >
+                        {g.name}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </View>
+          ) : null}
 
           <TextInput
             testID="detail-notes"
@@ -355,6 +391,19 @@ const makeStyles = (c: Palette) =>
       fontWeight: "600",
       paddingVertical: 2,
     },
+    listRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+    listLabel: { color: c.textSecondary, fontSize: 13, width: 44 },
+    listChips: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 6 },
+    listChip: {
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: c.border,
+      paddingVertical: 5,
+      paddingHorizontal: 10,
+    },
+    listChipActive: { backgroundColor: c.primary, borderColor: c.primary },
+    listChipText: { color: c.textSecondary, fontSize: 13 },
+    listChipTextActive: { color: c.onPrimary },
     notes: {
       minHeight: 120,
       borderWidth: 1,

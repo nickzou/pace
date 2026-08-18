@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test"
-import { expectSignedIn } from "./helpers"
+import { enableCustomStatuses, expectSignedIn } from "./helpers"
 
 // P2-03 · Custom statuses. Reuses the session saved by auth.setup.ts.
 test.use({ storageState: "playwright/.auth/user.json" })
+
+// Sync-heavy (settings + groups + statuses cold-sync in CI) — give headroom.
+test.beforeEach(() => test.slow())
 
 // The end-to-end flow the feature exists for: define a custom DONE status in
 // Settings, assign it to a task from the list, and confirm the task reads as done
@@ -14,26 +17,24 @@ test("create a custom done status, assign it in the list → task reads as done 
   const stamp = Date.now()
   const statusName = `Shipped ${stamp}`
 
-  // 1. Settings — enable custom statuses (the management UI is gated behind the
-  //    toggle), then add a DONE status to the seeded default group.
-  await page.goto("/settings")
+  // 1. Settings — enable custom statuses (gated behind the toggle; the helper waits for
+  //    user_settings to sync before toggling), then add a DONE status to the default group.
+  await enableCustomStatuses(page)
 
-  // Not expectSignedIn here: /settings has its own account "Sign out" button in
-  // addition to the shell's, so that shared helper (which asserts a single "Sign out")
-  // hits a strict-mode violation. The toggle being visible confirms both that we're
-  // signed in (storageState) and that the Statuses section rendered.
-  const toggle = page.getByRole("switch", { name: "Enable custom statuses" })
-  await expect(toggle).toBeVisible()
-  if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
-  await expect(toggle).toHaveAttribute("aria-checked", "true")
+  // Scope to the seeded default group's block — other specs in the run leave extra
+  // groups behind (the DB is truncated once per run, tests run serially), so the bare
+  // placeholder/category/Add would be ambiguous across groups.
+  const defaultBlock = page
+    .locator("div.rounded-lg")
+    .filter({ has: page.getByLabel("Rename Default list") })
+  await defaultBlock.getByPlaceholder("New status…").fill(statusName)
+  await defaultBlock.getByLabel("Category").selectOption("done")
+  await defaultBlock.getByRole("button", { name: "green", exact: true }).click() // a palette colour
+  await defaultBlock.getByRole("button", { name: "Add", exact: true }).click()
 
-  await page.getByPlaceholder("New status…").fill(statusName)
-  await page.getByLabel("Category").selectOption("done")
-  await page.getByRole("button", { name: "green", exact: true }).click() // a palette colour
-  await page.getByRole("button", { name: "Add", exact: true }).click()
-
-  // It lands in the group's status list.
-  await expect(page.getByText(statusName)).toBeVisible()
+  // It lands in the group's status list. (The name is an editable field now — P2-03
+  // polish — so assert the row's rename input, not static text.)
+  await expect(page.getByLabel(`Rename ${statusName}`)).toBeVisible()
 
   // 2. List — add a task. It starts on the default open status "To Do" and is not done.
   await page.goto("/")
