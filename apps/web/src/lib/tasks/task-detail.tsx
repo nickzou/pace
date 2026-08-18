@@ -1,5 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import {
   combineLocal,
   DUE_FALLBACK,
@@ -43,6 +44,14 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: groups } = useQuery<{ id: string; name: string }>(
     "SELECT id, name FROM status_groups ORDER BY position, created_at",
   )
+  const { data: allTags } = useQuery<TagOption>(
+    "SELECT id, name, color FROM tags ORDER BY position, created_at",
+  )
+  const { data: taskTags } = useQuery<TagOption>(
+    "SELECT tg.id, tg.name, tg.color FROM task_tags tt JOIN tags tg ON tg.id = tt.tag_id WHERE tt.task_id = ?",
+    [id],
+  )
+  const assignedIds = useMemo(() => new Set(taskTags.map((t) => t.id)), [taskTags])
   const task = rows[0]
 
   const [title, setTitle] = useState("")
@@ -165,6 +174,17 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </select>
         </label>
       ) : null}
+
+      {/* Tags — all shown (no +k collapse; the detail has room) + a picker to edit. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TagChips tags={taskTags} max={99} />
+        <TagPicker
+          taskId={id}
+          assignedIds={assignedIds}
+          allTags={allTags}
+          nextPosition={allTags.length}
+        />
+      </div>
 
       <textarea
         value={description}
