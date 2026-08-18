@@ -1,0 +1,110 @@
+# Mobile · P2-03 status polish. Recolour + rename a status, add + rename a status list,
+# then close/reopen Settings to prove the edits round-tripped through PowerSync (read back
+# from local SQLite), not just optimistic UI. Mirrors the web status-editing.spec.ts.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start — the session persists in secure-store.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user (unique email per run).
+- evalScript: ${output.email = 'maestro-statusedit-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro StatusEdit"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Open Settings and enable custom statuses. The toggle is disabled until user_settings
+# syncs down (P2-03) — wait for it to enable so the tap actually toggles.
+- tapOn:
+    id: "settings-open"
+- extendedWaitUntil:
+    visible:
+      id: "statuses-toggle"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "statuses-toggle"
+- assertVisible:
+    id: "add-status-input"
+
+# Add a status (space-free name to keep the testID selectors simple).
+- tapOn:
+    id: "add-status-input"
+- inputText: "QA"
+- hideKeyboard
+- tapOn:
+    id: "add-status-btn"
+- assertVisible:
+    id: "status-name-QA"
+
+# Recolour it: open its picker and pick blue (the recolorStatus path — the gap this fixes).
+- tapOn:
+    id: "status-color-QA"
+- tapOn:
+    id: "status-swatch-blue"
+
+# Rename it QA -> QAdone. The name input saves on blur, so tap the section heading to blur.
+- tapOn:
+    id: "status-name-QA"
+- eraseText: 12
+- inputText: "QAdone"
+- tapOn: "Statuses"
+- assertVisible:
+    id: "status-name-QAdone"
+
+# Add a status list and rename it Sprint -> Sprint2 (the previously-unreachable capability).
+- tapOn:
+    id: "new-group-input"
+- inputText: "Sprint"
+- hideKeyboard
+- tapOn:
+    id: "new-group-btn"
+- assertVisible:
+    id: "group-name-Sprint"
+- tapOn:
+    id: "group-name-Sprint"
+- eraseText: 12
+- inputText: "Sprint2"
+- tapOn: "Statuses"
+- assertVisible:
+    id: "group-name-Sprint2"
+
+# Persistence: close + reopen Settings, then scroll back to the statuses section. The
+# renamed status and list are read from local SQLite, proving the edits reached Postgres
+# and synced down — not just optimistic UI. (settings-close sits at the top of the modal,
+# scrolled off after all the edits, and reopening lands at the top — hence the scrolls.)
+- scrollUntilVisible:
+    element:
+      id: "settings-close"
+    direction: UP
+- tapOn:
+    id: "settings-close"
+- tapOn:
+    id: "settings-open"
+- scrollUntilVisible:
+    element:
+      id: "status-name-QAdone"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: "group-name-Sprint2"
+    direction: DOWN
