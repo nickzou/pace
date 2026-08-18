@@ -1,0 +1,60 @@
+import type { AbstractPowerSyncDatabase } from "@powersync/web"
+
+// Client write helpers for tags (P2-04). Each writes straight to local SQLite; the
+// PowerSync connector replays it to the matching tRPC procedure (tags: INSERT → create,
+// UPDATE → update, DELETE → softDelete; task_tags: INSERT → assign, DELETE → unassign).
+//
+// Note on delete/undo: a task's soft-delete does NOT cascade to its task_tags links
+// (cascade fires only on a hard delete), so links survive a task delete + undo untouched —
+// no capture needed in tasks' deleteWithUndo.
+const now = () => new Date().toISOString()
+
+export function createTag(
+  db: AbstractPowerSyncDatabase,
+  name: string,
+  color: string,
+  position: number,
+) {
+  const ts = now()
+  return db.execute(
+    "INSERT INTO tags (id, name, color, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [crypto.randomUUID(), name, color, position, ts, ts],
+  )
+}
+
+export function renameTag(db: AbstractPowerSyncDatabase, id: string, name: string) {
+  return db.execute("UPDATE tags SET name = ?, updated_at = ? WHERE id = ?", [name, now(), id])
+}
+
+export function recolorTag(db: AbstractPowerSyncDatabase, id: string, color: string) {
+  return db.execute("UPDATE tags SET color = ?, updated_at = ? WHERE id = ?", [color, now(), id])
+}
+
+export function deleteTag(db: AbstractPowerSyncDatabase, id: string) {
+  return db.execute("DELETE FROM tags WHERE id = ?", [id])
+}
+
+// Reorder: write each tag's new position (replays as individual PATCH → tags.update).
+export async function reorderTags(db: AbstractPowerSyncDatabase, orderedIds: string[]) {
+  const ts = now()
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.execute("UPDATE tags SET position = ?, updated_at = ? WHERE id = ?", [
+      i,
+      ts,
+      orderedIds[i],
+    ])
+  }
+}
+
+// Assign / unassign a tag to a task via the join. The link id is deterministic, so the
+// insert is idempotent (OR IGNORE) and converges across offline devices.
+export function assignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
+  return db.execute(
+    "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id, created_at) VALUES (?, ?, ?, ?)",
+    [`${taskId}_${tagId}`, taskId, tagId, now()],
+  )
+}
+
+export function unassignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
+  return db.execute("DELETE FROM task_tags WHERE id = ?", [`${taskId}_${tagId}`])
+}

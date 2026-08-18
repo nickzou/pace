@@ -125,6 +125,37 @@ async function uploadOp(
         })
       }
       return
+
+    case "tags":
+      if (type === UpdateType.PUT) {
+        await trpc.tags.create.mutate({
+          id,
+          name: String(data.name ?? ""),
+          color: String(data.color ?? "") as StatusColor,
+          ...(data.position != null ? { position: Number(data.position) } : {}),
+        })
+      } else if (type === UpdateType.PATCH) {
+        await trpc.tags.update.mutate({
+          id,
+          ...(data.name !== undefined ? { name: String(data.name) } : {}),
+          ...(data.color !== undefined ? { color: String(data.color) as StatusColor } : {}),
+          ...(data.position !== undefined ? { position: Number(data.position) } : {}),
+        })
+      } else {
+        await trpc.tags.softDelete.mutate({ id })
+      }
+      return
+
+    case "task_tags": {
+      // The id is the deterministic `${taskId}_${tagId}` (uuids never contain "_"), so a
+      // DELETE — which carries no opData — still yields the pair. No PATCH: links are immutable.
+      const [taskId, tagId] = id.split("_")
+      if (taskId && tagId) {
+        if (type === UpdateType.DELETE) await trpc.tags.unassign.mutate({ taskId, tagId })
+        else await trpc.tags.assign.mutate({ taskId, tagId })
+      }
+      return
+    }
   }
 }
 
