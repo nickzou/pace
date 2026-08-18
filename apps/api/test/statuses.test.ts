@@ -180,4 +180,73 @@ describe("statuses router", () => {
     const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, userId))
     expect(row?.customStatusesEnabled).toBe(true)
   })
+
+  // items.update / groups.update back the P2-03-polish edit affordances (recolour / rename
+  // an existing status or group). They existed in the router from the start but had no UI —
+  // these pin the contract the Settings edit controls now depend on.
+  it("updates a status's name and color, leaving category and position untouched", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const groupId = await defaultGroupId(userId)
+    const id = await caller.statuses.items.create({
+      groupId,
+      name: "Blocked",
+      color: "red",
+      category: "in_progress",
+      position: 3,
+    })
+    await caller.statuses.items.update({ id, name: "Waiting", color: "amber" })
+    const [row] = await db.select().from(statuses).where(eq(statuses.id, id))
+    expect(row?.name).toBe("Waiting")
+    expect(row?.color).toBe("amber")
+    expect(row?.category).toBe("in_progress") // partial update — untouched
+    expect(row?.position).toBe(3) // untouched
+  })
+
+  it("recolours and renames a seeded (system) status — only delete is protected", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const id = await seededStatus(userId, "done")
+    await caller.statuses.items.update({ id, name: "Complete", color: "teal" })
+    const [row] = await db.select().from(statuses).where(eq(statuses.id, id))
+    expect(row?.name).toBe("Complete")
+    expect(row?.color).toBe("teal")
+    expect(row?.isSystem).toBe(true) // still the protected seeded row
+  })
+
+  it("won't update a status the user doesn't own", async () => {
+    const u1 = await makeUser()
+    const u2 = await makeUser()
+    const foreign = await seededStatus(u2, "open")
+    await expect(
+      appRouter.createCaller({ db, userId: u1 }).statuses.items.update({
+        id: foreign,
+        name: "Hijacked",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" })
+    const [row] = await db.select().from(statuses).where(eq(statuses.id, foreign))
+    expect(row?.name).not.toBe("Hijacked")
+  })
+
+  it("renames a status group, including the default group", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const id = await defaultGroupId(userId)
+    await caller.statuses.groups.update({ id, name: "My Workflow" })
+    const [row] = await db.select().from(statusGroups).where(eq(statusGroups.id, id))
+    expect(row?.name).toBe("My Workflow")
+    expect(row?.isDefault).toBe(true) // still the default group
+  })
+
+  it("won't update a group the user doesn't own", async () => {
+    const u1 = await makeUser()
+    const u2 = await makeUser()
+    const foreign = await defaultGroupId(u2)
+    await expect(
+      appRouter.createCaller({ db, userId: u1 }).statuses.groups.update({
+        id: foreign,
+        name: "Hijacked",
+      }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" })
+  })
 })
