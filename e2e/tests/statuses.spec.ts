@@ -27,13 +27,20 @@ test("create a custom done status, assign it in the list → task reads as done 
   if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
   await expect(toggle).toHaveAttribute("aria-checked", "true")
 
-  await page.getByPlaceholder("New status…").fill(statusName)
-  await page.getByLabel("Category").selectOption("done")
-  await page.getByRole("button", { name: "green", exact: true }).click() // a palette colour
-  await page.getByRole("button", { name: "Add", exact: true }).click()
+  // Scope to the seeded default group's block — other specs in the run leave extra
+  // groups behind (the DB is truncated once per run, tests run serially), so the bare
+  // placeholder/category/Add would be ambiguous across groups.
+  const defaultBlock = page
+    .locator("div.rounded-lg")
+    .filter({ has: page.getByLabel("Rename Default list") })
+  await defaultBlock.getByPlaceholder("New status…").fill(statusName)
+  await defaultBlock.getByLabel("Category").selectOption("done")
+  await defaultBlock.getByRole("button", { name: "green", exact: true }).click() // a palette colour
+  await defaultBlock.getByRole("button", { name: "Add", exact: true }).click()
 
-  // It lands in the group's status list.
-  await expect(page.getByText(statusName)).toBeVisible()
+  // It lands in the group's status list. (The name is an editable field now — P2-03
+  // polish — so assert the row's rename input, not static text.)
+  await expect(page.getByLabel(`Rename ${statusName}`)).toBeVisible()
 
   // 2. List — add a task. It starts on the default open status "To Do" and is not done.
   await page.goto("/")
