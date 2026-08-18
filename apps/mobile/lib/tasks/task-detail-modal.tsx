@@ -25,6 +25,7 @@ import {
 } from "./dates"
 import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "./mutations"
 import { StatusControl, type StatusOption } from "./status-control"
+import { openStatusForGroup } from "./status-group"
 
 // The single-task view/editor. On mobile there's no navigation, so this
 // full-screen Modal IS the detail view (the analogue of the web's /tasks/$taskId
@@ -151,12 +152,10 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   const dueState = task ? dueDayState(task.due_date, resolved) : null
 
   // Move the task to another status list. The group is derived from status_id, so switching
-  // points the task at the target group's first open status (the ≥1-open invariant grants one).
+  // points the task at the target group's first open status (see openStatusForGroup).
   const selectGroup = (groupId: string) => {
     if (!task || groupId === task.status_group_id) return
-    const target =
-      allStatuses.find((s) => s.group_id === groupId && s.category === "open") ??
-      allStatuses.find((s) => s.group_id === groupId)
+    const target = openStatusForGroup(allStatuses, groupId)
     if (target) void setTaskStatus(db, id, target.id)
   }
 

@@ -10,6 +10,7 @@ import {
 } from "#/lib/tasks/dates"
 import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "#/lib/tasks/mutations"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
+import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { useToast } from "#/lib/toast"
 
 // A task joined with its status (P2-03).
@@ -108,14 +109,11 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const resolved = task.status_category === "done"
   const options = allStatuses.filter((s) => s.group_id === task.status_group_id)
 
-  // Move the task to another status list. A task's group is derived from its status_id, so
-  // switching lists means pointing it at the target group's first open status (the design's
-  // "switching resets to the new group's open" rule). The ≥1-open invariant guarantees one.
+  // Move the task to another status list. The group is derived from status_id, so switching
+  // points the task at the target group's first open status (see openStatusForGroup).
   const selectGroup = (groupId: string) => {
     if (groupId === task.status_group_id) return
-    const target =
-      allStatuses.find((s) => s.group_id === groupId && s.category === "open") ??
-      allStatuses.find((s) => s.group_id === groupId)
+    const target = openStatusForGroup(allStatuses, groupId)
     if (target) void setTaskStatus(db, id, target.id)
   }
   const dueState = dueDayState(task.due_date, resolved)
