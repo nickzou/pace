@@ -1,5 +1,5 @@
-import { expect, type Page, test } from "@playwright/test"
-import { expectSignedIn } from "./helpers"
+import { expect, test } from "@playwright/test"
+import { enableCustomStatuses, expectSignedIn } from "./helpers"
 
 // P2-03 polish: editing an existing status (recolour / rename), renaming a group, and
 // moving a task to another status list. Each of these had the API + connector wired from
@@ -9,19 +9,9 @@ import { expectSignedIn } from "./helpers"
 // let these gaps ship). Reuses the session saved by auth.setup.ts.
 test.use({ storageState: "playwright/.auth/user.json" })
 
-// The management UI is gated behind the enable toggle; turn it on (idempotent).
-async function enableCustomStatuses(page: Page): Promise<void> {
-  await page.goto("/settings")
-  const toggle = page.getByRole("switch", { name: "Enable custom statuses" })
-  // The toggle is disabled until user_settings syncs down. Acting on the pre-sync
-  // default races the sync (it can flip back), so wait for the real state to load first.
-  await expect(toggle).toBeEnabled()
-  if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
-  await expect(toggle).toHaveAttribute("aria-checked", "true")
-  // Gate on the management UI actually rendering (its "new list" input only exists when
-  // enabled) so callers don't race the re-render.
-  await expect(page.getByPlaceholder("New status list…")).toBeVisible()
-}
+// Each test cold-syncs user_settings + groups + statuses from an empty local DB, which is
+// slow in CI — give generous headroom so the sync waits don't blow the default timeout.
+test.beforeEach(() => test.slow())
 
 test("recolour and rename an existing status → both persist across a reload", async ({ page }) => {
   const stamp = Date.now()

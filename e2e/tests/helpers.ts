@@ -33,3 +33,19 @@ export async function expectSignedOut(page: Page): Promise<void> {
   await expect(page.getByRole("link", { name: /sign in/i })).toBeVisible()
   await expect(page.getByRole("button", { name: "Sign out" })).toBeHidden()
 }
+
+// Turn on custom statuses from /settings (P2-03), robust to cold PowerSync sync. The
+// toggle is `disabled` until user_settings syncs down — in CI each test starts with an
+// empty local DB, so that can take well over the default 5s expect timeout. Wait for the
+// toggle to be enabled (real value loaded) BEFORE reading/clicking it: acting on the
+// pre-sync default both misfires under slow sync and can clobber an already-on value
+// (e.g. when an earlier spec enabled it and the server already says true). Idempotent.
+export async function enableCustomStatuses(page: Page): Promise<void> {
+  await page.goto("/settings")
+  const toggle = page.getByRole("switch", { name: "Enable custom statuses" })
+  await expect(toggle).toBeEnabled({ timeout: 30_000 })
+  if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
+  await expect(toggle).toHaveAttribute("aria-checked", "true")
+  // Gate on the management UI actually rendering so callers don't race the re-render.
+  await expect(page.getByPlaceholder("New status list…")).toBeVisible()
+}
