@@ -52,7 +52,31 @@ const user_settings = new Table({
   custom_statuses_enabled: column.integer,
 })
 
-export const AppSchema = new Schema({ tasks, status_groups, statuses, user_settings })
+// Tags (P2-04) — a flat, user-scoped tag library (always on, no enable gate).
+const tags = new Table({
+  name: column.text,
+  color: column.text, // one of @pace/tokens STATUS_COLORS keys
+  position: column.integer,
+  created_at: column.text,
+  updated_at: column.text,
+})
+
+// The task↔tag join. Its implicit id is the deterministic `${task_id}_${tag_id}`. No
+// deleted_at — a link is hard-deleted (removing it IS the unassign).
+const task_tags = new Table({
+  task_id: column.text,
+  tag_id: column.text,
+  created_at: column.text,
+})
+
+export const AppSchema = new Schema({
+  tasks,
+  status_groups,
+  statuses,
+  user_settings,
+  tags,
+  task_tags,
+})
 
 // Bump this on ANY change above (add/remove/rename a table or column). On load,
 // reconcileSchemaVersion (./db) compares it to the version the on-device DB was built
@@ -62,4 +86,5 @@ export const AppSchema = new Schema({ tasks, status_groups, statuses, user_setti
 //
 // v2 (P2-03): tasks completed → status_id/resolved_at; + status_groups/statuses/
 // user_settings tables.
-export const SCHEMA_VERSION = "2"
+// v3 (P2-04): + tags/task_tags tables.
+export const SCHEMA_VERSION = "3"

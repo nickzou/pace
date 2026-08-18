@@ -21,6 +21,17 @@ export {
   userSettingsSchema,
 } from "./status"
 export {
+  type NewTag,
+  newTagSchema,
+  type Tag,
+  type TaskTag,
+  tagIdSchema,
+  tagSchema,
+  taskTagSchema,
+  type UpdateTag,
+  updateTagSchema,
+} from "./tag"
+export {
   type NewTask,
   newTaskSchema,
   type Task,

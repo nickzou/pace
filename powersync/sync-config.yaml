@@ -32,3 +32,14 @@ streams:
   user_settings:
     auto_subscribe: true
     query: SELECT * FROM user_settings WHERE user_id = auth.user_id()
+
+  # Tags (P2-04) — the user's tag library + the task↔tag links. Same per-user scoping.
+  # `tags` are soft-deleted (tombstone falls out); `task_tags` are hard-deleted — a link
+  # has no independent lifecycle, so removing it IS the unassign (no deleted_at column).
+  tags:
+    auto_subscribe: true
+    query: SELECT * FROM tags WHERE user_id = auth.user_id() AND deleted_at IS NULL
+
+  task_tags:
+    auto_subscribe: true
+    query: SELECT * FROM task_tags WHERE user_id = auth.user_id()
