@@ -261,36 +261,43 @@ function TaskRow({
         options={options}
         onSelect={onSelectStatus}
       />
-      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-        <span
-          className={cn("block truncate text-sm", resolved && "text-muted-foreground line-through")}
-        >
-          {task.title}
-        </span>
-        {task.description ? (
-          <span className="block truncate text-xs text-muted-foreground">{task.description}</span>
-        ) : null}
-        {task.due_date ? (
+      {/* Title/notes/due open the task; the tag chips sit outside the button so each chip
+          can open its own edit popover (a button can't nest a button). */}
+      <div className="min-w-0 flex-1">
+        <button type="button" onClick={onOpen} className="block w-full text-left">
           <span
             className={cn(
-              "block text-xs",
-              dueState === "overdue"
-                ? "text-destructive"
-                : dueState === "today"
-                  ? "text-warning"
-                  : "text-muted-foreground",
+              "block truncate text-sm",
+              resolved && "text-muted-foreground line-through",
             )}
           >
-            {dueState === "overdue" ? "Overdue · " : "Due "}
-            {formatDate(task.due_date, !!task.due_has_time)}
+            {task.title}
           </span>
-        ) : null}
+          {task.description ? (
+            <span className="block truncate text-xs text-muted-foreground">{task.description}</span>
+          ) : null}
+          {task.due_date ? (
+            <span
+              className={cn(
+                "block text-xs",
+                dueState === "overdue"
+                  ? "text-destructive"
+                  : dueState === "today"
+                    ? "text-warning"
+                    : "text-muted-foreground",
+              )}
+            >
+              {dueState === "overdue" ? "Overdue · " : "Due "}
+              {formatDate(task.due_date, !!task.due_has_time)}
+            </span>
+          ) : null}
+        </button>
         {tags.length > 0 ? (
-          <span className="mt-1.5 block">
-            <TagChips tags={tags} max={4} />
-          </span>
+          <div className="mt-1.5">
+            <TagChips tags={tags} taskId={task.id} max={4} />
+          </div>
         ) : null}
-      </button>
+      </div>
       <TagPicker
         taskId={task.id}
         assignedIds={assignedIds}

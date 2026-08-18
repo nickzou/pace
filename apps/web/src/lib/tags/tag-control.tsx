@@ -14,30 +14,104 @@ import { cn } from "#/lib/utils"
 
 export type TagOption = { id: string; name: string; color: string }
 
-// Read-only pills for a task's tags. Overflow beyond `max` collapses to a +k chip.
-export function TagChips({ tags, max = 3 }: { tags: TagOption[]; max?: number }) {
-  const { theme } = useTheme()
+// A task's tags as pills. Each chip opens a small edit popover (rename + recolour + remove).
+// Overflow beyond `max` collapses to a +k chip. `taskId` enables the "Remove from task"
+// action in the popover (present wherever a task's own tags are shown).
+export function TagChips({
+  tags,
+  taskId,
+  max = 3,
+}: {
+  tags: TagOption[]
+  taskId?: string
+  max?: number
+}) {
   if (tags.length === 0) return null
   const shown = tags.slice(0, max)
   const extra = tags.length - shown.length
   return (
     <span className="flex flex-wrap items-center gap-1">
       {shown.map((t) => (
-        <span
-          key={t.id}
-          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-white"
-          style={{ backgroundColor: statusHex(t.color, theme) }}
-        >
-          {t.name}
-        </span>
+        <EditableChip key={t.id} tag={t} taskId={taskId} />
       ))}
       {extra > 0 ? <span className="text-[11px] text-muted-foreground">+{extra}</span> : null}
     </span>
   )
 }
 
-// Assign/unassign tags on a task, with inline create-and-assign. The trigger defaults to a
-// small "Tags" button; pass `children` (a single element) to use a custom trigger.
+// One chip → a small popover to rename / recolour the tag (and remove it from the task).
+function EditableChip({ tag, taskId }: { tag: TagOption; taskId?: string }) {
+  const db = usePowerSync()
+  const { theme } = useTheme()
+  const [name, setName] = useState(tag.name)
+  const [open, setOpen] = useState(false)
+  useEffect(() => setName(tag.name), [tag.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== tag.name) void renameTag(db, tag.id, trimmed)
+    else setName(tag.name)
+  }
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Edit ${tag.name}`}
+          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-white transition-opacity hover:opacity-90"
+          style={{ backgroundColor: statusHex(tag.color, theme) }}
+        >
+          {tag.name}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="flex w-56 flex-col gap-2 p-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === "Enter") e.currentTarget.blur()
+          }}
+          aria-label={`Rename ${tag.name}`}
+          className="w-full rounded border border-input bg-background px-2 py-1 text-sm outline-none focus:border-ring"
+        />
+        <div className="flex flex-wrap gap-1">
+          {STATUS_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={c}
+              onClick={() => void recolorTag(db, tag.id, c)}
+              className={cn(
+                "size-5 rounded-full transition-transform hover:scale-110",
+                tag.color === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
+              )}
+              style={{ backgroundColor: statusHex(c, theme) }}
+            />
+          ))}
+        </div>
+        {taskId ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (taskId) void unassignTag(db, taskId, tag.id)
+              setOpen(false)
+            }}
+            className="text-left text-xs text-muted-foreground transition-colors hover:text-destructive"
+          >
+            Remove from task
+          </button>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+// A dropdown to assign/unassign tags on a task, with inline create-and-assign. Editing a
+// tag's name/colour lives on the chips (EditableChip) and in Settings. The trigger defaults
+// to a small "Tags" button; pass `children` (a single element) to use a custom trigger.
 export function TagPicker({
   taskId,
   assignedIds,
@@ -52,6 +126,7 @@ export function TagPicker({
   children?: ReactNode
 }) {
   const db = usePowerSync()
+  const { theme } = useTheme()
   const [newName, setNewName] = useState("")
 
   const toggle = (tagId: string) => {
@@ -80,19 +155,28 @@ export function TagPicker({
           </button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-60">
+      <DropdownMenuContent align="start" className="min-w-52 p-1">
         {allTags.length === 0 ? (
           <p className="px-2 py-1.5 text-xs text-muted-foreground">
             No tags yet — create one below.
           </p>
         ) : (
           allTags.map((t) => (
-            <EditableTagRow
+            <button
               key={t.id}
-              tag={t}
-              assigned={assignedIds.has(t.id)}
-              onToggle={() => toggle(t.id)}
-            />
+              type="button"
+              onClick={() => toggle(t.id)}
+              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm transition-colors hover:bg-accent"
+            >
+              <span className="flex size-4 items-center justify-center">
+                {assignedIds.has(t.id) ? <Check className="size-3.5" /> : null}
+              </span>
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: statusHex(t.color, theme) }}
+              />
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+            </button>
           ))
         )}
         <div className="mt-1 flex items-center gap-1 border-t border-border px-1.5 pt-1.5">
@@ -100,7 +184,6 @@ export function TagPicker({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
-              // Keep radix's menu typeahead from stealing the keystrokes.
               e.stopPropagation()
               if (e.key === "Enter") {
                 e.preventDefault()
@@ -122,86 +205,5 @@ export function TagPicker({
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-// A tag row inside the picker: a checkbox toggles it on the task; the colour dot opens a
-// swatch recolour; the name is an inline rename. So a tag can be edited (name + colour)
-// from anywhere the picker is — the list rows, the modal, and the detail — not just Settings.
-function EditableTagRow({
-  tag,
-  assigned,
-  onToggle,
-}: {
-  tag: TagOption
-  assigned: boolean
-  onToggle: () => void
-}) {
-  const db = usePowerSync()
-  const { theme } = useTheme()
-  const [name, setName] = useState(tag.name)
-  const [picking, setPicking] = useState(false)
-  useEffect(() => setName(tag.name), [tag.name])
-
-  const saveName = () => {
-    const trimmed = name.trim()
-    if (trimmed && trimmed !== tag.name) void renameTag(db, tag.id, trimmed)
-    else setName(tag.name)
-  }
-
-  return (
-    <div className="flex flex-col gap-1 px-1.5 py-1">
-      <div className="flex items-center gap-2 text-sm">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label={assigned ? `Unassign ${tag.name}` : `Assign ${tag.name}`}
-          className={cn(
-            "flex size-4 shrink-0 items-center justify-center rounded border",
-            assigned ? "border-primary bg-primary text-primary-foreground" : "border-input",
-          )}
-        >
-          {assigned ? <Check className="size-3" /> : null}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPicking((p) => !p)}
-          aria-label={`Change ${tag.name} colour`}
-          className="size-2.5 shrink-0 rounded-full ring-ring ring-offset-1 ring-offset-popover transition hover:ring-2"
-          style={{ backgroundColor: statusHex(tag.color, theme) }}
-        />
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={saveName}
-          onKeyDown={(e) => {
-            e.stopPropagation()
-            if (e.key === "Enter") e.currentTarget.blur()
-          }}
-          aria-label={`Rename ${tag.name}`}
-          className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 outline-none focus:border-ring focus:bg-background"
-        />
-      </div>
-      {picking ? (
-        <div className="flex flex-wrap gap-1 pl-6">
-          {STATUS_COLORS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-label={c}
-              onClick={() => {
-                void recolorTag(db, tag.id, c)
-                setPicking(false)
-              }}
-              className={cn(
-                "size-4 rounded-full transition-transform hover:scale-110",
-                tag.color === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
-              )}
-              style={{ backgroundColor: statusHex(c, theme) }}
-            />
-          ))}
-        </div>
-      ) : null}
-    </div>
   )
 }

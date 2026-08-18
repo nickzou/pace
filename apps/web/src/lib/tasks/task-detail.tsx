@@ -175,9 +175,10 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         </label>
       ) : null}
 
-      {/* Tags — all shown (no +k collapse; the detail has room) + a picker to edit. */}
+      {/* Tags — all shown (no +k collapse; the detail has room). Click a chip to edit it;
+          the picker assigns/creates. */}
       <div className="flex flex-wrap items-center gap-2">
-        <TagChips tags={taskTags} max={99} />
+        <TagChips tags={taskTags} taskId={id} max={99} />
         <TagPicker
           taskId={id}
           assignedIds={assignedIds}
