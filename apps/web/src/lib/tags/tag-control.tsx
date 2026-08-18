@@ -1,16 +1,16 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync } from "@powersync/react"
 import { Check, Plus, Tag as TagIcon } from "lucide-react"
-import { type ReactNode, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu"
-import { assignTag, createTag, unassignTag } from "#/lib/tags/mutations"
+import { assignTag, createTag, recolorTag, renameTag, unassignTag } from "#/lib/tags/mutations"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
+import { cn } from "#/lib/utils"
 
 export type TagOption = { id: string; name: string; color: string }
 
@@ -52,7 +52,6 @@ export function TagPicker({
   children?: ReactNode
 }) {
   const db = usePowerSync()
-  const { theme } = useTheme()
   const [newName, setNewName] = useState("")
 
   const toggle = (tagId: string) => {
@@ -81,29 +80,19 @@ export function TagPicker({
           </button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-52">
+      <DropdownMenuContent align="start" className="min-w-60">
         {allTags.length === 0 ? (
           <p className="px-2 py-1.5 text-xs text-muted-foreground">
             No tags yet — create one below.
           </p>
         ) : (
           allTags.map((t) => (
-            <DropdownMenuItem
+            <EditableTagRow
               key={t.id}
-              onSelect={(e) => {
-                e.preventDefault()
-                toggle(t.id)
-              }}
-            >
-              <span className="flex size-4 items-center justify-center">
-                {assignedIds.has(t.id) ? <Check className="size-3.5" /> : null}
-              </span>
-              <span
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: statusHex(t.color, theme) }}
-              />
-              <span className="min-w-0 flex-1 truncate">{t.name}</span>
-            </DropdownMenuItem>
+              tag={t}
+              assigned={assignedIds.has(t.id)}
+              onToggle={() => toggle(t.id)}
+            />
           ))
         )}
         <div className="mt-1 flex items-center gap-1 border-t border-border px-1.5 pt-1.5">
@@ -133,5 +122,86 @@ export function TagPicker({
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
+  )
+}
+
+// A tag row inside the picker: a checkbox toggles it on the task; the colour dot opens a
+// swatch recolour; the name is an inline rename. So a tag can be edited (name + colour)
+// from anywhere the picker is — the list rows, the modal, and the detail — not just Settings.
+function EditableTagRow({
+  tag,
+  assigned,
+  onToggle,
+}: {
+  tag: TagOption
+  assigned: boolean
+  onToggle: () => void
+}) {
+  const db = usePowerSync()
+  const { theme } = useTheme()
+  const [name, setName] = useState(tag.name)
+  const [picking, setPicking] = useState(false)
+  useEffect(() => setName(tag.name), [tag.name])
+
+  const saveName = () => {
+    const trimmed = name.trim()
+    if (trimmed && trimmed !== tag.name) void renameTag(db, tag.id, trimmed)
+    else setName(tag.name)
+  }
+
+  return (
+    <div className="flex flex-col gap-1 px-1.5 py-1">
+      <div className="flex items-center gap-2 text-sm">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={assigned ? `Unassign ${tag.name}` : `Assign ${tag.name}`}
+          className={cn(
+            "flex size-4 shrink-0 items-center justify-center rounded border",
+            assigned ? "border-primary bg-primary text-primary-foreground" : "border-input",
+          )}
+        >
+          {assigned ? <Check className="size-3" /> : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => setPicking((p) => !p)}
+          aria-label={`Change ${tag.name} colour`}
+          className="size-2.5 shrink-0 rounded-full ring-ring ring-offset-1 ring-offset-popover transition hover:ring-2"
+          style={{ backgroundColor: statusHex(tag.color, theme) }}
+        />
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === "Enter") e.currentTarget.blur()
+          }}
+          aria-label={`Rename ${tag.name}`}
+          className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 outline-none focus:border-ring focus:bg-background"
+        />
+      </div>
+      {picking ? (
+        <div className="flex flex-wrap gap-1 pl-6">
+          {STATUS_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={c}
+              onClick={() => {
+                void recolorTag(db, tag.id, c)
+                setPicking(false)
+              }}
+              className={cn(
+                "size-4 rounded-full transition-transform hover:scale-110",
+                tag.color === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
+              )}
+              style={{ backgroundColor: statusHex(c, theme) }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
   )
 }
