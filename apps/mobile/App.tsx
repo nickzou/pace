@@ -20,9 +20,11 @@ import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
 import { SettingsModal } from "./lib/settings/settings-modal"
+import { TagChips, type TagOption, TagPicker } from "./lib/tags/tag-control"
 import { dueDayState, formatDate } from "./lib/tasks/dates"
+import { matchesFilters } from "./lib/tasks/filter"
 import { deleteWithUndo, setTaskStatus, type Task } from "./lib/tasks/mutations"
-import { StatusControl, type StatusOption } from "./lib/tasks/status-control"
+import { StatusControl, type StatusOption, statusHex } from "./lib/tasks/status-control"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
 import { type Palette, ThemeProvider, useTheme, useThemedStyles } from "./lib/theme"
 import { ToastProvider, useToast } from "./lib/toast"
@@ -129,7 +131,7 @@ function Tasks() {
   const db = usePowerSync()
   const toast = useToast()
   const styles = useThemedStyles(makeStyles)
-  const { colors } = useTheme()
+  const { scheme, colors } = useTheme()
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: tasks, isLoading } = useQuery<ListTask>(
@@ -147,6 +149,14 @@ function Tasks() {
     "SELECT s.id FROM statuses s JOIN status_groups g ON g.id = s.group_id WHERE g.is_default = 1 AND s.category = 'open' ORDER BY s.position LIMIT 1",
   )
   const defaultStatusId = defaults[0]?.id
+  const { data: allTags } = useQuery<TagOption>(
+    "SELECT id, name, color FROM tags ORDER BY position, created_at",
+  )
+  const { data: links } = useQuery<TagOption & { task_id: string }>(
+    "SELECT tt.task_id, tg.id, tg.name, tg.color FROM task_tags tt JOIN tags tg ON tg.id = tt.tag_id",
+  )
+  // Local (not URL — RN has no URL) tag include filter: tap a pill to narrow to it (any-of).
+  const [filterTags, setFilterTags] = useState<string[]>([])
 
   const statusesByGroup = useMemo(() => {
     const map = new Map<string, StatusOption[]>()
@@ -157,6 +167,24 @@ function Tasks() {
     }
     return map
   }, [allStatuses])
+
+  const tagsByTask = useMemo(() => {
+    const map = new Map<string, TagOption[]>()
+    for (const l of links) {
+      const arr = map.get(l.task_id) ?? []
+      arr.push({ id: l.id, name: l.name, color: l.color })
+      map.set(l.task_id, arr)
+    }
+    return map
+  }, [links])
+
+  const visible = tasks.filter((t) =>
+    matchesFilters(t, tagsByTask.get(t.id) ?? [], {
+      tags: filterTags.length ? filterTags : undefined,
+    }),
+  )
+  const toggleFilterTag = (id: string) =>
+    setFilterTags((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   function add() {
     const trimmed = title.trim()
@@ -194,14 +222,47 @@ function Tasks() {
         </Pressable>
       </View>
 
+      {allTags.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {allTags.map((t) => {
+            const on = filterTags.includes(t.id)
+            const color = statusHex(t.color, scheme)
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => toggleFilterTag(t.id)}
+                style={[
+                  styles.filterPill,
+                  { borderColor: color },
+                  on ? { backgroundColor: color } : null,
+                ]}
+              >
+                <Text style={[styles.filterPillText, on ? styles.filterPillTextOn : null]}>
+                  {t.name}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      ) : null}
+
       {isLoading ? (
         <ActivityIndicator color={colors.textPrimary} style={styles.tasksLoading} />
-      ) : tasks.length === 0 ? (
-        <Text style={styles.footer}>No tasks yet — add your first above.</Text>
+      ) : visible.length === 0 ? (
+        <Text style={styles.footer}>
+          {filterTags.length
+            ? "No tasks match the tag filter."
+            : "No tasks yet — add your first above."}
+        </Text>
       ) : (
-        tasks.map((task) => {
+        visible.map((task) => {
           const resolved = task.status_category === "done"
           const dueState = dueDayState(task.due_date, resolved)
+          const tags = tagsByTask.get(task.id) ?? []
           return (
             <View key={task.id} style={styles.task}>
               <StatusControl
@@ -214,39 +275,44 @@ function Tasks() {
                 options={statusesByGroup.get(task.status_group_id) ?? []}
                 onSelect={(sid) => void setTaskStatus(db, task.id, sid)}
               />
-              <Pressable
-                testID={`open-${task.id}`}
-                style={styles.taskBody}
-                onPress={() => setSelectedId(task.id)}
-              >
-                <Text
-                  style={[styles.taskText, resolved ? styles.taskTextDone : null]}
-                  numberOfLines={1}
-                >
-                  {task.title}
-                </Text>
-                {task.description ? (
-                  <Text style={styles.taskDesc} numberOfLines={1}>
-                    {task.description}
-                  </Text>
-                ) : null}
-                {task.due_date ? (
+              <View style={styles.bodyCol}>
+                <Pressable testID={`open-${task.id}`} onPress={() => setSelectedId(task.id)}>
                   <Text
-                    style={[
-                      styles.taskDue,
-                      dueState === "overdue"
-                        ? styles.taskDueOverdue
-                        : dueState === "today"
-                          ? styles.taskDueToday
-                          : null,
-                    ]}
+                    style={[styles.taskText, resolved ? styles.taskTextDone : null]}
                     numberOfLines={1}
                   >
-                    {dueState === "overdue" ? "Overdue · " : "Due "}
-                    {formatDate(task.due_date, !!task.due_has_time)}
+                    {task.title}
                   </Text>
-                ) : null}
-              </Pressable>
+                  {task.description ? (
+                    <Text style={styles.taskDesc} numberOfLines={1}>
+                      {task.description}
+                    </Text>
+                  ) : null}
+                  {task.due_date ? (
+                    <Text
+                      style={[
+                        styles.taskDue,
+                        dueState === "overdue"
+                          ? styles.taskDueOverdue
+                          : dueState === "today"
+                            ? styles.taskDueToday
+                            : null,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {dueState === "overdue" ? "Overdue · " : "Due "}
+                      {formatDate(task.due_date, !!task.due_has_time)}
+                    </Text>
+                  ) : null}
+                </Pressable>
+                {tags.length > 0 ? <TagChips tags={tags} taskId={task.id} max={4} /> : null}
+                <TagPicker
+                  taskId={task.id}
+                  assignedIds={new Set(tags.map((t) => t.id))}
+                  allTags={allTags}
+                  nextPosition={allTags.length}
+                />
+              </View>
               <Pressable
                 testID={`delete-${task.id}`}
                 onPress={() => void deleteWithUndo(db, task, toast)}
@@ -342,6 +408,16 @@ const makeStyles = (c: Palette) =>
     checkboxDone: { borderColor: c.success, backgroundColor: "rgba(16,185,129,0.2)" },
     check: { color: c.successText, fontSize: 12 },
     taskBody: { flex: 1 },
+    bodyCol: { flex: 1, gap: 6 },
+    filterRow: { gap: 8, paddingBottom: 12, paddingRight: 8 },
+    filterPill: {
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    filterPillText: { color: c.textSecondary, fontSize: 13 },
+    filterPillTextOn: { color: "#fff", fontWeight: "600" },
     taskText: { color: c.textPrimary, fontSize: 15 },
     taskDesc: { color: c.textMuted, fontSize: 13, marginTop: 2 },
     taskDue: { color: c.textMuted, fontSize: 12, marginTop: 2 },
