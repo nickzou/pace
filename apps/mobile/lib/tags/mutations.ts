@@ -8,17 +8,20 @@ import * as Crypto from "expo-crypto"
 // (cascade fires only on a hard delete), so links survive a task delete + undo untouched.
 const now = () => new Date().toISOString()
 
-export function createTag(
+// Returns the minted id so callers can create-and-assign in one step (the tag picker).
+export async function createTag(
   db: AbstractPowerSyncDatabase,
   name: string,
   color: string,
   position: number,
-) {
+): Promise<string> {
+  const id = Crypto.randomUUID()
   const ts = now()
-  return db.execute(
+  await db.execute(
     "INSERT INTO tags (id, name, color, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [Crypto.randomUUID(), name, color, position, ts, ts],
+    [id, name, color, position, ts, ts],
   )
+  return id
 }
 
 export function renameTag(db: AbstractPowerSyncDatabase, id: string, name: string) {

@@ -9,17 +9,20 @@ import type { AbstractPowerSyncDatabase } from "@powersync/web"
 // no capture needed in tasks' deleteWithUndo.
 const now = () => new Date().toISOString()
 
-export function createTag(
+// Returns the minted id so callers can create-and-assign in one step (the tag picker).
+export async function createTag(
   db: AbstractPowerSyncDatabase,
   name: string,
   color: string,
   position: number,
-) {
+): Promise<string> {
+  const id = crypto.randomUUID()
   const ts = now()
-  return db.execute(
+  await db.execute(
     "INSERT INTO tags (id, name, color, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [crypto.randomUUID(), name, color, position, ts, ts],
+    [id, name, color, position, ts, ts],
   )
+  return id
 }
 
 export function renameTag(db: AbstractPowerSyncDatabase, id: string, name: string) {

@@ -5,7 +5,18 @@ import { type ReactNode, useEffect, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
 import { RequireLocalDb } from "#/lib/powersync/require-db"
 import { dueDayState } from "#/lib/tasks/dates"
+import { statusHex } from "#/lib/tasks/status-control"
+import { useTheme } from "#/lib/theme"
 import { cn } from "#/lib/utils"
+
+type TagNav = { id: string; name: string; color: string; count: number }
+
+// Coerce a ?tags querystring value to a string[] of active tag ids.
+function activeTagIdsFrom(v: unknown): Set<string> {
+  if (Array.isArray(v)) return new Set(v.map(String))
+  if (typeof v === "string" && v) return new Set([v])
+  return new Set()
+}
 
 // The app shell: sidebar (brand · smart-view nav with live counts · user footer)
 // plus the <main> frame. Shared by every signed-in surface — the task list and the
@@ -44,9 +55,20 @@ function Shell({ children }: { children: ReactNode }) {
   const { data: rows } = useQuery<CountRow>(
     "SELECT t.due_date, s.category FROM tasks t JOIN statuses s ON s.id = t.status_id",
   )
+  const { data: tagRows } = useQuery<{ id: string; name: string; color: string }>(
+    "SELECT id, name, color FROM tags ORDER BY position, created_at",
+  )
+  // Per-tag count of active (non-resolved) tasks carrying it.
+  const { data: tagCountRows } = useQuery<{ tag_id: string; n: number }>(
+    "SELECT tt.tag_id AS tag_id, COUNT(*) AS n FROM task_tags tt JOIN tasks t ON t.id = tt.task_id JOIN statuses s ON s.id = t.status_id WHERE s.category != 'done' GROUP BY tt.tag_id",
+  )
   const loc = useRouterState({ select: (s) => s.location })
   const activeView: View | undefined =
     loc.pathname === "/" ? ((loc.search as { view?: View }).view ?? "all") : undefined
+  const activeTagIds =
+    loc.pathname === "/"
+      ? activeTagIdsFrom((loc.search as { tags?: unknown }).tags)
+      : new Set<string>()
 
   const [sheetOpen, setSheetOpen] = useState(false)
 
@@ -69,10 +91,13 @@ function Shell({ children }: { children: ReactNode }) {
       ? rows.length
       : rows.filter((r) => dueDayState(r.due_date, r.category === "done") === v).length
 
+  const countByTag = new Map(tagCountRows.map((r) => [r.tag_id, r.n]))
+  const tags: TagNav[] = tagRows.map((t) => ({ ...t, count: countByTag.get(t.id) ?? 0 }))
+
   const email = session?.user.email ?? ""
   const initials = email.slice(0, 2).toUpperCase() || "··"
   const settingsActive = loc.pathname === "/settings"
-  const nav = { count, activeView, email, initials, settingsActive }
+  const nav = { count, activeView, email, initials, settingsActive, tags, activeTagIds }
 
   return (
     <div className="flex h-screen">
@@ -125,6 +150,8 @@ function SidebarNav({
   email,
   initials,
   settingsActive,
+  tags,
+  activeTagIds,
   onNavigate,
 }: {
   count: (v: View) => number
@@ -132,8 +159,11 @@ function SidebarNav({
   email: string
   initials: string
   settingsActive: boolean
+  tags: TagNav[]
+  activeTagIds: Set<string>
   onNavigate?: () => void
 }) {
+  const { theme } = useTheme()
   return (
     <>
       <Link
@@ -177,6 +207,40 @@ function SidebarNav({
           )
         })}
       </nav>
+
+      {tags.length > 0 ? (
+        <nav className="flex flex-col gap-0.5">
+          <span className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Tags
+          </span>
+          {tags.map((t) => {
+            const active = activeTagIds.has(t.id)
+            return (
+              <Link
+                key={t.id}
+                to="/"
+                search={{ tags: [t.id] }}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
+                  active
+                    ? "bg-accent font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <span
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: statusHex(t.color, theme) }}
+                />
+                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                {t.count > 0 ? (
+                  <span className="text-xs text-muted-foreground">{t.count}</span>
+                ) : null}
+              </Link>
+            )
+          })}
+        </nav>
+      ) : null}
 
       <div className="mt-auto flex items-center gap-1 text-sm">
         <Link
