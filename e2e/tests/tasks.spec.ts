@@ -100,6 +100,13 @@ test("an explicit time equal to the no-time default (11:59 PM) is kept, not swal
   await page.getByLabel("Due time").fill("23:59")
   await expect(page.getByLabel("Due time")).toHaveValue("23:59")
 
+  // Close the detail and confirm the ROW shows the explicit time. The row reads from the
+  // reactive tasks query, so it only renders "11:59" once the write has committed to the
+  // local DB — deterministically gating the reload below rather than racing an in-flight
+  // async write (which, under load, could otherwise reload before the write lands).
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("listitem").filter({ hasText: title })).toContainText("11:59")
+
   // After a reload the time survives (not blanked as if it were the default).
   await page.reload()
   await expectSignedIn(page)

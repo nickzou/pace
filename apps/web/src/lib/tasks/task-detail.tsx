@@ -1,5 +1,5 @@
 import { usePowerSync, useQuery } from "@powersync/react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import {
   combineLocal,
@@ -62,17 +62,19 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const [dueTime, setDueTime] = useState("")
   const seededFor = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (task && seededFor.current !== task.id) {
-      seededFor.current = task.id
-      setTitle(task.title)
-      setDescription(task.description)
-      setStartDay(toDateInput(task.start_date))
-      setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
-      setDueDay(toDateInput(task.due_date))
-      setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
-    }
-  }, [task])
+  // Seed the editable fields the first time a task loads — during render, NOT in an effect,
+  // so there's never a committed frame where the task is present but the inputs are still
+  // empty. A late (post-paint) effect seed would clobber a fast edit (or an e2e fill) made
+  // in that window. Guarded by the ref, so it runs once per task and can't loop.
+  if (task && seededFor.current !== task.id) {
+    seededFor.current = task.id
+    setTitle(task.title)
+    setDescription(task.description)
+    setStartDay(toDateInput(task.start_date))
+    setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
+    setDueDay(toDateInput(task.due_date))
+    setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
+  }
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   if (!task) return <p className="text-sm text-muted-foreground">This task no longer exists.</p>

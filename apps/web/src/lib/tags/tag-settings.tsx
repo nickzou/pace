@@ -121,7 +121,7 @@ function AddTag({ nextPosition }: { nextPosition: number }) {
           className="flex-1"
           onKeyDown={(e) => e.key === "Enter" && add()}
         />
-        <Button type="button" onClick={add} disabled={!name.trim()}>
+        <Button type="button" aria-label="Add tag" onClick={add} disabled={!name.trim()}>
           Add
         </Button>
       </div>
