@@ -98,6 +98,7 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
       <View style={styles.groupHead}>
         <View style={styles.groupNameWrap}>
           <TextInput
+            testID={`group-name-${group.name}`}
             value={name}
             onChangeText={setName}
             onBlur={saveName}
@@ -140,10 +141,15 @@ function EditableStatus({ status }: { status: StatusRow }) {
   return (
     <View style={styles.statusItem}>
       <View style={styles.statusRow}>
-        <Pressable onPress={() => setPicking((p) => !p)} hitSlop={6}>
+        <Pressable
+          testID={`status-color-${status.name}`}
+          onPress={() => setPicking((p) => !p)}
+          hitSlop={6}
+        >
           <View style={[styles.dot, { backgroundColor: statusHex(status.color, scheme) }]} />
         </Pressable>
         <TextInput
+          testID={`status-name-${status.name}`}
           value={name}
           onChangeText={setName}
           onBlur={saveName}
@@ -162,6 +168,7 @@ function EditableStatus({ status }: { status: StatusRow }) {
           {STATUS_COLORS.map((cc) => (
             <Pressable
               key={cc}
+              testID={`status-swatch-${cc}`}
               onPress={() => {
                 void recolorStatus(db, status.id, cc)
                 setPicking(false)
@@ -196,6 +203,7 @@ function AddStatus({ groupId, nextPosition }: { groupId: string; nextPosition: n
     <View style={styles.addBox}>
       <View style={styles.addRow}>
         <TextInput
+          testID="add-status-input"
           value={name}
           onChangeText={setName}
           placeholder="New status…"
@@ -203,7 +211,12 @@ function AddStatus({ groupId, nextPosition }: { groupId: string; nextPosition: n
           style={styles.input}
           onSubmitEditing={add}
         />
-        <Pressable onPress={add} disabled={!name.trim()} style={styles.addBtn}>
+        <Pressable
+          testID="add-status-btn"
+          onPress={add}
+          disabled={!name.trim()}
+          style={styles.addBtn}
+        >
           <Text style={styles.addBtnText}>Add</Text>
         </Pressable>
       </View>
@@ -224,6 +237,7 @@ function AddStatus({ groupId, nextPosition }: { groupId: string; nextPosition: n
         {STATUS_COLORS.map((cc) => (
           <Pressable
             key={cc}
+            testID={`add-swatch-${cc}`}
             onPress={() => setColor(cc)}
             style={[
               styles.swatch,
@@ -251,6 +265,7 @@ function NewGroup({ nextPosition }: { nextPosition: number }) {
   return (
     <View style={styles.addRow}>
       <TextInput
+        testID="new-group-input"
         value={name}
         onChangeText={setName}
         placeholder="New status list…"
@@ -258,7 +273,7 @@ function NewGroup({ nextPosition }: { nextPosition: number }) {
         style={styles.input}
         onSubmitEditing={add}
       />
-      <Pressable onPress={add} disabled={!name.trim()} style={styles.addBtn}>
+      <Pressable testID="new-group-btn" onPress={add} disabled={!name.trim()} style={styles.addBtn}>
         <Text style={styles.addBtnText}>Add list</Text>
       </Pressable>
     </View>
