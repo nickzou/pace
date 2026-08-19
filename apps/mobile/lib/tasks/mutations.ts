@@ -1,4 +1,5 @@
 import type { AbstractPowerSyncDatabase } from "@powersync/react-native"
+import * as Crypto from "expo-crypto"
 
 // The task shape the UI reads from local SQLite: the implicit `id` plus the synced
 // columns. `status_id` references the task's status (P2-03); done-ness is derived by
@@ -14,6 +15,8 @@ export type Task = {
   due_date: string | null
   start_has_time: number
   due_has_time: number
+  // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
+  parent_id: string | null
   created_at: string
   updated_at: string
 }
@@ -21,6 +24,34 @@ export type Task = {
 // Every write goes straight to local SQLite; the PowerSync connector replays them to
 // the API in the background (INSERT → create, UPDATE → update, DELETE → softDelete).
 // There's no cache to invalidate — the live useQuery cursors refresh.
+
+// Create a task locally (replays as create). `parentId` makes it a subtask; the server runs
+// the depth/cycle guard on upload. `statusId` is the caller's default open status. Returns
+// the minted id.
+export function createTask(
+  db: AbstractPowerSyncDatabase,
+  opts: { title: string; statusId: string; parentId?: string | null },
+): Promise<string> {
+  const id = Crypto.randomUUID()
+  const now = new Date().toISOString()
+  return db
+    .execute(
+      "INSERT INTO tasks (id, title, description, status_id, parent_id, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?)",
+      [id, opts.title, opts.statusId, opts.parentId ?? null, now, now],
+    )
+    .then(() => id)
+}
+
+// Re-parent a task, or promote it to top-level with parentId = null. Writes ONLY parent_id
+// (isolated), so the connector routes it to the guarded setParent procedure rather than the
+// generic update. The server rejects a move that would cycle or exceed the depth cap.
+export function setTaskParent(db: AbstractPowerSyncDatabase, id: string, parentId: string | null) {
+  return db.execute("UPDATE tasks SET parent_id = ?, updated_at = ? WHERE id = ?", [
+    parentId,
+    new Date().toISOString(),
+    id,
+  ])
+}
 
 // Set the task's status. resolved_at is left to the server (derived from the status's
 // category on upload, then synced back), so we only touch status_id here.
@@ -54,31 +85,65 @@ export function updateTask(
 
 type Toast = { show: (message: string, action?: { label: string; onClick: () => void }) => void }
 
-// Delete with Undo, built on the soft-delete tombstone. The delete is a local DELETE —
-// it replays as softDelete, stamping deletedAt, and the row drops out of the sync stream.
-// Undo re-inserts the captured row with the same id, which replays as a create; the
-// server's create upsert clears deletedAt, restoring it. Ops replay in order.
+type TagLink = { id: string; task_id: string; tag_id: string; created_at: string }
+
+// Delete with Undo, extended to the whole subtree (P2-05) — the mobile twin of web's. Deleting
+// a task also removes its descendants (captured with their tag links) so Undo restores the
+// whole subtree, re-inserted TOP-DOWN so each child's create sees a live parent (the server's
+// depth guard needs one). The server's create upsert clears deletedAt.
 export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, toast: Toast) {
-  await db.execute("DELETE FROM tasks WHERE id = ?", [task.id])
-  toast.show("Task deleted", {
+  const subtree = await db.getAll<Task & { _depth: number }>(
+    `WITH RECURSIVE sub(id, depth) AS (
+       SELECT id, 0 FROM tasks WHERE id = ?
+       UNION ALL
+       SELECT t.id, sub.depth + 1 FROM tasks t JOIN sub ON t.parent_id = sub.id
+     )
+     SELECT t.*, sub.depth AS _depth FROM tasks t JOIN sub ON t.id = sub.id ORDER BY sub.depth`,
+    [task.id],
+  )
+  const ids = subtree.map((t) => t.id)
+  const holes = ids.map(() => "?").join(", ")
+  const links = await db.getAll<TagLink>(
+    `SELECT id, task_id, tag_id, created_at FROM task_tags WHERE task_id IN (${holes})`,
+    ids,
+  )
+
+  await db.execute(`DELETE FROM tasks WHERE id IN (${holes})`, ids)
+
+  const subCount = subtree.length - 1
+  const message =
+    subCount > 0 ? `Task and ${subCount} subtask${subCount > 1 ? "s" : ""} deleted` : "Task deleted"
+
+  toast.show(message, {
     label: "Undo",
     onClick: () => {
-      void db.execute(
-        "INSERT INTO tasks (id, title, description, status_id, resolved_at, start_date, due_date, start_has_time, due_has_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-          task.id,
-          task.title,
-          task.description,
-          task.status_id,
-          task.resolved_at,
-          task.start_date,
-          task.due_date,
-          task.start_has_time,
-          task.due_has_time,
-          task.created_at,
-          task.updated_at,
-        ],
-      )
+      void (async () => {
+        for (const t of subtree) {
+          await db.execute(
+            "INSERT INTO tasks (id, title, description, status_id, resolved_at, start_date, due_date, start_has_time, due_has_time, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+              t.id,
+              t.title,
+              t.description,
+              t.status_id,
+              t.resolved_at,
+              t.start_date,
+              t.due_date,
+              t.start_has_time,
+              t.due_has_time,
+              t.parent_id,
+              t.created_at,
+              t.updated_at,
+            ],
+          )
+        }
+        for (const l of links) {
+          await db.execute(
+            "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id, created_at) VALUES (?, ?, ?, ?)",
+            [l.id, l.task_id, l.tag_id, l.created_at],
+          )
+        }
+      })()
     },
   })
 }

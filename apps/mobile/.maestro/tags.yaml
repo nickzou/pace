@@ -1,0 +1,72 @@
+# Mobile tags flow (P2-04): sign up -> add a task -> create + assign a tag from its row
+# picker -> the chip shows on the row -> filter by that tag. Mirrors apps/web's tags.spec.ts.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start — the session persists in secure-store.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user (unique email per run).
+- evalScript: ${output.email = 'maestro-tags-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Tags"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a task. The composer is disabled until the seeded statuses sync down (P2-03), so wait
+# for it to enable before tapping.
+- tapOn:
+    id: "task-input"
+- inputText: "Tagged"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Tagged"
+
+# Open the task's tag picker (one task, so the row picker is unambiguous) and create-and-assign.
+- tapOn:
+    id: "tag-picker"
+- tapOn:
+    id: "new-tag-input"
+- inputText: "work"
+# Drop the keyboard so it isn't covering the Add button (else the tap lands on a key).
+- hideKeyboard
+- tapOn:
+    id: "new-tag-btn"
+# Close the picker modal (keyboard is down, so Android back hits its onRequestClose).
+- back
+
+# The chip lands on the task row once create-and-assign commits (both are async local
+# writes, so give the row a moment to re-render).
+- extendedWaitUntil:
+    visible:
+      id: "tag-chip-work"
+    timeout: 10000
+
+# Filter by the tag → the task stays visible (it carries the tag).
+- tapOn:
+    id: "filter-pill-work"
+- assertVisible: "Tagged"

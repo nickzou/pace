@@ -28,6 +28,8 @@ target/
 .env
 .env.*
 !.env.example
+# Non-secret e2e backend config (throwaway values; used by scripts/local-mobile-e2e.sh)
+!.env.e2e
 
 # TLS certs / keys — provisioned onto the box from secrets, never committed
 *.pem
@@ -51,3 +53,6 @@ coverage/
 
 # Generated per-environment deploy files (hold secrets)
 deploy/envs/
+
+# Local mobile e2e build artifact (scripts/local-mobile-e2e.sh)
+pace-app.apk

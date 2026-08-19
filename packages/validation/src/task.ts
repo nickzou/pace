@@ -24,6 +24,9 @@ export const taskSchema = z.object({
   dueDate: z.iso.datetime().nullable(),
   startHasTime: z.boolean().default(false),
   dueHasTime: z.boolean().default(false),
+  // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
+  // A subtask is just a task with a parent; nesting is capped at 5 levels server-side.
+  parentId: z.uuid().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
@@ -50,6 +53,8 @@ export const newTaskSchema = taskSchema
     dueDate: taskSchema.shape.dueDate.optional(),
     startHasTime: taskSchema.shape.startHasTime.optional(),
     dueHasTime: taskSchema.shape.dueHasTime.optional(),
+    // Optional on create: set when minting a subtask, omitted for a top-level task.
+    parentId: taskSchema.shape.parentId.optional(),
   })
 
 export type NewTask = z.infer<typeof newTaskSchema>
@@ -73,3 +78,14 @@ export type UpdateTask = z.infer<typeof updateTaskSchema>
 
 // Identifies a single task by id (used by softDelete).
 export const taskIdSchema = z.object({ id: z.uuid() })
+
+// Re-parent a task (P2-05): move it under another task, or null to promote it back to
+// top-level. Parent changes go through their own mutation (deliberately NOT part of
+// updateTaskSchema) so the depth/cycle guard has a single home and the connector maps a
+// clean, single-purpose op.
+export const setParentSchema = z.object({
+  id: z.uuid(),
+  parentId: z.uuid().nullable(),
+})
+
+export type SetParent = z.infer<typeof setParentSchema>

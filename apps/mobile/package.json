@@ -38,7 +38,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "maestro test .maestro"
+    "test:e2e": "maestro test .maestro",
+    "test:e2e:local": "bash scripts/local-mobile-e2e.sh"
   },
   "private": true
 }

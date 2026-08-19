@@ -7,7 +7,7 @@ import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import { dueDayState, formatDate } from "#/lib/tasks/dates"
-import { type Filters, matchesFilters } from "#/lib/tasks/filter"
+import { type Filters, hasActiveFilters, matchesFilters } from "#/lib/tasks/filter"
 import { FilterBar } from "#/lib/tasks/filter-bar"
 import { deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
@@ -49,14 +49,20 @@ type ListTask = Task & {
   status_color: string
   status_category: string
   status_group_id: string
+  // Subtask roll-up (P2-05): counts of this task's direct children, for the progress badge.
+  child_count: number
+  done_count: number
 }
 
 const TASKS_SQL = `
   SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
-         t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+         t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
          t.created_at, t.updated_at,
          s.name AS status_name, s.color AS status_color,
-         s.category AS status_category, s.group_id AS status_group_id
+         s.category AS status_category, s.group_id AS status_group_id,
+         (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
+         (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+            WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
   FROM tasks t JOIN statuses s ON s.id = t.status_id
   ORDER BY t.created_at DESC`
 
@@ -121,10 +127,18 @@ function TaskListView() {
     return map
   }, [links])
 
+  // Task id → title, so a surfaced subtask can show where it lives.
+  const titleById = useMemo(() => new Map(tasks.map((t) => [t.id, t.title])), [tasks])
+
   const q = search.trim().toLowerCase()
+  // Unfiltered, the list shows only top-level tasks — subtasks live inside their parent. As
+  // soon as any facet or search is active it flattens to every matching task at any depth,
+  // each with a parent breadcrumb, so a due subtask still surfaces in a date view.
+  const flat = hasActiveFilters(filters) || q.length > 0
   const visible = tasks
     .filter((t) => matchesFilters(t, tagsByTask.get(t.id) ?? [], filters))
     .filter((t) => (q ? t.title.toLowerCase().includes(q) : true))
+    .filter((t) => flat || t.parent_id == null)
 
   const currentLabel = VIEWS.find((v) => v.key === filters.view)?.label ?? "All tasks"
   const setFilters = (patch: Partial<Filters>) =>
@@ -207,6 +221,7 @@ function TaskListView() {
                   options={statusesByGroup.get(task.status_group_id) ?? []}
                   tags={tagsByTask.get(task.id) ?? []}
                   allTags={allTags}
+                  parentTitle={task.parent_id ? titleById.get(task.parent_id) : undefined}
                   onSelectStatus={(sid) => void setTaskStatus(db, task.id, sid)}
                   onOpen={() => setSelectedId(task.id)}
                   onDelete={() => void deleteWithUndo(db, task, toast)}
@@ -228,6 +243,7 @@ function TaskRow({
   options,
   tags,
   allTags,
+  parentTitle,
   onSelectStatus,
   onOpen,
   onDelete,
@@ -237,6 +253,7 @@ function TaskRow({
   options: StatusOption[]
   tags: TagOption[]
   allTags: TagOption[]
+  parentTitle?: string
   onSelectStatus: (statusId: string) => void
   onOpen: () => void
   onDelete: () => void
@@ -265,13 +282,25 @@ function TaskRow({
           can open its own edit popover (a button can't nest a button). */}
       <div className="min-w-0 flex-1">
         <button type="button" onClick={onOpen} className="block w-full text-left">
-          <span
-            className={cn(
-              "block truncate text-sm",
-              resolved && "text-muted-foreground line-through",
-            )}
-          >
-            {task.title}
+          {parentTitle ? (
+            <span className="block truncate text-[11px] text-muted-foreground">
+              ↳ in {parentTitle}
+            </span>
+          ) : null}
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                "min-w-0 truncate text-sm",
+                resolved && "text-muted-foreground line-through",
+              )}
+            >
+              {task.title}
+            </span>
+            {task.child_count > 0 ? (
+              <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {task.done_count}/{task.child_count}
+              </span>
+            ) : null}
           </span>
           {task.description ? (
             <span className="block truncate text-xs text-muted-foreground">{task.description}</span>

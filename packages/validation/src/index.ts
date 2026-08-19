@@ -34,6 +34,8 @@ export {
 export {
   type NewTask,
   newTaskSchema,
+  type SetParent,
+  setParentSchema,
   type Task,
   taskIdSchema,
   taskSchema,

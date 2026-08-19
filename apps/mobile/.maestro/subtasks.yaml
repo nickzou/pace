@@ -1,0 +1,81 @@
+# Mobile subtasks flow (P2-05): sign up -> add a task -> add a subtask from its detail ->
+# drill into the subtask (parent breadcrumb) -> promote it to top-level -> it becomes its
+# own task in the list. Mirrors apps/web's subtasks.spec.ts.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user.
+- evalScript: ${output.email = 'maestro-subtasks-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Subtasks"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a top-level task (wait for the composer to enable once statuses sync).
+- tapOn:
+    id: "task-input"
+- inputText: "Parent"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Parent"
+
+# Open its detail.
+- tapOn: "Parent"
+- assertVisible:
+    id: "detail-title"
+
+# Add a subtask (the Subtasks section is below the fold in the detail — scroll to it).
+- scrollUntilVisible:
+    element:
+      id: "subtask-input"
+    direction: DOWN
+- tapOn:
+    id: "subtask-input"
+- inputText: "Child"
+- hideKeyboard
+- tapOn:
+    id: "subtask-add"
+- assertVisible:
+    id: "subtask-Child"
+
+# Drill into the subtask — its own detail shows a parent breadcrumb.
+- tapOn:
+    id: "subtask-Child"
+- assertVisible:
+    id: "detail-parent"
+
+# Promote it to top-level, then close the detail.
+- tapOn:
+    id: "parent-none"
+- tapOn:
+    id: "detail-close"
+
+# It's now its own top-level task in the list.
+- assertVisible: "Child"

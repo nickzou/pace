@@ -53,22 +53,33 @@ async function uploadOp(
           ...(data.due_date != null ? { dueDate: String(data.due_date) } : {}),
           ...(data.start_has_time != null ? { startHasTime: !!data.start_has_time } : {}),
           ...(data.due_has_time != null ? { dueHasTime: !!data.due_has_time } : {}),
+          ...(data.parent_id != null ? { parentId: String(data.parent_id) } : {}),
         })
       } else if (type === UpdateType.PATCH) {
-        await trpc.tasks.update.mutate({
-          id,
-          ...(data.title !== undefined ? { title: String(data.title) } : {}),
-          ...(data.description !== undefined ? { description: String(data.description) } : {}),
-          ...(data.status_id !== undefined ? { statusId: String(data.status_id) } : {}),
-          ...(data.start_date !== undefined
-            ? { startDate: data.start_date != null ? String(data.start_date) : null }
-            : {}),
-          ...(data.due_date !== undefined
-            ? { dueDate: data.due_date != null ? String(data.due_date) : null }
-            : {}),
-          ...(data.start_has_time !== undefined ? { startHasTime: !!data.start_has_time } : {}),
-          ...(data.due_has_time !== undefined ? { dueHasTime: !!data.due_has_time } : {}),
-        })
+        // A re-parent is an isolated change to parent_id (setTaskParent writes only that
+        // column), so it routes to the guarded setParent procedure — not the generic update,
+        // which deliberately can't touch the hierarchy. null promotes to top-level.
+        if (data.parent_id !== undefined) {
+          await trpc.tasks.setParent.mutate({
+            id,
+            parentId: data.parent_id != null ? String(data.parent_id) : null,
+          })
+        } else {
+          await trpc.tasks.update.mutate({
+            id,
+            ...(data.title !== undefined ? { title: String(data.title) } : {}),
+            ...(data.description !== undefined ? { description: String(data.description) } : {}),
+            ...(data.status_id !== undefined ? { statusId: String(data.status_id) } : {}),
+            ...(data.start_date !== undefined
+              ? { startDate: data.start_date != null ? String(data.start_date) : null }
+              : {}),
+            ...(data.due_date !== undefined
+              ? { dueDate: data.due_date != null ? String(data.due_date) : null }
+              : {}),
+            ...(data.start_has_time !== undefined ? { startHasTime: !!data.start_has_time } : {}),
+            ...(data.due_has_time !== undefined ? { dueHasTime: !!data.due_has_time } : {}),
+          })
+        }
       } else {
         await trpc.tasks.softDelete.mutate({ id })
       }

@@ -121,6 +121,9 @@ type ListTask = Task & {
   status_color: string
   status_category: string
   status_group_id: string
+  // Subtask roll-up (P2-05): counts of this task's direct children, for the progress badge.
+  child_count: number
+  done_count: number
 }
 
 // Reads/writes go straight to local SQLite. useQuery is live — it re-runs on any
@@ -136,10 +139,13 @@ function Tasks() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const { data: tasks, isLoading } = useQuery<ListTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
-            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
             t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
-            s.category AS status_category, s.group_id AS status_group_id
+            s.category AS status_category, s.group_id AS status_group_id,
+            (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
+            (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
+               WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
      FROM tasks t JOIN statuses s ON s.id = t.status_id ORDER BY t.created_at DESC`,
   )
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
@@ -178,11 +184,19 @@ function Tasks() {
     return map
   }, [links])
 
-  const visible = tasks.filter((t) =>
-    matchesFilters(t, tagsByTask.get(t.id) ?? [], {
-      tags: filterTags.length ? filterTags : undefined,
-    }),
-  )
+  // Task id → title, so a surfaced subtask can show where it lives.
+  const titleById = useMemo(() => new Map(tasks.map((t) => [t.id, t.title])), [tasks])
+
+  // Unfiltered, the list shows only top-level tasks — subtasks live inside their parent. A
+  // tag filter flattens to every matching task at any depth, each with a parent breadcrumb.
+  const flat = filterTags.length > 0
+  const visible = tasks
+    .filter((t) =>
+      matchesFilters(t, tagsByTask.get(t.id) ?? [], {
+        tags: filterTags.length ? filterTags : undefined,
+      }),
+    )
+    .filter((t) => flat || t.parent_id == null)
   const toggleFilterTag = (id: string) =>
     setFilterTags((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
@@ -234,6 +248,7 @@ function Tasks() {
             return (
               <Pressable
                 key={t.id}
+                testID={`filter-pill-${t.name}`}
                 onPress={() => toggleFilterTag(t.id)}
                 style={[
                   styles.filterPill,
@@ -263,6 +278,7 @@ function Tasks() {
           const resolved = task.status_category === "done"
           const dueState = dueDayState(task.due_date, resolved)
           const tags = tagsByTask.get(task.id) ?? []
+          const parentTitle = task.parent_id ? titleById.get(task.parent_id) : undefined
           return (
             <View key={task.id} style={styles.task}>
               <StatusControl
@@ -277,6 +293,16 @@ function Tasks() {
               />
               <View style={styles.bodyCol}>
                 <Pressable testID={`open-${task.id}`} onPress={() => setSelectedId(task.id)}>
+                  {parentTitle ? (
+                    <Text style={styles.taskParent} numberOfLines={1}>
+                      ↳ in {parentTitle}
+                    </Text>
+                  ) : null}
+                  {task.child_count > 0 ? (
+                    <Text style={styles.taskProgress}>
+                      {task.done_count}/{task.child_count} subtasks
+                    </Text>
+                  ) : null}
                   <Text
                     style={[styles.taskText, resolved ? styles.taskTextDone : null]}
                     numberOfLines={1}
@@ -325,7 +351,11 @@ function Tasks() {
         })
       )}
 
-      <TaskDetailModal id={selectedId} onClose={() => setSelectedId(null)} />
+      <TaskDetailModal
+        id={selectedId}
+        onClose={() => setSelectedId(null)}
+        onOpenTask={setSelectedId}
+      />
     </>
   )
 }
@@ -419,6 +449,8 @@ const makeStyles = (c: Palette) =>
     filterPillText: { color: c.textSecondary, fontSize: 13 },
     filterPillTextOn: { color: "#fff", fontWeight: "600" },
     taskText: { color: c.textPrimary, fontSize: 15 },
+    taskParent: { color: c.textMuted, fontSize: 11, marginBottom: 2 },
+    taskProgress: { color: c.textMuted, fontSize: 11, marginBottom: 2 },
     taskDesc: { color: c.textMuted, fontSize: 13, marginTop: 2 },
     taskDue: { color: c.textMuted, fontSize: 12, marginTop: 2 },
     taskDueOverdue: { color: c.dangerText },

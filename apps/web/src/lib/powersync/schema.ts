@@ -22,6 +22,8 @@ const tasks = new Table({
   // Whether a real time-of-day was picked (0/1).
   start_has_time: column.integer,
   due_has_time: column.integer,
+  // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
+  parent_id: column.text,
   created_at: column.text,
   updated_at: column.text,
 })
@@ -87,4 +89,5 @@ export const AppSchema = new Schema({
 // v2 (P2-03): tasks completed → status_id/resolved_at; + status_groups/statuses/
 // user_settings tables.
 // v3 (P2-04): + tags/task_tags tables.
-export const SCHEMA_VERSION = "3"
+// v4 (P2-05): + tasks.parent_id (subtask hierarchy).
+export const SCHEMA_VERSION = "4"

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { newTaskSchema, taskSchema, updateTaskSchema } from "./task"
+import { newTaskSchema, setParentSchema, taskSchema, updateTaskSchema } from "./task"
 
 const UUID = "11111111-1111-4111-8111-111111111111"
 const STATUS = "22222222-2222-4222-8222-222222222222"
+const PARENT = "33333333-3333-4333-8333-333333333333"
 const iso = () => new Date().toISOString()
 const validTask = () => ({
   id: UUID,
@@ -11,6 +12,7 @@ const validTask = () => ({
   resolvedAt: null,
   startDate: null,
   dueDate: null,
+  parentId: null,
   createdAt: iso(),
   updatedAt: iso(),
   deletedAt: null,
@@ -38,6 +40,12 @@ describe("taskSchema", () => {
     expect(t.dueDate).not.toBeNull()
     expect(taskSchema.safeParse({ ...validTask(), dueDate: "not-a-date" }).success).toBe(false)
   })
+
+  it("carries parentId (P2-05): null for top-level, a uuid for a subtask; rejects garbage", () => {
+    expect(taskSchema.parse({ ...validTask(), parentId: null }).parentId).toBeNull()
+    expect(taskSchema.parse({ ...validTask(), parentId: PARENT }).parentId).toBe(PARENT)
+    expect(taskSchema.safeParse({ ...validTask(), parentId: "nope" }).success).toBe(false)
+  })
 })
 
 describe("newTaskSchema", () => {
@@ -50,6 +58,25 @@ describe("newTaskSchema", () => {
 
   it("accepts a client-supplied statusId", () => {
     expect(newTaskSchema.parse({ title: "x", statusId: STATUS }).statusId).toBe(STATUS)
+  })
+
+  it("takes an optional parentId to mint a subtask (omitted = top-level)", () => {
+    expect(newTaskSchema.parse({ title: "x" }).parentId).toBeUndefined()
+    expect(newTaskSchema.parse({ title: "x", parentId: PARENT }).parentId).toBe(PARENT)
+    expect(newTaskSchema.safeParse({ title: "x", parentId: "nope" }).success).toBe(false)
+  })
+})
+
+describe("setParentSchema", () => {
+  it("moves under a uuid parent or promotes to top-level with null", () => {
+    expect(setParentSchema.parse({ id: UUID, parentId: PARENT }).parentId).toBe(PARENT)
+    expect(setParentSchema.parse({ id: UUID, parentId: null }).parentId).toBeNull()
+  })
+
+  it("requires an id and a present parentId field (null or uuid, not omitted/garbage)", () => {
+    expect(setParentSchema.safeParse({ parentId: PARENT }).success).toBe(false)
+    expect(setParentSchema.safeParse({ id: UUID }).success).toBe(false)
+    expect(setParentSchema.safeParse({ id: UUID, parentId: "nope" }).success).toBe(false)
   })
 })
 
