@@ -6,7 +6,7 @@ import { useToast } from "../toast"
 import { formatDate } from "./dates"
 import { createTask, deleteWithUndo, setTaskStatus, type Task } from "./mutations"
 import { setTaskOrder } from "./order"
-import { DragHandle, TaskSortList, useRowSortable } from "./order-dnd"
+import { DragHandle, TaskSortList, useOptimisticOrder, useRowSortable } from "./order-dnd"
 
 // Subtasks nest at most this deep (top-level = 1). Kept in step with the server's MAX_DEPTH.
 export const MAX_DEPTH = 5
@@ -134,6 +134,11 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
   const atMax = depth >= MAX_DEPTH
   const doneCount = children.filter((c) => c.status_category === "done").length
 
+  // Optimistic order so a reorder drop doesn't snap back while the write round-trips.
+  const { items: orderedChildren, onMove } = useOptimisticOrder(children, (id, key) =>
+    setTaskOrder(db, id, key),
+  )
+
   const add = async () => {
     const t = title.trim()
     if (!t || !defaultStatusId) return
@@ -155,9 +160,9 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
       </div>
 
       {children.length > 0 ? (
-        <TaskSortList items={children} onMove={(id, key) => void setTaskOrder(db, id, key)}>
+        <TaskSortList items={orderedChildren} onMove={onMove}>
           <ul className="space-y-1">
-            {children.map((c) => (
+            {orderedChildren.map((c) => (
               <SubtaskRow
                 key={c.id}
                 child={c}

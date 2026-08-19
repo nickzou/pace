@@ -16,7 +16,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical } from "lucide-react"
-import type { CSSProperties, ReactNode } from "react"
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react"
 import { keyBetween } from "./order"
 
 // Web drag-and-drop for a manually-ordered task list (P2-06). dnd-kit is a thin UI layer over
@@ -28,13 +28,15 @@ import { keyBetween } from "./order"
 
 type Orderable = { id: string; sort_order: string }
 
-export function TaskSortList({
+export function TaskSortList<T extends Orderable>({
   items,
   onMove,
   children,
 }: {
-  items: Orderable[]
-  onMove: (id: string, key: string) => void
+  items: T[]
+  // Called on drop with the moved id, its new fractional key, and the fully-reordered list (for
+  // an optimistic render — see useOptimisticOrder).
+  onMove: (id: string, key: string, reordered: T[]) => void
   children: ReactNode
 }) {
   const sensors = useSensors(
@@ -55,7 +57,7 @@ export function TaskSortList({
     const prev = reordered[newIndex - 1]?.sort_order ?? null
     const next = reordered[newIndex + 1]?.sort_order ?? null
     try {
-      onMove(String(active.id), keyBetween(prev, next))
+      onMove(String(active.id), keyBetween(prev, next), reordered)
     } catch {
       // Neighbours share a key (a rare offline collision) — no gap to insert into. Skip; the
       // next drag, against re-synced keys, resolves it.
@@ -69,6 +71,38 @@ export function TaskSortList({
       </SortableContext>
     </DndContext>
   )
+}
+
+// Optimistic ordering: renders a local reordered copy the instant a drop happens, so the row
+// doesn't snap back to its old spot while the sort_order write round-trips through local SQLite
+// and the reactive query. The override is dropped once the query reflects the new order (or the
+// membership changes underneath us), after which the query is the single source of truth again.
+export function useOptimisticOrder<T extends Orderable>(
+  dbItems: T[],
+  persist: (id: string, key: string) => void,
+): { items: T[]; onMove: (id: string, key: string, reordered: T[]) => void } {
+  const [optimistic, setOptimistic] = useState<T[] | null>(null)
+
+  useEffect(() => {
+    setOptimistic((cur) => {
+      if (!cur) return null
+      const dbSig = dbItems.map((t) => t.id).join(",")
+      const curSig = cur.map((t) => t.id).join(",")
+      // Same rows, same order → the write landed; hand control back to the query. A changed set
+      // of rows (add/remove/sync) → drop the override rather than render a stale order.
+      const sameSet =
+        dbItems.length === cur.length && dbItems.every((t) => cur.some((c) => c.id === t.id))
+      return curSig === dbSig || !sameSet ? null : cur
+    })
+  }, [dbItems])
+
+  return {
+    items: optimistic ?? dbItems,
+    onMove: (id, key, reordered) => {
+      setOptimistic(reordered)
+      persist(id, key)
+    },
+  }
 }
 
 // The per-row drag state: put `setNodeRef`/`style` on the row container and spread `handleProps`

@@ -11,7 +11,13 @@ import { type Filters, hasActiveFilters, matchesFilters } from "#/lib/tasks/filt
 import { FilterBar } from "#/lib/tasks/filter-bar"
 import { createTask, deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
 import { setTaskOrder } from "#/lib/tasks/order"
-import { DragHandle, type RowSortable, TaskSortList, useRowSortable } from "#/lib/tasks/order-dnd"
+import {
+  DragHandle,
+  type RowSortable,
+  TaskSortList,
+  useOptimisticOrder,
+  useRowSortable,
+} from "#/lib/tasks/order-dnd"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { TaskModal } from "#/lib/tasks/task-modal"
 import { useToast } from "#/lib/toast"
@@ -156,6 +162,12 @@ function TaskListView() {
   // rows are a subset (or date-ordered), so "drop between hidden rows" has no defined target.
   const draggable = !flat
 
+  // Render through the optimistic-order overlay so a drop reorders instantly (no snap-back while
+  // the sort_order write round-trips). A no-op when not dragging: items === visible.
+  const { items: ordered, onMove } = useOptimisticOrder(visible, (id, key) =>
+    setTaskOrder(db, id, key),
+  )
+
   const currentLabel = VIEWS.find((v) => v.key === filters.view)?.label ?? "All tasks"
   const setFilters = (patch: Partial<Filters>) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }) })
@@ -226,7 +238,7 @@ function TaskListView() {
             </p>
           ) : (
             (() => {
-              const rows = visible.map((task, i) => {
+              const rows = ordered.map((task, i) => {
                 const rowProps = {
                   task,
                   first: i === 0,
@@ -250,7 +262,7 @@ function TaskListView() {
                 </ul>
               )
               return draggable ? (
-                <TaskSortList items={visible} onMove={(id, key) => void setTaskOrder(db, id, key)}>
+                <TaskSortList items={ordered} onMove={onMove}>
                   {list}
                 </TaskSortList>
               ) : (
