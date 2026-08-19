@@ -92,7 +92,7 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
           {children.map((c) => {
             const done = c.status_category === "done"
             return (
-              <li key={c.id} className="flex items-center gap-2">
+              <li key={c.id} className="flex items-center gap-2 py-1.5">
                 <StatusControl
                   current={{
                     id: c.status_id,
