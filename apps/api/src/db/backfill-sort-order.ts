@@ -14,8 +14,8 @@
 // requires the auth vars the one-off migrate container isn't given.
 import { resolve } from "node:path"
 import { config } from "dotenv"
-import { generateNKeysBetween } from "fractional-indexing"
 import postgres from "postgres"
+import { type BackfillRow, planBackfill } from "./sort-order"
 
 // Local: load the repo-root .env. In a container DATABASE_URL is already set, so this
 // is a harmless no-op (dotenv never overrides an existing process-env value).
@@ -26,15 +26,13 @@ if (!url) throw new Error("Missing required env var: DATABASE_URL")
 
 const sql = postgres(url)
 
-type Row = { id: string; userId: string; parentId: string | null }
-
 async function backfill(): Promise<void> {
   // Only un-keyed rows. Tombstones are skipped — a soft-deleted task carries no visible
   // order, and an Undo re-create restamps it from the client's captured columns anyway.
   // Order defines the key assignment: created_at DESC (newest first) so the smallest key
   // goes to the newest task, and `ORDER BY sort_order` reproduces today's newest-first list.
   // id breaks created_at ties deterministically.
-  const rows = await sql<Row[]>`
+  const rows = await sql<BackfillRow[]>`
     SELECT id, user_id AS "userId", parent_id AS "parentId"
     FROM tasks
     WHERE sort_order = '' AND deleted_at IS NULL
@@ -45,29 +43,13 @@ async function backfill(): Promise<void> {
     return
   }
 
-  // Group by sibling scope (user_id + parent_id); rows already arrive scope-contiguous.
-  const scopes = new Map<string, Row[]>()
-  for (const row of rows) {
-    const key = `${row.userId}::${row.parentId ?? "root"}`
-    const group = scopes.get(key)
-    if (group) group.push(row)
-    else scopes.set(key, [row])
-  }
-
-  let updated = 0
+  const plan = planBackfill(rows)
   await sql.begin(async (tx) => {
-    for (const group of scopes.values()) {
-      const keys = generateNKeysBetween(null, null, group.length)
-      for (let i = 0; i < group.length; i++) {
-        const row = group[i]
-        const key = keys[i]
-        if (!row || key === undefined) continue
-        await tx`UPDATE tasks SET sort_order = ${key} WHERE id = ${row.id}`
-        updated++
-      }
+    for (const { id, sortOrder } of plan) {
+      await tx`UPDATE tasks SET sort_order = ${sortOrder} WHERE id = ${id}`
     }
   })
-  console.log(`[backfill-sort-order] keyed ${updated} task(s) across ${scopes.size} scope(s)`)
+  console.log(`[backfill-sort-order] keyed ${plan.length} task(s)`)
 }
 
 // postgres.js keeps the event loop alive; exit explicitly once done.
