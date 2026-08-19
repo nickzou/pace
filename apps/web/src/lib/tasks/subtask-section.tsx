@@ -1,11 +1,10 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
-import { useState } from "react"
-import { statusHex } from "#/lib/tasks/status-control"
-import { useTheme } from "#/lib/theme"
+import { useMemo, useState } from "react"
+import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { useToast } from "../toast"
 import { formatDate } from "./dates"
-import { createTask, deleteWithUndo, type Task } from "./mutations"
+import { createTask, deleteWithUndo, setTaskStatus, type Task } from "./mutations"
 
 // Subtasks nest at most this deep (top-level = 1). Kept in step with the server's MAX_DEPTH.
 export const MAX_DEPTH = 5
@@ -15,8 +14,11 @@ type ChildRow = {
   title: string
   due_date: string | null
   due_has_time: number
+  status_id: string
+  status_name: string
   status_color: string
   status_category: string
+  status_group_id: string
   child_count: number
   done_count: number
 }
@@ -28,12 +30,12 @@ type ChildRow = {
 export function SubtaskSection({ parentId, depth }: { parentId: string; depth: number }) {
   const db = usePowerSync()
   const toast = useToast()
-  const { theme } = useTheme()
   const [title, setTitle] = useState("")
 
   const { data: children } = useQuery<ChildRow>(
-    `SELECT t.id, t.title, t.due_date, t.due_has_time,
-            s.color AS status_color, s.category AS status_category,
+    `SELECT t.id, t.title, t.due_date, t.due_has_time, t.status_id,
+            s.name AS status_name, s.color AS status_color, s.category AS status_category,
+            s.group_id AS status_group_id,
             (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
             (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
                WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
@@ -41,6 +43,20 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
      WHERE t.parent_id = ? ORDER BY t.created_at DESC`,
     [parentId],
   )
+  // All statuses, grouped by their list — so each child's control offers only its own group's
+  // options (a child may sit in a different status list from the parent).
+  const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
+    "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
+  )
+  const statusesByGroup = useMemo(() => {
+    const map = new Map<string, StatusOption[]>()
+    for (const s of allStatuses) {
+      const arr = map.get(s.group_id) ?? []
+      arr.push({ id: s.id, name: s.name, color: s.color, category: s.category })
+      map.set(s.group_id, arr)
+    }
+    return map
+  }, [allStatuses])
   // The default open status a new subtask is created with — same one the top-level composer uses.
   const { data: def } = useQuery<{ id: string }>(
     `SELECT s.id FROM statuses s JOIN status_groups g ON g.id = s.group_id
@@ -77,9 +93,15 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
             const done = c.status_category === "done"
             return (
               <li key={c.id} className="flex items-center gap-2">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: statusHex(c.status_color, theme) }}
+                <StatusControl
+                  current={{
+                    id: c.status_id,
+                    name: c.status_name,
+                    color: c.status_color,
+                    category: c.status_category,
+                  }}
+                  options={statusesByGroup.get(c.status_group_id) ?? []}
+                  onSelect={(sid) => void setTaskStatus(db, c.id, sid)}
                 />
                 <Link
                   to="/tasks/$taskId"
