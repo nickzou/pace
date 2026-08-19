@@ -100,6 +100,9 @@ test("move a task to another status list → its status changes and persists", a
   // status (openStatusForGroup) — the whole reason a non-default group is now reachable.
   await page.getByText(title).click()
   await page.getByLabel("Status list").selectOption({ label: listName })
+  // Gate the reload on the switch committing locally — the detail's own status control flips
+  // to the Work list's open status — so we don't race the async write against the reload.
+  await expect(page.getByRole("dialog").getByRole("button", { name: openStatus })).toBeVisible()
 
   // Reload proves the switch round-tripped: the list row now shows the Work open status,
   // not To Do.

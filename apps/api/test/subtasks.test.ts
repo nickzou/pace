@@ -167,4 +167,53 @@ describe("tasks.softDelete — cascade", () => {
     const live = await caller.tasks.list()
     expect(live.map((t) => t.id).sort()).toEqual([parent.id, c2.id].sort())
   })
+
+  it("undo re-creates a soft-deleted subtree, restoring each row's parent (upsert path)", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const parent = await caller.tasks.create({ title: "P" })
+    const child = await caller.tasks.create({ title: "C", parentId: parent.id })
+    await caller.tasks.softDelete({ id: parent.id }) // cascades to child
+
+    // Undo replays as create (top-down): re-create parent then child with their captured ids
+    // + parentId. The upsert clears deletedAt and restores the link.
+    await caller.tasks.create({ id: parent.id, title: "P", parentId: null })
+    await caller.tasks.create({ id: child.id, title: "C", parentId: parent.id })
+
+    const live = await caller.tasks.list()
+    expect(live.map((t) => t.id).sort()).toEqual([parent.id, child.id].sort())
+    expect(live.find((t) => t.id === child.id)?.parentId).toBe(parent.id)
+  })
+})
+
+describe("tasks.setParent — deeper moves & scoping", () => {
+  it("allows re-parenting under a non-top-level task when within the cap", async () => {
+    const caller = appRouter.createCaller({ db, userId: await makeUser() })
+    const [, b] = await chain(caller, 2) // a > b  (b is at level 2)
+    const loose = await caller.tasks.create({ title: "loose" })
+    // loose (height 1) under b (depth 2) → 2 + 1 = 3 ≤ 5, allowed → loose becomes level 3
+    const moved = await caller.tasks.setParent({ id: loose.id, parentId: b as string })
+    expect(moved.parentId).toBe(b)
+  })
+
+  it("won't re-parent, or cascade-delete across, another user's tasks", async () => {
+    const a = await makeUser()
+    const bId = await makeUser()
+    const aCaller = appRouter.createCaller({ db, userId: a })
+    const bCaller = appRouter.createCaller({ db, userId: bId })
+    const aParent = await aCaller.tasks.create({ title: "A parent" })
+    const aChild = await aCaller.tasks.create({ title: "A child", parentId: aParent.id })
+
+    // b can't move a's task, and can't delete a's tree.
+    await expect(bCaller.tasks.setParent({ id: aChild.id, parentId: null })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    })
+    await expect(bCaller.tasks.softDelete({ id: aParent.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    })
+    // a's tree is untouched.
+    expect((await aCaller.tasks.list()).map((t) => t.id).sort()).toEqual(
+      [aParent.id, aChild.id].sort(),
+    )
+  })
 })

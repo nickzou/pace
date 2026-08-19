@@ -67,9 +67,11 @@ test("set a past due DATE only (no time) → it saves, is flagged Overdue, and r
   const due = page.getByLabel("Due date")
   await due.fill("2020-01-01")
 
-  // The date is held, and the past due date flags the task Overdue.
+  // The date is held, and the past due date flags the task Overdue. Scope the badge to the
+  // open detail — a bare .first() could match a leftover overdue task and let the reload race
+  // this task's still-in-flight write.
   await expect(due).toHaveValue("2020-01-01")
-  await expect(page.getByText(/Overdue/).first()).toBeVisible()
+  await expect(page.getByRole("dialog").getByText("Overdue")).toBeVisible()
 
   // Reload a fresh page and reopen: the date stored as a UTC timestamp round-trips
   // back to the same local day — proving it reached the server and synced back.
