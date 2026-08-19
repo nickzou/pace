@@ -9,7 +9,9 @@ import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import { dueDayState, formatDate } from "#/lib/tasks/dates"
 import { type Filters, hasActiveFilters, matchesFilters } from "#/lib/tasks/filter"
 import { FilterBar } from "#/lib/tasks/filter-bar"
-import { deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
+import { createTask, deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
+import { setTaskOrder } from "#/lib/tasks/order"
+import { DragHandle, type RowSortable, TaskSortList, useRowSortable } from "#/lib/tasks/order-dnd"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { TaskModal } from "#/lib/tasks/task-modal"
 import { useToast } from "#/lib/toast"
@@ -57,14 +59,14 @@ type ListTask = Task & {
 const TASKS_SQL = `
   SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
          t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-         t.created_at, t.updated_at,
+         t.sort_order, t.created_at, t.updated_at,
          s.name AS status_name, s.color AS status_color,
          s.category AS status_category, s.group_id AS status_group_id,
          (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
          (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
             WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
   FROM tasks t JOIN statuses s ON s.id = t.status_id
-  ORDER BY t.created_at DESC`
+  ORDER BY t.sort_order, t.id`
 
 const STATUSES_SQL = "SELECT id, group_id, name, color, category FROM statuses ORDER BY position"
 
@@ -135,10 +137,24 @@ function TaskListView() {
   // soon as any facet or search is active it flattens to every matching task at any depth,
   // each with a parent breadcrumb, so a due subtask still surfaces in a date view.
   const flat = hasActiveFilters(filters) || q.length > 0
-  const visible = tasks
+  const matched = tasks
     .filter((t) => matchesFilters(t, tagsByTask.get(t.id) ?? [], filters))
     .filter((t) => (q ? t.title.toLowerCase().includes(q) : true))
     .filter((t) => flat || t.parent_id == null)
+
+  // A date smart-view reads as an agenda: sort by due date first, manual order (the sort_order
+  // the base query already applied) as the stable tiebreak. Array.sort is stable, and date-only
+  // tasks store end-of-day, so within a day timed tasks lead and untimed ones follow in manual
+  // order. Every other view keeps pure manual order.
+  const isDateView =
+    filters.view === "today" || filters.view === "upcoming" || filters.view === "overdue"
+  const visible = isDateView
+    ? [...matched].sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))
+    : matched
+
+  // Dragging lives only in the unfiltered top-level list. In a filtered/date/search view the
+  // rows are a subset (or date-ordered), so "drop between hidden rows" has no defined target.
+  const draggable = !flat
 
   const currentLabel = VIEWS.find((v) => v.key === filters.view)?.label ?? "All tasks"
   const setFilters = (patch: Partial<Filters>) =>
@@ -149,11 +165,8 @@ function TaskListView() {
     event.preventDefault()
     const trimmed = title.trim()
     if (!trimmed || !defaultStatusId) return
-    const now = new Date().toISOString()
-    await db.execute(
-      "INSERT INTO tasks (id, title, description, status_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [crypto.randomUUID(), trimmed, "", defaultStatusId, now, now],
-    )
+    // createTask mints a bottom-of-scope sort key, so a new task lands at the end of the list.
+    await createTask(db, { title: trimmed, statusId: defaultStatusId })
     setTitle("")
   }
 
@@ -212,22 +225,38 @@ function TaskListView() {
                   : "No tasks match these filters."}
             </p>
           ) : (
-            <ul className="overflow-hidden rounded-xl border border-border bg-card shadow-glow">
-              {visible.map((task, i) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  first={i === 0}
-                  options={statusesByGroup.get(task.status_group_id) ?? []}
-                  tags={tagsByTask.get(task.id) ?? []}
-                  allTags={allTags}
-                  parentTitle={task.parent_id ? titleById.get(task.parent_id) : undefined}
-                  onSelectStatus={(sid) => void setTaskStatus(db, task.id, sid)}
-                  onOpen={() => setSelectedId(task.id)}
-                  onDelete={() => void deleteWithUndo(db, task, toast)}
-                />
-              ))}
-            </ul>
+            (() => {
+              const rows = visible.map((task, i) => {
+                const rowProps = {
+                  task,
+                  first: i === 0,
+                  options: statusesByGroup.get(task.status_group_id) ?? [],
+                  tags: tagsByTask.get(task.id) ?? [],
+                  allTags,
+                  parentTitle: task.parent_id ? titleById.get(task.parent_id) : undefined,
+                  onSelectStatus: (sid: string) => void setTaskStatus(db, task.id, sid),
+                  onOpen: () => setSelectedId(task.id),
+                  onDelete: () => void deleteWithUndo(db, task, toast),
+                }
+                return draggable ? (
+                  <SortableTaskRow key={task.id} {...rowProps} />
+                ) : (
+                  <TaskRow key={task.id} {...rowProps} />
+                )
+              })
+              const list = (
+                <ul className="overflow-hidden rounded-xl border border-border bg-card shadow-glow">
+                  {rows}
+                </ul>
+              )
+              return draggable ? (
+                <TaskSortList items={visible} onMove={(id, key) => void setTaskOrder(db, id, key)}>
+                  {list}
+                </TaskSortList>
+              ) : (
+                list
+              )
+            })()
           )}
         </div>
       </div>
@@ -235,6 +264,25 @@ function TaskListView() {
       <TaskModal id={selectedId} onClose={() => setSelectedId(null)} />
     </>
   )
+}
+
+type TaskRowProps = {
+  task: ListTask
+  first: boolean
+  options: StatusOption[]
+  tags: TagOption[]
+  allTags: TagOption[]
+  parentTitle?: string
+  onSelectStatus: (statusId: string) => void
+  onOpen: () => void
+  onDelete: () => void
+}
+
+// The draggable variant: calls useSortable (needs a SortableContext ancestor, provided by
+// TaskSortList) and threads the drag state into TaskRow. Rendered only in the unfiltered list.
+function SortableTaskRow(props: TaskRowProps) {
+  const sortable = useRowSortable(props.task.id)
+  return <TaskRow {...props} sortable={sortable} />
 }
 
 function TaskRow({
@@ -247,27 +295,22 @@ function TaskRow({
   onSelectStatus,
   onOpen,
   onDelete,
-}: {
-  task: ListTask
-  first: boolean
-  options: StatusOption[]
-  tags: TagOption[]
-  allTags: TagOption[]
-  parentTitle?: string
-  onSelectStatus: (statusId: string) => void
-  onOpen: () => void
-  onDelete: () => void
-}) {
+  sortable,
+}: TaskRowProps & { sortable?: RowSortable }) {
   const resolved = task.status_category === "done"
   const dueState = dueDayState(task.due_date, resolved)
   const assignedIds = useMemo(() => new Set(tags.map((t) => t.id)), [tags])
   return (
     <li
+      ref={sortable?.setNodeRef}
+      style={sortable?.style}
       className={cn(
         "group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40",
         !first && "border-t border-border",
+        sortable?.isDragging && "relative z-10 bg-card opacity-80 shadow-lg",
       )}
     >
+      {sortable ? <DragHandle handleProps={sortable.handleProps} /> : null}
       <StatusControl
         current={{
           id: task.status_id,
