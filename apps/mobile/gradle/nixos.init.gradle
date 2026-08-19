@@ -1,0 +1,38 @@
+// NixOS ⇄ Gradle/AGP toolchain shim for local Android (Expo/RN) builds.
+//
+// Installed into ~/.gradle/init.d by the flake's `.#android` devshell, so it applies
+// automatically to Gradle builds run there — and ONLY there: it is guarded on ANDROID_HOME
+// pointing at the read-only Nix SDK, so it never touches CI (writable SDK, ubuntu runner)
+// or any other Android project on the machine.
+//
+// Why this exists — it's the Gradle analogue of the Biome BIOME_BINARY trick: the versions
+// the JS package manager pulls in don't match what the Nix SDK ships, and the Nix SDK can't
+// auto-install the difference (read-only store). Two concrete mismatches:
+//   • AAPT2 — AGP downloads its own aapt2 from Maven, a generic dynamically-linked Linux
+//     binary NixOS can't exec ("Could not start dynamically linked executable"). Redirect
+//     to the Nix-patched aapt2 that ships inside build-tools.
+//   • NDK + build-tools — RN 0.86.2 requests versions (e.g. ndk 27.0.12077973,
+//     build-tools 35) the Nix SDK doesn't have. Pin every Android module to the versions
+//     that ARE present (derived from ANDROID_HOME, so this survives flake bumps).
+def androidHome = System.getenv('ANDROID_HOME')
+if (androidHome != null && androidHome.startsWith('/nix/store')) {
+    def latestDir = { File dir ->
+        dir.isDirectory() ? dir.listFiles().findAll { it.isDirectory() }*.name.max() : null
+    }
+    def buildTools = latestDir(new File(androidHome, 'build-tools'))
+    def ndk = latestDir(new File(androidHome, 'ndk'))
+    def aapt2 = buildTools ? new File(androidHome, "build-tools/${buildTools}/aapt2") : null
+
+    if (aapt2 != null && aapt2.exists()) {
+        gradle.startParameter.projectProperties.put('android.aapt2FromMavenOverride', aapt2.absolutePath)
+    }
+    gradle.allprojects { project ->
+        project.afterEvaluate {
+            def android = project.extensions.findByName('android')
+            if (android != null) {
+                if (ndk != null) android.ndkVersion = ndk
+                if (buildTools != null) android.buildToolsVersion = buildTools
+            }
+        }
+    }
+}

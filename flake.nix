@@ -29,7 +29,10 @@
         includeEmulator = true;
         includeSystemImages = true;
         includeNDK = true;
-        ndkVersions = [ "27.1.12297006" ]; # RN 0.86's default NDK (for the local gradle APK build)
+        # The NDK we ship for the local gradle APK build. RN 0.86.2 actually asks for
+        # 27.0.12077973, which isn't in this nixpkgs; nixos.init.gradle pins every module to
+        # whatever IS here, so the listed version just has to exist.
+        ndkVersions = [ "27.1.12297006" ];
         cmakeVersions = [ "3.22.1" ]; # RN's native build uses CMake
       };
       androidSdk = androidComposition.androidsdk;
@@ -108,7 +111,12 @@
             # emulator then can't find (they were empty on entry).
             export ANDROID_USER_HOME="$HOME/.android"
             export ANDROID_AVD_HOME="$HOME/.android/avd"
-            echo "🤖 Pace android shell — ANDROID_HOME=$ANDROID_HOME"
+            # Install the NixOS ⇄ Gradle toolchain shim so the local APK build "just works"
+            # (redirects AAPT2 to the Nix-patched binary + pins NDK/build-tools to what the
+            # Nix SDK ships). Guarded on the Nix SDK inside the script, so it's inert for CI
+            # and other Android projects. The Gradle analogue of the Biome BIOME_BINARY trick.
+            install -Dm644 ${./apps/mobile/gradle/nixos.init.gradle} "$HOME/.gradle/init.d/pace-nixos-android.init.gradle"
+            echo "🤖 Pace android shell — ANDROID_HOME=$ANDROID_HOME (Gradle NixOS shim installed)"
             echo "   AVD:   avdmanager create avd -n pace -k 'system-images;android-34;google_apis;x86_64' --device pixel_6"
             echo "   boot:  emulator -avd pace -no-window -gpu swiftshader_indirect -no-snapshot -noaudio &"
             echo "   flows: pnpm --filter @pace/mobile test:e2e"
