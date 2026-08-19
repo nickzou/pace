@@ -3,9 +3,8 @@
 import "@azure/core-asynciterator-polyfill"
 
 import { usePowerSync, useQuery } from "@powersync/react"
-import * as Crypto from "expo-crypto"
 import { StatusBar } from "expo-status-bar"
-import { useEffect, useMemo, useState } from "react"
+import { type ComponentProps, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
   Pressable,
@@ -15,6 +14,12 @@ import {
   TextInput,
   View,
 } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
+import {
+  NestedReorderableList,
+  ScrollViewContainer,
+  useReorderableDrag,
+} from "react-native-reorderable-list"
 import { AuthScreen } from "./AuthScreen"
 import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
@@ -23,7 +28,8 @@ import { SettingsModal } from "./lib/settings/settings-modal"
 import { TagChips, type TagOption, TagPicker } from "./lib/tags/tag-control"
 import { dueDayState, formatDate } from "./lib/tasks/dates"
 import { matchesFilters } from "./lib/tasks/filter"
-import { deleteWithUndo, setTaskStatus, type Task } from "./lib/tasks/mutations"
+import { createTask, deleteWithUndo, setTaskStatus, type Task } from "./lib/tasks/mutations"
+import { useReorder } from "./lib/tasks/reorder"
 import { StatusControl, type StatusOption, statusHex } from "./lib/tasks/status-control"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
 import { type Palette, ThemeProvider, useTheme, useThemedStyles } from "./lib/theme"
@@ -31,13 +37,17 @@ import { ToastProvider, useToast } from "./lib/toast"
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <ApiProvider>
-        <ToastProvider>
-          <Main />
-        </ToastProvider>
-      </ApiProvider>
-    </ThemeProvider>
+    // GestureHandlerRootView must wrap the whole app for react-native-gesture-handler (P2-06
+    // drag-to-reorder) to receive touches.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <ApiProvider>
+          <ToastProvider>
+            <Main />
+          </ToastProvider>
+        </ApiProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   )
 }
 
@@ -84,7 +94,9 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
   const styles = useThemedStyles(makeStyles)
   const [settingsOpen, setSettingsOpen] = useState(false)
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    // ScrollViewContainer (from react-native-reorderable-list) replaces the plain ScrollView so a
+    // NestedReorderableList inside it can auto-scroll while dragging near the edges (P2-06).
+    <ScrollViewContainer contentContainerStyle={styles.container}>
       <View style={styles.authBar}>
         <Text testID="signed-in" style={styles.authBarText} numberOfLines={1}>
           Signed in as <Text style={styles.authBarEmail}>{email}</Text>
@@ -111,7 +123,7 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
           onClose={() => setSettingsOpen(false)}
         />
       </PowerSyncProvider>
-    </ScrollView>
+    </ScrollViewContainer>
   )
 }
 
@@ -132,7 +144,6 @@ type ListTask = Task & {
 // writes to the API in the background. (Mirrors apps/web's TaskList.)
 function Tasks() {
   const db = usePowerSync()
-  const toast = useToast()
   const styles = useThemedStyles(makeStyles)
   const { scheme, colors } = useTheme()
   const [title, setTitle] = useState("")
@@ -140,13 +151,13 @@ function Tasks() {
   const { data: tasks, isLoading } = useQuery<ListTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-            t.created_at, t.updated_at,
+            t.sort_order, t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id,
             (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
             (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
                WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
-     FROM tasks t JOIN statuses s ON s.id = t.status_id ORDER BY t.created_at DESC`,
+     FROM tasks t JOIN statuses s ON s.id = t.status_id ORDER BY t.sort_order, t.id`,
   )
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
     "SELECT id, group_id, name, color, category FROM statuses ORDER BY position",
@@ -197,17 +208,18 @@ function Tasks() {
       }),
     )
     .filter((t) => flat || t.parent_id == null)
+  // Dragging lives only in the unfiltered top-level list (P2-06); a filtered subset has no
+  // defined drop target. The reorder hook adds an optimistic order so a drop doesn't snap back.
+  const draggable = !flat
+  const { items: ordered, onReorder } = useReorder(db, visible)
   const toggleFilterTag = (id: string) =>
     setFilterTags((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   function add() {
     const trimmed = title.trim()
     if (!trimmed || !defaultStatusId) return
-    const now = new Date().toISOString()
-    void db.execute(
-      "INSERT INTO tasks (id, title, description, status_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-      [Crypto.randomUUID(), trimmed, "", defaultStatusId, now, now],
-    )
+    // createTask mints a bottom-of-scope sort key, so a new task lands at the end of the list.
+    void createTask(db, { title: trimmed, statusId: defaultStatusId })
     setTitle("")
   }
 
@@ -273,82 +285,37 @@ function Tasks() {
             ? "No tasks match the tag filter."
             : "No tasks yet — add your first above."}
         </Text>
+      ) : draggable ? (
+        // Unfiltered top-level list: long-press a row to drag-reorder. Nested inside the screen's
+        // ScrollViewContainer, so it doesn't scroll itself; the separator replaces the container's
+        // gap between rows.
+        <NestedReorderableList
+          data={ordered}
+          keyExtractor={(t) => t.id}
+          onReorder={onReorder}
+          renderItem={({ item }) => (
+            <DraggableTaskRow
+              task={item}
+              options={statusesByGroup.get(item.status_group_id) ?? []}
+              tags={tagsByTask.get(item.id) ?? []}
+              allTags={allTags}
+              parentTitle={item.parent_id ? titleById.get(item.parent_id) : undefined}
+              onOpen={() => setSelectedId(item.id)}
+            />
+          )}
+        />
       ) : (
-        visible.map((task) => {
-          const resolved = task.status_category === "done"
-          const dueState = dueDayState(task.due_date, resolved)
-          const tags = tagsByTask.get(task.id) ?? []
-          const parentTitle = task.parent_id ? titleById.get(task.parent_id) : undefined
-          return (
-            <View key={task.id} style={styles.task}>
-              <StatusControl
-                current={{
-                  id: task.status_id,
-                  name: task.status_name,
-                  color: task.status_color,
-                  category: task.status_category,
-                }}
-                options={statusesByGroup.get(task.status_group_id) ?? []}
-                onSelect={(sid) => void setTaskStatus(db, task.id, sid)}
-              />
-              <View style={styles.bodyCol}>
-                <Pressable testID={`open-${task.id}`} onPress={() => setSelectedId(task.id)}>
-                  {parentTitle ? (
-                    <Text style={styles.taskParent} numberOfLines={1}>
-                      ↳ in {parentTitle}
-                    </Text>
-                  ) : null}
-                  {task.child_count > 0 ? (
-                    <Text style={styles.taskProgress}>
-                      {task.done_count}/{task.child_count} subtasks
-                    </Text>
-                  ) : null}
-                  <Text
-                    style={[styles.taskText, resolved ? styles.taskTextDone : null]}
-                    numberOfLines={1}
-                  >
-                    {task.title}
-                  </Text>
-                  {task.description ? (
-                    <Text style={styles.taskDesc} numberOfLines={1}>
-                      {task.description}
-                    </Text>
-                  ) : null}
-                  {task.due_date ? (
-                    <Text
-                      style={[
-                        styles.taskDue,
-                        dueState === "overdue"
-                          ? styles.taskDueOverdue
-                          : dueState === "today"
-                            ? styles.taskDueToday
-                            : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {dueState === "overdue" ? "Overdue · " : "Due "}
-                      {formatDate(task.due_date, !!task.due_has_time)}
-                    </Text>
-                  ) : null}
-                </Pressable>
-                {tags.length > 0 ? <TagChips tags={tags} taskId={task.id} max={4} /> : null}
-                <TagPicker
-                  taskId={task.id}
-                  assignedIds={new Set(tags.map((t) => t.id))}
-                  allTags={allTags}
-                  nextPosition={allTags.length}
-                />
-              </View>
-              <Pressable
-                testID={`delete-${task.id}`}
-                onPress={() => void deleteWithUndo(db, task, toast)}
-                hitSlop={8}
-              >
-                <Text style={styles.delete}>✕</Text>
-              </Pressable>
-            </View>
-          )
-        })
+        ordered.map((task) => (
+          <TaskRow
+            key={task.id}
+            task={task}
+            options={statusesByGroup.get(task.status_group_id) ?? []}
+            tags={tagsByTask.get(task.id) ?? []}
+            allTags={allTags}
+            parentTitle={task.parent_id ? titleById.get(task.parent_id) : undefined}
+            onOpen={() => setSelectedId(task.id)}
+          />
+        ))
       )}
 
       <TaskDetailModal
@@ -358,6 +325,110 @@ function Tasks() {
       />
     </>
   )
+}
+
+// One task row. Module-level (not defined inside Tasks) so the reorderable list keeps stable cell
+// identity across renders. `onLongPressDrag`, when set, lifts the row for dragging (P2-06).
+function TaskRow({
+  task,
+  options,
+  tags,
+  allTags,
+  parentTitle,
+  onOpen,
+  onLongPressDrag,
+}: {
+  task: ListTask
+  options: StatusOption[]
+  tags: TagOption[]
+  allTags: TagOption[]
+  parentTitle?: string
+  onOpen: () => void
+  onLongPressDrag?: () => void
+}) {
+  const db = usePowerSync()
+  const toast = useToast()
+  const styles = useThemedStyles(makeStyles)
+  const resolved = task.status_category === "done"
+  const dueState = dueDayState(task.due_date, resolved)
+  return (
+    <View style={styles.task}>
+      <StatusControl
+        current={{
+          id: task.status_id,
+          name: task.status_name,
+          color: task.status_color,
+          category: task.status_category,
+        }}
+        options={options}
+        onSelect={(sid) => void setTaskStatus(db, task.id, sid)}
+      />
+      <View style={styles.bodyCol}>
+        <Pressable
+          testID={`open-${task.id}`}
+          onPress={onOpen}
+          onLongPress={onLongPressDrag}
+          delayLongPress={220}
+        >
+          {parentTitle ? (
+            <Text style={styles.taskParent} numberOfLines={1}>
+              ↳ in {parentTitle}
+            </Text>
+          ) : null}
+          {task.child_count > 0 ? (
+            <Text style={styles.taskProgress}>
+              {task.done_count}/{task.child_count} subtasks
+            </Text>
+          ) : null}
+          <Text style={[styles.taskText, resolved ? styles.taskTextDone : null]} numberOfLines={1}>
+            {task.title}
+          </Text>
+          {task.description ? (
+            <Text style={styles.taskDesc} numberOfLines={1}>
+              {task.description}
+            </Text>
+          ) : null}
+          {task.due_date ? (
+            <Text
+              style={[
+                styles.taskDue,
+                dueState === "overdue"
+                  ? styles.taskDueOverdue
+                  : dueState === "today"
+                    ? styles.taskDueToday
+                    : null,
+              ]}
+              numberOfLines={1}
+            >
+              {dueState === "overdue" ? "Overdue · " : "Due "}
+              {formatDate(task.due_date, !!task.due_has_time)}
+            </Text>
+          ) : null}
+        </Pressable>
+        {tags.length > 0 ? <TagChips tags={tags} taskId={task.id} max={4} /> : null}
+        <TagPicker
+          taskId={task.id}
+          assignedIds={new Set(tags.map((t) => t.id))}
+          allTags={allTags}
+          nextPosition={allTags.length}
+        />
+      </View>
+      <Pressable
+        testID={`delete-${task.id}`}
+        onPress={() => void deleteWithUndo(db, task, toast)}
+        hitSlop={8}
+      >
+        <Text style={styles.delete}>✕</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+// The draggable variant: useReorderableDrag (valid only inside a ReorderableList cell) gives the
+// long-press-to-lift trigger, wired to the row's onLongPress.
+function DraggableTaskRow(props: Omit<ComponentProps<typeof TaskRow>, "onLongPressDrag">) {
+  const drag = useReorderableDrag()
+  return <TaskRow {...props} onLongPressDrag={drag} />
 }
 
 const makeStyles = (c: Palette) =>

@@ -1,16 +1,9 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
 import { useEffect, useRef, useState } from "react"
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native"
+import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
+import { GestureHandlerRootView } from "react-native-gesture-handler"
+import { ScrollViewContainer } from "react-native-reorderable-list"
 import { TagChips, type TagOption, TagPicker } from "../tags/tag-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
 import { useToast } from "../toast"
@@ -51,10 +44,12 @@ export function TaskDetailModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      {/* Keyed by id so drilling into a subtask remounts with clean seeded state. */}
-      <View style={styles.screen}>
+      {/* RN Modal renders in a separate view hierarchy outside the app-root GestureHandlerRootView,
+          so gestures (P2-06 subtask drag) need their own root here. Keyed by id so drilling into a
+          subtask remounts with clean seeded state. */}
+      <GestureHandlerRootView style={styles.screen}>
         {id !== null ? <Detail key={id} id={id} onClose={onClose} onOpenTask={onOpenTask} /> : null}
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   )
 }
@@ -209,7 +204,9 @@ function Detail({
   }
 
   return (
-    <ScrollView
+    // ScrollViewContainer (react-native-reorderable-list) so the Subtasks NestedReorderableList can
+    // auto-scroll while dragging (P2-06).
+    <ScrollViewContainer
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -466,7 +463,7 @@ function Detail({
           </Pressable>
         </>
       )}
-    </ScrollView>
+    </ScrollViewContainer>
   )
 
   async function handleDelete() {
