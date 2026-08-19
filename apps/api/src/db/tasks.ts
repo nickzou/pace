@@ -1,4 +1,12 @@
-import { boolean, index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import {
+  type AnyPgColumn,
+  boolean,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core"
 import { user } from "./auth"
 import { statuses } from "./statuses"
 
@@ -41,6 +49,14 @@ export const tasks = pgTable(
     dueDate: timestamp("due_date", { withTimezone: true }),
     startHasTime: boolean("start_has_time").notNull().default(false),
     dueHasTime: boolean("due_has_time").notNull().default(false),
+    // Subtask hierarchy (P2-05): the parent task, or NULL for a top-level task — a
+    // self-reference, since a subtask is just a task with a parent. onDelete "set null"
+    // is only a hard-delete safety net (promotes orphans to top-level); the everyday
+    // delete is a soft, undoable, recursive cascade run in the tasks router, which also
+    // caps nesting at 5 levels. AnyPgColumn breaks the self-referential type cycle.
+    parentId: uuid("parent_id").references((): AnyPgColumn => tasks.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -48,5 +64,9 @@ export const tasks = pgTable(
       .notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (table) => [index("tasks_user_id_idx").on(table.userId)],
+  (table) => [
+    index("tasks_user_id_idx").on(table.userId),
+    // The detail view loads a task's children, and the guards/cascade walk the tree, by parent.
+    index("tasks_parent_id_idx").on(table.parentId),
+  ],
 )
