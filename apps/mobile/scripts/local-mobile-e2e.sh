@@ -66,7 +66,12 @@ else
   say "Building the release APK"
   ( cd apps/mobile
     npx expo prebuild --platform android --no-install
-    ./android/gradlew -p android assembleRelease --no-daemon
+    # NDK/build-tools come from the init script; aapt2 must be a per-build -P (AGP snapshots
+    # project properties before init scripts run). Both point at what the Nix SDK ships.
+    AAPT2="$(ls -d "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)"
+    ./android/gradlew -p android assembleRelease --no-daemon \
+      --init-script "$ROOT/apps/mobile/gradle/nixos.init.gradle" \
+      -Pandroid.aapt2FromMavenOverride="$AAPT2"
     cp android/app/build/outputs/apk/release/app-release.apk "$ROOT/pace-app.apk" )
 fi
 
