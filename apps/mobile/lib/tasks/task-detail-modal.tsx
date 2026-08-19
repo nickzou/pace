@@ -24,16 +24,25 @@ import {
   START_FALLBACK,
   toDate,
 } from "./dates"
-import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "./mutations"
+import { deleteWithUndo, setTaskParent, setTaskStatus, type Task, updateTask } from "./mutations"
 import { StatusControl, type StatusOption } from "./status-control"
 import { openStatusForGroup } from "./status-group"
+import { SubtaskSection } from "./subtask-section"
 
 // The single-task view/editor. On mobile there's no navigation, so this
 // full-screen Modal IS the detail view (the analogue of the web's /tasks/$taskId
 // route + quick modal). Open by passing a task id; `null` keeps it closed. React
 // context (PowerSync, toast) flows into RN Modal children, so the editor reads the
 // live task and raises the Undo toast just like the list does.
-export function TaskDetailModal({ id, onClose }: { id: string | null; onClose: () => void }) {
+export function TaskDetailModal({
+  id,
+  onClose,
+  onOpenTask,
+}: {
+  id: string | null
+  onClose: () => void
+  onOpenTask: (id: string) => void
+}) {
   const styles = useThemedStyles(makeStyles)
   return (
     <Modal
@@ -42,7 +51,10 @@ export function TaskDetailModal({ id, onClose }: { id: string | null; onClose: (
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <View style={styles.screen}>{id !== null ? <Detail id={id} onClose={onClose} /> : null}</View>
+      {/* Keyed by id so drilling into a subtask remounts with clean seeded state. */}
+      <View style={styles.screen}>
+        {id !== null ? <Detail key={id} id={id} onClose={onClose} onOpenTask={onOpenTask} /> : null}
+      </View>
     </Modal>
   )
 }
@@ -55,18 +67,47 @@ type DetailTask = Task & {
   status_group_id: string
 }
 
-function Detail({ id, onClose }: { id: string; onClose: () => void }) {
+function Detail({
+  id,
+  onClose,
+  onOpenTask,
+}: {
+  id: string
+  onClose: () => void
+  onOpenTask: (id: string) => void
+}) {
   const db = usePowerSync()
   const toast = useToast()
   const styles = useThemedStyles(makeStyles)
   const { colors } = useTheme()
   const { data: rows } = useQuery<DetailTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
-            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
             t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id
      FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
+    [id],
+  )
+  // Depth (1 = top-level), the parent (breadcrumb), and top-level tasks to re-parent under
+  // (cycle-safe: descendants are never top-level). The server guards the actual move.
+  const { data: depthRows } = useQuery<{ depth: number }>(
+    `WITH RECURSIVE up(id, parent_id, lvl) AS (
+       SELECT id, parent_id, 1 FROM tasks WHERE id = ?
+       UNION ALL
+       SELECT t.id, t.parent_id, up.lvl + 1 FROM tasks t JOIN up ON t.id = up.parent_id
+     )
+     SELECT max(lvl) AS depth FROM up`,
+    [id],
+  )
+  const depth = depthRows[0]?.depth ?? 1
+  const { data: parentRows } = useQuery<{ id: string; title: string }>(
+    "SELECT p.id, p.title FROM tasks t JOIN tasks p ON p.id = t.parent_id WHERE t.id = ?",
+    [id],
+  )
+  const parentTask = parentRows[0]
+  const { data: topLevel } = useQuery<{ id: string; title: string }>(
+    "SELECT id, title FROM tasks WHERE parent_id IS NULL AND id != ? ORDER BY created_at DESC",
     [id],
   )
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
@@ -179,6 +220,18 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
         </Pressable>
       </View>
 
+      {parentTask ? (
+        <Pressable
+          testID="detail-parent"
+          onPress={() => onOpenTask(parentTask.id)}
+          style={styles.breadcrumb}
+        >
+          <Text style={styles.breadcrumbText} numberOfLines={1}>
+            ↑ {parentTask.title}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {!task ? (
         <Text style={styles.gone}>This task no longer exists.</Text>
       ) : (
@@ -229,6 +282,45 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               </View>
             </View>
           ) : null}
+
+          <View style={styles.listRow}>
+            <Text style={styles.listLabel}>Parent</Text>
+            <View style={styles.listChips}>
+              <Pressable
+                testID="parent-none"
+                onPress={() => void setTaskParent(db, id, null)}
+                style={[styles.listChip, !task.parent_id ? styles.listChipActive : null]}
+              >
+                <Text
+                  style={[styles.listChipText, !task.parent_id ? styles.listChipTextActive : null]}
+                >
+                  None
+                </Text>
+              </Pressable>
+              {parentTask && !topLevel.some((t) => t.id === task.parent_id) ? (
+                <Pressable style={[styles.listChip, styles.listChipActive]}>
+                  <Text style={[styles.listChipText, styles.listChipTextActive]}>
+                    {parentTask.title}
+                  </Text>
+                </Pressable>
+              ) : null}
+              {topLevel.map((t) => {
+                const active = t.id === task.parent_id
+                return (
+                  <Pressable
+                    key={t.id}
+                    testID={`parent-${t.title}`}
+                    onPress={() => void setTaskParent(db, id, t.id)}
+                    style={[styles.listChip, active ? styles.listChipActive : null]}
+                  >
+                    <Text style={[styles.listChipText, active ? styles.listChipTextActive : null]}>
+                      {t.title}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </View>
 
           <View style={styles.tagsRow}>
             <TagChips tags={taskTags} taskId={id} max={99} />
@@ -363,6 +455,8 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
             />
           ) : null}
 
+          <SubtaskSection parentId={id} depth={depth} onOpenTask={onOpenTask} />
+
           <Pressable
             testID="detail-delete"
             onPress={() => void handleDelete()}
@@ -388,6 +482,8 @@ const makeStyles = (c: Palette) =>
     container: { padding: 24, paddingTop: 64, gap: 16 },
     header: { flexDirection: "row", justifyContent: "flex-end" },
     done: { color: c.primary, fontSize: 15, fontWeight: "600" },
+    breadcrumb: { alignSelf: "flex-start" },
+    breadcrumbText: { color: c.textMuted, fontSize: 13 },
     gone: { color: c.textSecondary, fontSize: 15, marginTop: 12 },
     titleRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
     checkbox: {
