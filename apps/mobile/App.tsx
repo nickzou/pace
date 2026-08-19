@@ -248,6 +248,7 @@ function Tasks() {
             return (
               <Pressable
                 key={t.id}
+                testID={`filter-pill-${t.name}`}
                 onPress={() => toggleFilterTag(t.id)}
                 style={[
                   styles.filterPill,
