@@ -54,6 +54,7 @@ async function uploadOp(
           ...(data.start_has_time != null ? { startHasTime: !!data.start_has_time } : {}),
           ...(data.due_has_time != null ? { dueHasTime: !!data.due_has_time } : {}),
           ...(data.parent_id != null ? { parentId: String(data.parent_id) } : {}),
+          ...(data.sort_order != null ? { sortOrder: String(data.sort_order) } : {}),
         })
       } else if (type === UpdateType.PATCH) {
         // A re-parent is an isolated change to parent_id (setTaskParent writes only that
@@ -78,6 +79,8 @@ async function uploadOp(
               : {}),
             ...(data.start_has_time !== undefined ? { startHasTime: !!data.start_has_time } : {}),
             ...(data.due_has_time !== undefined ? { dueHasTime: !!data.due_has_time } : {}),
+            // A reorder (P2-06) is an isolated sort_order write → the generic update carries it.
+            ...(data.sort_order !== undefined ? { sortOrder: String(data.sort_order) } : {}),
           })
         }
       } else {

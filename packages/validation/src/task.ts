@@ -27,6 +27,10 @@ export const taskSchema = z.object({
   // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
   // A subtask is just a task with a parent; nesting is capped at 5 levels server-side.
   parentId: z.uuid().nullable(),
+  // Manual ordering (P2-06): a fractional (LexoRank-style) sort key. Tasks render
+  // `ORDER BY sortOrder, id` within a sibling scope (parentId); a drag rewrites only
+  // this field on the moved task, so reorders are O(1) and converge under offline sync.
+  sortOrder: z.string(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
@@ -55,6 +59,9 @@ export const newTaskSchema = taskSchema
     dueHasTime: taskSchema.shape.dueHasTime.optional(),
     // Optional on create: set when minting a subtask, omitted for a top-level task.
     parentId: taskSchema.shape.parentId.optional(),
+    // Optional on create: clients mint a bottom-of-scope key; if omitted, the server
+    // assigns one (queries the scope's current max key).
+    sortOrder: taskSchema.shape.sortOrder.optional(),
   })
 
 export type NewTask = z.infer<typeof newTaskSchema>
@@ -72,6 +79,8 @@ export const updateTaskSchema = z.object({
   dueDate: z.iso.datetime().nullable().optional(),
   startHasTime: z.boolean().optional(),
   dueHasTime: z.boolean().optional(),
+  // A reorder (P2-06) is just an update of the fractional sort key.
+  sortOrder: z.string().optional(),
 })
 
 export type UpdateTask = z.infer<typeof updateTaskSchema>

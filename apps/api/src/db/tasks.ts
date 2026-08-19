@@ -57,6 +57,14 @@ export const tasks = pgTable(
     parentId: uuid("parent_id").references((): AnyPgColumn => tasks.id, {
       onDelete: "set null",
     }),
+    // Manual ordering (P2-06): a fractional (LexoRank-style) sort key. Tasks render
+    // `ORDER BY sort_order, id` within a sibling scope (parent_id); a drag rewrites only
+    // this one row's key (generateKeyBetween of its new neighbours), so a reorder is O(1)
+    // and converges under offline sync — unlike the integer-position+renumber the statuses/
+    // tags routers use. NOT NULL: new rows get a key at insert; existing rows are backfilled
+    // (migration 0009) with spaced keys preserving today's created_at DESC order. The empty
+    // default only exists so the ADD COLUMN is non-blocking; the backfill overwrites it.
+    sortOrder: text("sort_order").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -68,5 +76,7 @@ export const tasks = pgTable(
     index("tasks_user_id_idx").on(table.userId),
     // The detail view loads a task's children, and the guards/cascade walk the tree, by parent.
     index("tasks_parent_id_idx").on(table.parentId),
+    // Mirrors the ordered read (P2-06): scope by owner + sibling set, ordered by the sort key.
+    index("tasks_order_idx").on(table.userId, table.parentId, table.sortOrder),
   ],
 )
