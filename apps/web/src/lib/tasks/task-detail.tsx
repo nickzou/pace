@@ -1,5 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
-import { useEffect, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
+import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import {
   combineLocal,
   DUE_FALLBACK,
@@ -43,6 +44,14 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: groups } = useQuery<{ id: string; name: string }>(
     "SELECT id, name FROM status_groups ORDER BY position, created_at",
   )
+  const { data: allTags } = useQuery<TagOption>(
+    "SELECT id, name, color FROM tags ORDER BY position, created_at",
+  )
+  const { data: taskTags } = useQuery<TagOption>(
+    "SELECT tg.id, tg.name, tg.color FROM task_tags tt JOIN tags tg ON tg.id = tt.tag_id WHERE tt.task_id = ?",
+    [id],
+  )
+  const assignedIds = useMemo(() => new Set(taskTags.map((t) => t.id)), [taskTags])
   const task = rows[0]
 
   const [title, setTitle] = useState("")
@@ -53,17 +62,19 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const [dueTime, setDueTime] = useState("")
   const seededFor = useRef<string | null>(null)
 
-  useEffect(() => {
-    if (task && seededFor.current !== task.id) {
-      seededFor.current = task.id
-      setTitle(task.title)
-      setDescription(task.description)
-      setStartDay(toDateInput(task.start_date))
-      setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
-      setDueDay(toDateInput(task.due_date))
-      setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
-    }
-  }, [task])
+  // Seed the editable fields the first time a task loads — during render, NOT in an effect,
+  // so there's never a committed frame where the task is present but the inputs are still
+  // empty. A late (post-paint) effect seed would clobber a fast edit (or an e2e fill) made
+  // in that window. Guarded by the ref, so it runs once per task and can't loop.
+  if (task && seededFor.current !== task.id) {
+    seededFor.current = task.id
+    setTitle(task.title)
+    setDescription(task.description)
+    setStartDay(toDateInput(task.start_date))
+    setStartTime(task.start_has_time ? toTimeInput(task.start_date) : "")
+    setDueDay(toDateInput(task.due_date))
+    setDueTime(task.due_has_time ? toTimeInput(task.due_date) : "")
+  }
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   if (!task) return <p className="text-sm text-muted-foreground">This task no longer exists.</p>
@@ -165,6 +176,18 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </select>
         </label>
       ) : null}
+
+      {/* Tags — all shown (no +k collapse; the detail has room). Click a chip to edit it;
+          the picker assigns/creates. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <TagChips tags={taskTags} taskId={id} max={99} />
+        <TagPicker
+          taskId={id}
+          assignedIds={assignedIds}
+          allTags={allTags}
+          nextPosition={allTags.length}
+        />
+      </div>
 
       <textarea
         value={description}

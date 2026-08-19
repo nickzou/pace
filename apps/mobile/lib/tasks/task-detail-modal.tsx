@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native"
+import { TagChips, type TagOption, TagPicker } from "../tags/tag-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
 import { useToast } from "../toast"
 import {
@@ -73,6 +74,13 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
   )
   const { data: groups } = useQuery<{ id: string; name: string }>(
     "SELECT id, name FROM status_groups ORDER BY position, created_at",
+  )
+  const { data: allTags } = useQuery<TagOption>(
+    "SELECT id, name, color FROM tags ORDER BY position, created_at",
+  )
+  const { data: taskTags } = useQuery<TagOption>(
+    "SELECT tg.id, tg.name, tg.color FROM task_tags tt JOIN tags tg ON tg.id = tt.tag_id WHERE tt.task_id = ?",
+    [id],
   )
   const task = rows[0]
 
@@ -221,6 +229,16 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
               </View>
             </View>
           ) : null}
+
+          <View style={styles.tagsRow}>
+            <TagChips tags={taskTags} taskId={id} max={99} />
+            <TagPicker
+              taskId={id}
+              assignedIds={new Set(taskTags.map((t) => t.id))}
+              allTags={allTags}
+              nextPosition={allTags.length}
+            />
+          </View>
 
           <TextInput
             testID="detail-notes"
@@ -391,6 +409,7 @@ const makeStyles = (c: Palette) =>
       fontWeight: "600",
       paddingVertical: 2,
     },
+    tagsRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
     listRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
     listLabel: { color: c.textSecondary, fontSize: 13, width: 44 },
     listChips: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 6 },
