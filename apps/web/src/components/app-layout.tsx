@@ -36,7 +36,7 @@ export const VIEWS: { key: View; label: string; icon: ReactNode }[] = [
   { key: "all", label: "All tasks", icon: <ListTodo /> },
 ]
 
-type CountRow = { due_date: string | null; category: string }
+type CountRow = { due_date: string | null; category: string; parent_id: string | null }
 
 export function AppLayout({ children }: { children: ReactNode }) {
   return (
@@ -53,7 +53,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 function Shell({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
   const { data: rows } = useQuery<CountRow>(
-    "SELECT t.due_date, s.category FROM tasks t JOIN statuses s ON s.id = t.status_id",
+    "SELECT t.due_date, t.parent_id, s.category FROM tasks t JOIN statuses s ON s.id = t.status_id",
   )
   const { data: tagRows } = useQuery<{ id: string; name: string; color: string }>(
     "SELECT id, name, color FROM tags ORDER BY position, created_at",
@@ -86,9 +86,11 @@ function Shell({ children }: { children: ReactNode }) {
     }
   }, [sheetOpen])
 
+  // "All" mirrors the unfiltered list (top-level only); the date views mirror the flat,
+  // all-depth surfacing, so a due subtask is counted where it shows.
   const count = (v: View) =>
     v === "all"
-      ? rows.length
+      ? rows.filter((r) => r.parent_id == null).length
       : rows.filter((r) => dueDayState(r.due_date, r.category === "done") === v).length
 
   const countByTag = new Map(tagCountRows.map((r) => [r.tag_id, r.n]))

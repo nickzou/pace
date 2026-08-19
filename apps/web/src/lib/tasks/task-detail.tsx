@@ -1,4 +1,5 @@
 import { usePowerSync, useQuery } from "@powersync/react"
+import { Link } from "@tanstack/react-router"
 import { useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import {
@@ -9,9 +10,16 @@ import {
   toDateInput,
   toTimeInput,
 } from "#/lib/tasks/dates"
-import { deleteWithUndo, setTaskStatus, type Task, updateTask } from "#/lib/tasks/mutations"
+import {
+  deleteWithUndo,
+  setTaskParent,
+  setTaskStatus,
+  type Task,
+  updateTask,
+} from "#/lib/tasks/mutations"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
+import { SubtaskSection } from "#/lib/tasks/subtask-section"
 import { useToast } from "#/lib/toast"
 
 // A task joined with its status (P2-03).
@@ -31,11 +39,33 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const toast = useToast()
   const { data: rows, isLoading } = useQuery<DetailTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
-            t.start_date, t.due_date, t.start_has_time, t.due_has_time,
+            t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
             t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id
      FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
+    [id],
+  )
+  // This task's depth (1 = top-level), the parent (for the breadcrumb), and the top-level
+  // tasks it can be re-parented under (cycle-safe by construction — descendants are never
+  // top-level). The server guards depth/cycle on the actual move.
+  const { data: depthRows } = useQuery<{ depth: number }>(
+    `WITH RECURSIVE up(id, parent_id, lvl) AS (
+       SELECT id, parent_id, 1 FROM tasks WHERE id = ?
+       UNION ALL
+       SELECT t.id, t.parent_id, up.lvl + 1 FROM tasks t JOIN up ON t.id = up.parent_id
+     )
+     SELECT max(lvl) AS depth FROM up`,
+    [id],
+  )
+  const depth = depthRows[0]?.depth ?? 1
+  const { data: parentRows } = useQuery<{ id: string; title: string }>(
+    "SELECT p.id, p.title FROM tasks t JOIN tasks p ON p.id = t.parent_id WHERE t.id = ?",
+    [id],
+  )
+  const parent = parentRows[0]
+  const { data: topLevel } = useQuery<{ id: string; title: string }>(
+    "SELECT id, title FROM tasks WHERE parent_id IS NULL AND id != ? ORDER BY created_at DESC",
     [id],
   )
   const { data: allStatuses } = useQuery<StatusOption & { group_id: string }>(
@@ -137,6 +167,16 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
 
   return (
     <div className="space-y-4">
+      {parent ? (
+        <Link
+          to="/tasks/$taskId"
+          params={{ taskId: parent.id }}
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground hover:underline"
+        >
+          ↑ {parent.title}
+        </Link>
+      ) : null}
+
       <div className="flex items-start gap-3">
         <div className="mt-1 shrink-0">
           <StatusControl
@@ -176,6 +216,26 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </select>
         </label>
       ) : null}
+
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        Parent
+        <select
+          aria-label="Parent task"
+          value={task.parent_id ?? ""}
+          onChange={(event) => void setTaskParent(db, id, event.target.value || null)}
+          className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
+        >
+          <option value="">None (top-level)</option>
+          {task.parent_id && parent && !topLevel.some((t) => t.id === task.parent_id) ? (
+            <option value={parent.id}>{parent.title} (current)</option>
+          ) : null}
+          {topLevel.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {/* Tags — all shown (no +k collapse; the detail has room). Click a chip to edit it;
           the picker assigns/creates. */}
@@ -249,6 +309,8 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </div>
         </label>
       </div>
+
+      <SubtaskSection parentId={id} depth={depth} />
 
       <div className="flex justify-end">
         <button
