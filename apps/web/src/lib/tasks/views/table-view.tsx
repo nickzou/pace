@@ -27,6 +27,9 @@ const col = createColumnHelper<ListTask>()
 // line up: status | title (flex) | tags | due.
 const GRID = "grid grid-cols-[11rem_minmax(0,1fr)_15rem_8rem] items-center gap-3"
 const ROW_H = 52
+// The fixed columns (~34rem) can't shrink to fit a phone, so below this the whole grid keeps its
+// width and the container scrolls horizontally instead of letting columns collide.
+const MIN_W = "min-w-[46rem]"
 
 export default function TableView({
   tasks,
@@ -170,7 +173,7 @@ export default function TableView({
       {table.getHeaderGroups().map((hg) => (
         <div
           key={hg.id}
-          className={cn(GRID, "sticky top-0 z-10 border-b border-border bg-card px-4 py-2")}
+          className={cn(GRID, MIN_W, "sticky top-0 z-10 border-b border-border bg-card px-4 py-2")}
         >
           {hg.headers.map((h) => {
             const sorted = h.column.getIsSorted()
@@ -204,7 +207,10 @@ export default function TableView({
       {rows.length === 0 ? (
         <p className="px-4 py-16 text-center text-sm text-muted-foreground">No tasks to show.</p>
       ) : (
-        <div style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}>
+        <div
+          className={MIN_W}
+          style={{ height: virt.getTotalSize(), position: "relative", width: "100%" }}
+        >
           {virt.getVirtualItems().map((vr) => {
             const row = rows[vr.index]
             if (!row) return null
@@ -222,7 +228,7 @@ export default function TableView({
                 }}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <div key={cell.id} className="min-w-0">
+                  <div key={cell.id} className="min-w-0 overflow-hidden">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </div>
                 ))}
