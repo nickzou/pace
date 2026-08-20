@@ -1,3 +1,6 @@
+// Must be the very first import (react-native-gesture-handler requirement) — it initialises the
+// native gesture handler before anything renders. Powers P2-06 drag-to-reorder.
+import "react-native-gesture-handler"
 import { registerRootComponent } from "expo"
 
 import App from "./App"

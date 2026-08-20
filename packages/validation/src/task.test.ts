@@ -13,6 +13,7 @@ const validTask = () => ({
   startDate: null,
   dueDate: null,
   parentId: null,
+  sortOrder: "a0",
   createdAt: iso(),
   updatedAt: iso(),
   deletedAt: null,
@@ -46,6 +47,12 @@ describe("taskSchema", () => {
     expect(taskSchema.parse({ ...validTask(), parentId: PARENT }).parentId).toBe(PARENT)
     expect(taskSchema.safeParse({ ...validTask(), parentId: "nope" }).success).toBe(false)
   })
+
+  it("requires a string sortOrder (P2-06): the fractional key is not optional on a full task", () => {
+    expect(taskSchema.parse({ ...validTask(), sortOrder: "Zz" }).sortOrder).toBe("Zz")
+    expect(taskSchema.safeParse({ ...validTask(), sortOrder: undefined }).success).toBe(false)
+    expect(taskSchema.safeParse({ ...validTask(), sortOrder: 5 }).success).toBe(false)
+  })
 })
 
 describe("newTaskSchema", () => {
@@ -64,6 +71,11 @@ describe("newTaskSchema", () => {
     expect(newTaskSchema.parse({ title: "x" }).parentId).toBeUndefined()
     expect(newTaskSchema.parse({ title: "x", parentId: PARENT }).parentId).toBe(PARENT)
     expect(newTaskSchema.safeParse({ title: "x", parentId: "nope" }).success).toBe(false)
+  })
+
+  it("takes an optional sortOrder (P2-06): omitted = server assigns a bottom-of-scope key", () => {
+    expect(newTaskSchema.parse({ title: "x" }).sortOrder).toBeUndefined()
+    expect(newTaskSchema.parse({ title: "x", sortOrder: "a0" }).sortOrder).toBe("a0")
   })
 })
 
@@ -90,5 +102,10 @@ describe("updateTaskSchema", () => {
   it("distinguishes clearing a date (null) from leaving it untouched (omitted)", () => {
     expect(updateTaskSchema.parse({ id: UUID, dueDate: null }).dueDate).toBeNull()
     expect(updateTaskSchema.parse({ id: UUID }).dueDate).toBeUndefined()
+  })
+
+  it("carries an optional sortOrder (P2-06): a reorder is just an update of the key", () => {
+    expect(updateTaskSchema.parse({ id: UUID, sortOrder: "a0V" }).sortOrder).toBe("a0V")
+    expect(updateTaskSchema.parse({ id: UUID }).sortOrder).toBeUndefined()
   })
 })

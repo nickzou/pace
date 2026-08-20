@@ -5,6 +5,8 @@ import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { useToast } from "../toast"
 import { formatDate } from "./dates"
 import { createTask, deleteWithUndo, setTaskStatus, type Task } from "./mutations"
+import { setTaskOrder } from "./order"
+import { DragHandle, TaskSortList, useOptimisticOrder, useRowSortable } from "./order-dnd"
 
 // Subtasks nest at most this deep (top-level = 1). Kept in step with the server's MAX_DEPTH.
 export const MAX_DEPTH = 5
@@ -21,6 +23,71 @@ type ChildRow = {
   status_group_id: string
   child_count: number
   done_count: number
+  sort_order: string
+}
+
+// One draggable subtask row. Calls useRowSortable (needs the TaskSortList's SortableContext) and
+// renders the grip + status + drill-down link + delete. Reordering here writes the child's
+// sort_order within the parent scope — the same fractional-key mechanism as the top-level list.
+function SubtaskRow({
+  child: c,
+  options,
+  onSelectStatus,
+  onDelete,
+}: {
+  child: ChildRow
+  options: StatusOption[]
+  onSelectStatus: (statusId: string) => void
+  onDelete: () => void
+}) {
+  const s = useRowSortable(c.id)
+  const done = c.status_category === "done"
+  return (
+    <li
+      ref={s.setNodeRef}
+      style={s.style}
+      className={`flex items-center gap-2 py-1.5 ${s.isDragging ? "relative z-10 opacity-80" : ""}`}
+    >
+      <DragHandle handleProps={s.handleProps} />
+      <StatusControl
+        current={{
+          id: c.status_id,
+          name: c.status_name,
+          color: c.status_color,
+          category: c.status_category,
+        }}
+        options={options}
+        onSelect={onSelectStatus}
+      />
+      <Link
+        to="/tasks/$taskId"
+        params={{ taskId: c.id }}
+        className={`min-w-0 flex-1 truncate text-sm hover:underline ${
+          done ? "text-muted-foreground line-through" : "text-foreground"
+        }`}
+      >
+        {c.title}
+      </Link>
+      {c.child_count > 0 ? (
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {c.done_count}/{c.child_count}
+        </span>
+      ) : null}
+      {c.due_date ? (
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {formatDate(c.due_date, !!c.due_has_time)}
+        </span>
+      ) : null}
+      <button
+        type="button"
+        aria-label={`Delete ${c.title}`}
+        onClick={onDelete}
+        className="shrink-0 text-xs text-muted-foreground transition hover:text-destructive"
+      >
+        ✕
+      </button>
+    </li>
+  )
 }
 
 // The "Subtasks" section shown in a task's detail (P2-05). Lists the task's *direct*
@@ -33,14 +100,14 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
   const [title, setTitle] = useState("")
 
   const { data: children } = useQuery<ChildRow>(
-    `SELECT t.id, t.title, t.due_date, t.due_has_time, t.status_id,
+    `SELECT t.id, t.title, t.due_date, t.due_has_time, t.status_id, t.sort_order,
             s.name AS status_name, s.color AS status_color, s.category AS status_category,
             s.group_id AS status_group_id,
             (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,
             (SELECT count(*) FROM tasks c JOIN statuses cs ON cs.id = c.status_id
                WHERE c.parent_id = t.id AND cs.category = 'done') AS done_count
      FROM tasks t JOIN statuses s ON s.id = t.status_id
-     WHERE t.parent_id = ? ORDER BY t.created_at DESC`,
+     WHERE t.parent_id = ? ORDER BY t.sort_order, t.id`,
     [parentId],
   )
   // All statuses, grouped by their list — so each child's control offers only its own group's
@@ -67,6 +134,11 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
   const atMax = depth >= MAX_DEPTH
   const doneCount = children.filter((c) => c.status_category === "done").length
 
+  // Optimistic order so a reorder drop doesn't snap back while the write round-trips.
+  const { items: orderedChildren, onMove } = useOptimisticOrder(children, (id, key) =>
+    setTaskOrder(db, id, key),
+  )
+
   const add = async () => {
     const t = title.trim()
     if (!t || !defaultStatusId) return
@@ -88,52 +160,19 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
       </div>
 
       {children.length > 0 ? (
-        <ul className="space-y-1">
-          {children.map((c) => {
-            const done = c.status_category === "done"
-            return (
-              <li key={c.id} className="flex items-center gap-2 py-1.5">
-                <StatusControl
-                  current={{
-                    id: c.status_id,
-                    name: c.status_name,
-                    color: c.status_color,
-                    category: c.status_category,
-                  }}
-                  options={statusesByGroup.get(c.status_group_id) ?? []}
-                  onSelect={(sid) => void setTaskStatus(db, c.id, sid)}
-                />
-                <Link
-                  to="/tasks/$taskId"
-                  params={{ taskId: c.id }}
-                  className={`min-w-0 flex-1 truncate text-sm hover:underline ${
-                    done ? "text-muted-foreground line-through" : "text-foreground"
-                  }`}
-                >
-                  {c.title}
-                </Link>
-                {c.child_count > 0 ? (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {c.done_count}/{c.child_count}
-                  </span>
-                ) : null}
-                {c.due_date ? (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {formatDate(c.due_date, !!c.due_has_time)}
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  aria-label={`Delete ${c.title}`}
-                  onClick={() => void deleteWithUndo(db, { id: c.id } as Task, toast)}
-                  className="shrink-0 text-xs text-muted-foreground transition hover:text-destructive"
-                >
-                  ✕
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <TaskSortList items={orderedChildren} onMove={onMove}>
+          <ul className="space-y-1">
+            {orderedChildren.map((c) => (
+              <SubtaskRow
+                key={c.id}
+                child={c}
+                options={statusesByGroup.get(c.status_group_id) ?? []}
+                onSelectStatus={(sid) => void setTaskStatus(db, c.id, sid)}
+                onDelete={() => void deleteWithUndo(db, { id: c.id } as Task, toast)}
+              />
+            ))}
+          </ul>
+        </TaskSortList>
       ) : null}
 
       {atMax ? (

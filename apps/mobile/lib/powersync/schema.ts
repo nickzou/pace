@@ -25,6 +25,9 @@ const tasks = new Table({
   due_has_time: column.integer,
   // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
   parent_id: column.text,
+  // Manual ordering (P2-06): the fractional sort key. Tasks list `ORDER BY sort_order, id`
+  // within a parent scope; a drag rewrites only this field on the moved task.
+  sort_order: column.text,
   created_at: column.text,
   updated_at: column.text,
 })
@@ -90,4 +93,5 @@ export const AppSchema = new Schema({
 // user_settings tables.
 // v3 (P2-04): + tags/task_tags tables.
 // v4 (P2-05): + tasks.parent_id (subtask hierarchy).
-export const SCHEMA_VERSION = "4"
+// v5 (P2-06): + tasks.sort_order (manual ordering / drag-and-drop).
+export const SCHEMA_VERSION = "5"

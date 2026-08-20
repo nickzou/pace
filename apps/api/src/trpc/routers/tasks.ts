@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server"
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
+import { generateKeyBetween } from "fractional-indexing"
 import { statuses, statusGroups } from "../../db/statuses"
 import { tasks } from "../../db/tasks"
 import {
@@ -31,6 +32,7 @@ function toTask(row: typeof tasks.$inferSelect): Task {
     startHasTime: row.startHasTime,
     dueHasTime: row.dueHasTime,
     parentId: row.parentId,
+    sortOrder: row.sortOrder,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
@@ -70,6 +72,27 @@ async function defaultStatus(ctx: ProtectedCtx): Promise<{ id: string; category:
   if (!row)
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "User has no default status" })
   return row
+}
+
+// A fractional key that sorts *after* every live task in the sibling scope (P2-06) — i.e.
+// the bottom of that list. Used when a create omits a key (a non-PowerSync caller, or the
+// server-authoritative path) and when a re-parent moves a task into a new scope. The `""`
+// default (pre-backfill / non-blocking ADD COLUMN) is treated as "no key" so it can never
+// poison generateKeyBetween. A user's sibling set is human-scale, so max() over the index
+// is cheap.
+async function bottomOfScopeKey(ctx: ProtectedCtx, parentId: string | null): Promise<string> {
+  const [row] = await ctx.db
+    .select({ max: sql<string | null>`max(${tasks.sortOrder})` })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, ctx.userId),
+        parentId === null ? isNull(tasks.parentId) : eq(tasks.parentId, parentId),
+        isNull(tasks.deletedAt),
+      ),
+    )
+  const max = row?.max && row.max !== "" ? row.max : null
+  return generateKeyBetween(max, null)
 }
 
 // The subtask nesting ceiling (P2-05). Top-level is level 1.
@@ -150,7 +173,9 @@ export const tasksRouter = router({
       .select()
       .from(tasks)
       .where(and(eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
-      .orderBy(desc(tasks.createdAt))
+      // Manual order (P2-06): the fractional key, with id as a stable tie-break so the
+      // order is total and identical on every device even after an offline key collision.
+      .orderBy(asc(tasks.sortOrder), asc(tasks.id))
     return rows.map(toTask)
   }),
 
@@ -176,6 +201,9 @@ export const tasksRouter = router({
     const resolvedInsert = status.category === "done" ? new Date() : null
     const resolvedUpsert =
       status.category === "done" ? sql`coalesce(${tasks.resolvedAt}, now())` : null
+    // Ordering (P2-06): PowerSync clients mint the key locally (offline creates), so a supplied
+    // key is honoured; a non-PowerSync caller that omits it lands at the bottom of its scope.
+    const sortOrder = input.sortOrder ?? (await bottomOfScopeKey(ctx, input.parentId ?? null))
 
     const shared = {
       title: input.title,
@@ -190,6 +218,9 @@ export const tasksRouter = router({
     // subtask's place in the tree. Only touched on upsert when explicitly sent (undefined =
     // leave as-is), so a plain re-create never silently re-parents.
     const parentPatch = input.parentId !== undefined ? { parentId: input.parentId } : {}
+    // sortOrder likewise: an undo re-create carries the original key (restoring the task to its
+    // place); a plain re-create leaves the existing key untouched — never reshuffles the list.
+    const sortPatch = input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}
     const [row] = input.id
       ? await ctx.db
           .insert(tasks)
@@ -198,11 +229,18 @@ export const tasksRouter = router({
             userId: ctx.userId,
             resolvedAt: resolvedInsert,
             parentId: input.parentId ?? null,
+            sortOrder,
             ...shared,
           })
           .onConflictDoUpdate({
             target: tasks.id,
-            set: { ...shared, ...parentPatch, resolvedAt: resolvedUpsert, deletedAt: null },
+            set: {
+              ...shared,
+              ...parentPatch,
+              ...sortPatch,
+              resolvedAt: resolvedUpsert,
+              deletedAt: null,
+            },
             setWhere: eq(tasks.userId, ctx.userId),
           })
           .returning()
@@ -212,6 +250,7 @@ export const tasksRouter = router({
             userId: ctx.userId,
             resolvedAt: resolvedInsert,
             parentId: input.parentId ?? null,
+            sortOrder,
             ...shared,
           })
           .returning()
@@ -253,9 +292,12 @@ export const tasksRouter = router({
   // WHERE. Parent moves have their own procedure (not `update`) so the guard has one home.
   setParent: protectedProcedure.input(setParentSchema).mutation(async ({ ctx, input }) => {
     if (input.parentId != null) await assertCanParent(ctx, input.id, input.parentId)
+    // Re-stamp a bottom-of-scope key (P2-06): the task's old key was ordered within its former
+    // sibling set and is meaningless in the new one, so drop it at the end of the new scope.
+    const sortOrder = await bottomOfScopeKey(ctx, input.parentId)
     const [row] = await ctx.db
       .update(tasks)
-      .set({ parentId: input.parentId })
+      .set({ parentId: input.parentId, sortOrder })
       .where(and(eq(tasks.id, input.id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
       .returning()
     if (!row) throw new TRPCError({ code: "NOT_FOUND" })

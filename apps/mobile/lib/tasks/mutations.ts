@@ -1,5 +1,6 @@
 import type { AbstractPowerSyncDatabase } from "@powersync/react-native"
 import * as Crypto from "expo-crypto"
+import { bottomOfScopeKey } from "./order"
 
 // The task shape the UI reads from local SQLite: the implicit `id` plus the synced
 // columns. `status_id` references the task's status (P2-03); done-ness is derived by
@@ -17,6 +18,8 @@ export type Task = {
   due_has_time: number
   // Subtask hierarchy (P2-05): the parent task's id, or null for a top-level task.
   parent_id: string | null
+  // Manual ordering (P2-06): the fractional sort key within the parent scope.
+  sort_order: string
   created_at: string
   updated_at: string
 }
@@ -28,18 +31,19 @@ export type Task = {
 // Create a task locally (replays as create). `parentId` makes it a subtask; the server runs
 // the depth/cycle guard on upload. `statusId` is the caller's default open status. Returns
 // the minted id.
-export function createTask(
+export async function createTask(
   db: AbstractPowerSyncDatabase,
   opts: { title: string; statusId: string; parentId?: string | null },
 ): Promise<string> {
   const id = Crypto.randomUUID()
   const now = new Date().toISOString()
-  return db
-    .execute(
-      "INSERT INTO tasks (id, title, description, status_id, parent_id, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?)",
-      [id, opts.title, opts.statusId, opts.parentId ?? null, now, now],
-    )
-    .then(() => id)
+  // Mint a bottom-of-scope key so the new task appends to the end of its list (P2-06).
+  const sortOrder = await bottomOfScopeKey(db, opts.parentId ?? null)
+  await db.execute(
+    "INSERT INTO tasks (id, title, description, status_id, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, ?, ?)",
+    [id, opts.title, opts.statusId, opts.parentId ?? null, sortOrder, now, now],
+  )
+  return id
 }
 
 // Re-parent a task, or promote it to top-level with parentId = null. Writes ONLY parent_id
@@ -120,7 +124,7 @@ export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, 
       void (async () => {
         for (const t of subtree) {
           await db.execute(
-            "INSERT INTO tasks (id, title, description, status_id, resolved_at, start_date, due_date, start_has_time, due_has_time, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tasks (id, title, description, status_id, resolved_at, start_date, due_date, start_has_time, due_has_time, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
               t.id,
               t.title,
@@ -132,6 +136,7 @@ export async function deleteWithUndo(db: AbstractPowerSyncDatabase, task: Task, 
               t.start_has_time,
               t.due_has_time,
               t.parent_id,
+              t.sort_order,
               t.created_at,
               t.updated_at,
             ],
