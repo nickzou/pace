@@ -43,6 +43,7 @@ jobs:
     permissions:
       contents: read
       packages: write # push to GHCR with the built-in GITHUB_TOKEN
+      pull-requests: read # resolve the merged PR number to reap its preview env
     env:
       REG: ghcr.io/${{ github.repository }}
       # CRITICAL: workflow_run runs against the default branch, so github.sha is
@@ -146,3 +147,30 @@ jobs:
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
                bash deploy/bin/up.sh prod \
             && docker image prune -f"
+
+      # Reap the merged PR's preview env. The pull_request:closed teardown in "Deploy"
+      # is unreliable on merge — dependency bots delete their branch on merge, which
+      # voids the refs/pull/<n>/merge ref and cancels that run before it tears down.
+      # This job is workflow_run-triggered (branch-delete can't cancel it), so do it
+      # here: resolve the PR that produced this commit, then run the same down.sh.
+      # Idempotent — a no-op for a direct push to main or an already-reaped env.
+      - name: Tear down the merged PR's preview
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -e
+          PR=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" \
+                 --jq 'map(select(.merged_at != null))[0].number // empty')
+          if [ -z "$PR" ]; then
+            echo "No merged PR for $SHA (direct push to main?) — nothing to reap."
+            exit 0
+          fi
+          echo "Reaping preview env for merged PR #$PR"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/deploy_key "deploy@$DEPLOY_HOST" "cd pace && bash deploy/bin/down.sh pr-$PR"
