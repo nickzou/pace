@@ -2,10 +2,11 @@ import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin, { Draggable } from "@fullcalendar/interaction"
 import FullCalendar from "@fullcalendar/react"
 import { usePowerSync } from "@powersync/react"
-import { CornerDownRight } from "lucide-react"
-import { useEffect, useMemo, useRef } from "react"
+import { CornerDownRight, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
+import { cn } from "#/lib/utils"
 import { combineLocal, DUE_FALLBACK, START_FALLBACK } from "../dates"
 import { updateTask } from "../mutations"
 import type { ListTask, TaskViewProps } from "./types"
@@ -22,6 +23,8 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   const db = usePowerSync()
   const { theme } = useTheme()
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
+  // On mobile the tray becomes a slide-out shelf (there's no room for a side column); this drives it.
+  const [shelfOpen, setShelfOpen] = useState(false)
 
   const { events, unscheduled } = useMemo(() => {
     const unscheduled = tasks.filter((t) => !t.due_date)
@@ -91,8 +94,8 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   }
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_15rem] gap-4">
-      <div className="rounded-xl border border-border bg-card p-3">
+    <div className="flex gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_15rem]">
+      <div className="min-w-0 flex-1 rounded-xl border border-border bg-card p-3">
         <FullCalendar
           plugins={[dayGridPlugin, interactionPlugin]}
           initialView="dayGridMonth"
@@ -125,10 +128,47 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
         />
       </div>
 
-      <div ref={trayRef} className="rounded-xl border border-border bg-card/50 p-2">
-        <p className="px-1 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Unscheduled
-        </p>
+      {/* Mobile: an edge handle to pull the shelf out, and a backdrop to dismiss it. */}
+      {shelfOpen ? (
+        <button
+          type="button"
+          aria-label="Close unscheduled"
+          onClick={() => setShelfOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShelfOpen(true)}
+          className="fixed top-1/2 right-0 z-20 -translate-y-1/2 rounded-l-lg border border-r-0 border-border bg-card px-1.5 py-3 text-xs text-muted-foreground shadow-md [writing-mode:vertical-rl] lg:hidden"
+        >
+          Unscheduled{unscheduled.length ? ` · ${unscheduled.length}` : ""}
+        </button>
+      )}
+
+      {/* Static side column on desktop; a right-side slide-out shelf on mobile. One element, so the
+          FullCalendar Draggable (trayRef) stays wired in either mode. */}
+      <div
+        ref={trayRef}
+        className={cn(
+          "rounded-xl border border-border bg-card/50 p-2 transition-transform",
+          "max-lg:fixed max-lg:top-0 max-lg:right-0 max-lg:z-40 max-lg:h-full max-lg:w-64 max-lg:overflow-y-auto max-lg:rounded-none max-lg:border-y-0 max-lg:border-r-0 max-lg:bg-card max-lg:shadow-xl",
+          shelfOpen ? "max-lg:translate-x-0" : "max-lg:translate-x-full",
+        )}
+      >
+        <div className="flex items-center justify-between px-1 pb-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Unscheduled
+          </p>
+          <button
+            type="button"
+            aria-label="Close"
+            onClick={() => setShelfOpen(false)}
+            className="text-muted-foreground hover:text-foreground lg:hidden [&_svg]:size-4"
+          >
+            <X />
+          </button>
+        </div>
         <div className="flex flex-col gap-1.5">
           {unscheduled.length === 0 ? (
             <p className="px-1 text-xs text-muted-foreground">Nothing unscheduled.</p>
