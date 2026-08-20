@@ -236,11 +236,11 @@ function TaskListView() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div className="flex-1 overflow-auto px-4 py-6">
         <div
           className={cn(
             "mx-auto flex flex-col gap-5",
-            layout === "list" ? "max-w-2xl" : "max-w-6xl",
+            layout === "list" ? "max-w-2xl" : "w-full",
           )}
         >
           <form onSubmit={add} className="flex gap-2">
