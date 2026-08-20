@@ -6,7 +6,17 @@ import { dueDayState } from "./dates"
 // stays separate (applied by the list).
 export type TagsMode = "any" | "all"
 
+// Presentation mode (P2-07) — how the same tasks are displayed. Orthogonal to the filters
+// below: `view` is a DATE facet, `layout` is how the filtered set is rendered.
+export type Layout = "list" | "table" | "calendar" | "board"
+export const LAYOUTS: Layout[] = ["list", "table", "calendar", "board"]
+export const DEFAULT_LAYOUT: Layout = "list"
+export function isLayout(v: unknown): v is Layout {
+  return typeof v === "string" && (LAYOUTS as string[]).includes(v)
+}
+
 export type Filters = {
+  layout?: Layout // presentation mode (P2-07); not a filter — ignored by matchesFilters
   view?: "today" | "upcoming" | "overdue" | "all" // date facet
   status?: string[] // any-of status ids
   tags?: string[] // include tag ids

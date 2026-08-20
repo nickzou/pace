@@ -1,14 +1,22 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { createFileRoute } from "@tanstack/react-router"
 import { Plus, Search, Trash2 } from "lucide-react"
-import { type FormEvent, useMemo, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState } from "react"
 import { AppLayout, VIEWS } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import { dueDayState, formatDate } from "#/lib/tasks/dates"
-import { type Filters, hasActiveFilters, matchesFilters } from "#/lib/tasks/filter"
+import {
+  DEFAULT_LAYOUT,
+  type Filters,
+  hasActiveFilters,
+  isLayout,
+  type Layout,
+  matchesFilters,
+} from "#/lib/tasks/filter"
 import { FilterBar } from "#/lib/tasks/filter-bar"
+import { LayoutSwitcher } from "#/lib/tasks/layout-switcher"
 import { createTask, deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
 import { setTaskOrder } from "#/lib/tasks/order"
 import {
@@ -40,6 +48,8 @@ export const Route = createFileRoute("/")({
   validateSearch: (search): Filters => {
     const v = search.view
     return {
+      // Presentation mode (P2-07) — orthogonal to the date `view` facet below.
+      layout: isLayout(search.layout) ? search.layout : undefined,
       view: v === "today" || v === "upcoming" || v === "overdue" || v === "all" ? v : undefined,
       status: toStrArray(search.status),
       tags: toStrArray(search.tags),
@@ -95,6 +105,18 @@ function Home() {
   )
 }
 
+// Placeholder for a layout not yet built (P2-07 scaffold). Table/Calendar/Board replace this in
+// their own steps; the switcher + shared query + persistence already work around it.
+function ComingSoon({ layout }: { layout: Layout }) {
+  const label = layout.charAt(0).toUpperCase() + layout.slice(1)
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
+      <p className="text-sm font-medium text-foreground">{label} view</p>
+      <p className="mt-1 text-sm text-muted-foreground">Coming soon — building it next.</p>
+    </div>
+  )
+}
+
 // The task list surface. Rendered inside AppLayout's PowerSync provider, so the
 // query/mutations are safe. The view filter comes from the URL; text search is local.
 function TaskListView() {
@@ -112,6 +134,15 @@ function TaskListView() {
   const [search, setSearch] = useState("")
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Presentation layout (P2-07). The URL is the source of truth; when absent, fall back to the
+  // last choice remembered in localStorage (decision B — sticky per-device, no backend), else the
+  // default. Persist whenever the URL carries a layout.
+  const stored = typeof window !== "undefined" ? window.localStorage.getItem("pace.layout") : null
+  const layout: Layout = filters.layout ?? (isLayout(stored) ? stored : DEFAULT_LAYOUT)
+  useEffect(() => {
+    if (filters.layout) window.localStorage.setItem("pace.layout", filters.layout)
+  }, [filters.layout])
 
   // Statuses grouped by their group, so each row's control lists only its group's options.
   const statusesByGroup = useMemo(() => {
@@ -193,6 +224,7 @@ function TaskListView() {
               : `${visible.length} ${visible.length === 1 ? "task" : "tasks"}`}
           </p>
         </div>
+        <LayoutSwitcher current={layout} onChange={(l) => setFilters({ layout: l })} />
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -226,7 +258,9 @@ function TaskListView() {
             onClear={clearFilters}
           />
 
-          {isLoading ? (
+          {layout !== "list" ? (
+            <ComingSoon layout={layout} />
+          ) : isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : visible.length === 0 ? (
             <p className="text-sm text-muted-foreground">
