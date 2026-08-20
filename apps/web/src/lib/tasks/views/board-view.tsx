@@ -36,6 +36,11 @@ import type { ListTask, TaskViewProps } from "./types"
 
 type Cols = Record<string, string[]> // statusId -> ordered task ids
 
+// Columns read left→right as a workflow: open → in-progress → done. Within a category we keep the
+// user's status `position` order (the query already sorts by it, and Array.sort is stable). Raw
+// position alone is creation order, which put "Done" before "In Progress".
+const CATEGORY_RANK: Record<string, number> = { open: 0, in_progress: 1, done: 2 }
+
 export default function BoardView({
   tasks,
   allStatuses,
@@ -48,10 +53,13 @@ export default function BoardView({
 
   // Columns = the default group's statuses (position-ordered, from the shared map).
   const defaultGroupId = allStatuses.find((s) => s.id === defaultStatusId)?.group_id
-  const columns = useMemo<StatusOption[]>(
-    () => (defaultGroupId ? (statusesByGroup.get(defaultGroupId) ?? []) : []),
-    [defaultGroupId, statusesByGroup],
-  )
+  const columns = useMemo<StatusOption[]>(() => {
+    const group = defaultGroupId ? (statusesByGroup.get(defaultGroupId) ?? []) : []
+    // Stable sort by category so position order is preserved within each category.
+    return [...group].sort(
+      (a, b) => (CATEGORY_RANK[a.category] ?? 9) - (CATEGORY_RANK[b.category] ?? 9),
+    )
+  }, [defaultGroupId, statusesByGroup])
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
 
