@@ -1,7 +1,7 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { createFileRoute } from "@tanstack/react-router"
 import { Plus, Search, Trash2 } from "lucide-react"
-import { type FormEvent, useEffect, useMemo, useState } from "react"
+import { type FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { AppLayout, VIEWS } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
@@ -17,7 +17,7 @@ import {
 } from "#/lib/tasks/filter"
 import { FilterBar } from "#/lib/tasks/filter-bar"
 import { LayoutSwitcher } from "#/lib/tasks/layout-switcher"
-import { createTask, deleteWithUndo, setTaskStatus, type Task } from "#/lib/tasks/mutations"
+import { createTask, deleteWithUndo, setTaskStatus } from "#/lib/tasks/mutations"
 import { setTaskOrder } from "#/lib/tasks/order"
 import {
   DragHandle,
@@ -28,8 +28,15 @@ import {
 } from "#/lib/tasks/order-dnd"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { TaskModal } from "#/lib/tasks/task-modal"
+import type { ListTask } from "#/lib/tasks/views/types"
 import { useToast } from "#/lib/toast"
 import { cn } from "#/lib/utils"
+
+// The heavy views are code-split (P2-07 §6): each loads only when first selected, so the default
+// list view never pays for the table/calendar/board libraries (the calendar is the heavy one).
+const TableView = lazy(() => import("#/lib/tasks/views/table-view"))
+const CalendarView = lazy(() => import("#/lib/tasks/views/calendar-view"))
+const BoardView = lazy(() => import("#/lib/tasks/views/board-view"))
 
 // A single querystring value can arrive as a string, an array, or absent. Coerce to a
 // non-empty string[] (or undefined) for the array facets.
@@ -59,18 +66,6 @@ export const Route = createFileRoute("/")({
   },
   component: Home,
 })
-
-// A task joined with its status (P2-03) — the category drives done-ness, the colour +
-// name drive the status control.
-type ListTask = Task & {
-  status_name: string
-  status_color: string
-  status_category: string
-  status_group_id: string
-  // Subtask roll-up (P2-05): counts of this task's direct children, for the progress badge.
-  child_count: number
-  done_count: number
-}
 
 const TASKS_SQL = `
   SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
@@ -105,16 +100,10 @@ function Home() {
   )
 }
 
-// Placeholder for a layout not yet built (P2-07 scaffold). Table/Calendar/Board replace this in
-// their own steps; the switcher + shared query + persistence already work around it.
-function ComingSoon({ layout }: { layout: Layout }) {
-  const label = layout.charAt(0).toUpperCase() + layout.slice(1)
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-card/50 px-6 py-16 text-center">
-      <p className="text-sm font-medium text-foreground">{label} view</p>
-      <p className="mt-1 text-sm text-muted-foreground">Coming soon — building it next.</p>
-    </div>
-  )
+// Shown while a code-split view's chunk loads (P2-07 §6). Brief — only on the first switch to a
+// given view; the chunk is cached thereafter.
+function ViewFallback() {
+  return <p className="py-16 text-center text-sm text-muted-foreground">Loading view…</p>
 }
 
 // The task list surface. Rendered inside AppLayout's PowerSync provider, so the
@@ -213,6 +202,17 @@ function TaskListView() {
     setTitle("")
   }
 
+  // One derived bundle handed to whichever non-list view is active — the shared source of truth.
+  const viewProps = {
+    tasks: visible,
+    allStatuses,
+    statusesByGroup,
+    tagsByTask,
+    allTags,
+    defaultStatusId,
+    onOpen: setSelectedId,
+  }
+
   return (
     <>
       <header className="flex items-center gap-4 border-b border-border px-8 py-5">
@@ -259,7 +259,15 @@ function TaskListView() {
           />
 
           {layout !== "list" ? (
-            <ComingSoon layout={layout} />
+            <Suspense fallback={<ViewFallback />}>
+              {layout === "table" ? (
+                <TableView {...viewProps} />
+              ) : layout === "calendar" ? (
+                <CalendarView {...viewProps} />
+              ) : (
+                <BoardView {...viewProps} />
+              )}
+            </Suspense>
           ) : isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : visible.length === 0 ? (
