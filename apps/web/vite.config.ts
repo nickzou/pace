@@ -19,7 +19,10 @@ const config = defineConfig({
   envDir: "../..",
   resolve: { tsconfigPaths: true },
   plugins: [
-    devtools(),
+    // Don't stamp `data-tsd-source` onto the document-shell tags: TanStack Start renders
+    // <html>/<head>/<body> from __root.tsx into the real document, so an injected attribute
+    // there mismatches on hydration (a dev-only warning). Go-to-source stays on everywhere else.
+    devtools({ injectSource: { enabled: true, ignore: { components: ["html", "head", "body"] } } }),
     nitro({ rollupConfig: { external: [/^@sentry\//] } }),
     tailwindcss(),
     tanstackStart({ spa: { enabled: isDesktop } }),
