@@ -25,21 +25,33 @@ async function addTopLevel(page: Page, title: string): Promise<void> {
   await expect(page.getByText(title)).toBeVisible()
 }
 
-// Lift the row's grip with the keyboard, step it up `n` positions, and drop. dnd-kit's
-// KeyboardSensor commits onDragEnd on the final Space — the same write path as a mouse drag.
-async function keyboardMoveUp(page: Page, handle: Locator, n: number): Promise<void> {
-  await handle.focus()
-  await page.keyboard.press("Space")
-  for (let i = 0; i < n; i++) await page.keyboard.press("ArrowUp")
-  await page.keyboard.press("Space")
-}
-
 // y-position of the row containing `title`, so we can assert relative order regardless of what
 // else is on screen.
 async function rowY(page: Page, title: string): Promise<number> {
   const box = await page.getByText(title, { exact: true }).boundingBox()
   if (!box) throw new Error(`no row for ${title}`)
   return box.y
+}
+
+// dnd-kit's sortable transition (drives the keyboard reorder animation) — settle past it between
+// keypresses so none land mid-transition and get dropped.
+const DND_SETTLE = 400
+
+// Lift the row's grip with the keyboard, step it up `n` positions, and drop. dnd-kit's
+// KeyboardSensor commits onDragEnd on the final Space — the same write path as a mouse drag. Two
+// things make this robust across runner speeds (the CI flake was both): gate on focus actually
+// landing before lifting, and pace each keypress past the ~250ms transition.
+async function keyboardMoveUp(page: Page, handle: Locator, n: number): Promise<void> {
+  await handle.focus()
+  await expect(handle).toBeFocused() // don't press Space until focus is really on the grip
+  await page.keyboard.press("Space") // lift into keyboard-drag mode
+  await page.waitForTimeout(DND_SETTLE)
+  for (let i = 0; i < n; i++) {
+    await page.keyboard.press("ArrowUp") // move up one position
+    await page.waitForTimeout(DND_SETTLE)
+  }
+  await page.keyboard.press("Space") // drop → commits the fractional-key write
+  await page.waitForTimeout(200)
 }
 
 test("drag-reorder persists across reload and syncs to a second device", async ({ browser }) => {
