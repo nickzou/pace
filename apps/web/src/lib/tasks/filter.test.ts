@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest"
-import { type Filters, hasActiveFilters, matchesFilters } from "./filter"
+import {
+  DEFAULT_LAYOUT,
+  type Filters,
+  hasActiveFilters,
+  isLayout,
+  LAYOUTS,
+  matchesFilters,
+} from "./filter"
 
 // P2-04 filter semantics: values OR *within* a facet, facets AND *across*. Tags add an
 // any/all include mode plus an exclude (none-of) facet. These are the rules the list and
@@ -112,5 +119,33 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters({ status: ["s"] })).toBe(true)
     expect(hasActiveFilters({ tags: ["a"] })).toBe(true)
     expect(hasActiveFilters({ notTags: ["b"] })).toBe(true)
+  })
+})
+
+// The presentation layout (P2-07) rides on Filters but is orthogonal to the data facets: it never
+// filters tasks and never counts as an "active filter" (so it doesn't flatten the list).
+describe("isLayout", () => {
+  it("accepts exactly the four known layouts", () => {
+    for (const l of LAYOUTS) expect(isLayout(l)).toBe(true)
+    expect(DEFAULT_LAYOUT).toBe("list")
+  })
+
+  it("rejects unknown / non-string values", () => {
+    for (const v of ["kanban", "", "List", undefined, null, 3, {}]) expect(isLayout(v)).toBe(false)
+  })
+})
+
+describe("layout is orthogonal to filtering", () => {
+  it("does not affect matchesFilters", () => {
+    const t = { due_date: null, status_id: "s", status_category: "open" }
+    expect(matchesFilters(t, [], { layout: "board" })).toBe(true)
+    expect(matchesFilters(t, [], { status: ["other"], layout: "board" })).toBe(
+      matchesFilters(t, [], { status: ["other"] }),
+    )
+  })
+
+  it("a layout alone is not an active filter", () => {
+    expect(hasActiveFilters({ layout: "table" })).toBe(false)
+    expect(hasActiveFilters({ layout: "board", view: "all" })).toBe(false)
   })
 })

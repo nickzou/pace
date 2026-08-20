@@ -37,8 +37,12 @@ export function ViewSettings({
           <DialogTitle>View settings</DialogTitle>
           <DialogDescription>Options that apply to how tasks are displayed.</DialogDescription>
         </DialogHeader>
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
+        <label
+          htmlFor="view-show-subtasks"
+          className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3"
+        >
           <Checkbox
+            id="view-show-subtasks"
             checked={showSubtasks}
             onCheckedChange={(v) => onShowSubtasksChange(v === true)}
             className="mt-0.5"
