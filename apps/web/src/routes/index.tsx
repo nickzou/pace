@@ -28,6 +28,7 @@ import {
 } from "#/lib/tasks/order-dnd"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { TaskModal } from "#/lib/tasks/task-modal"
+import { ViewSettings } from "#/lib/tasks/view-settings"
 import type { ListTask } from "#/lib/tasks/views/types"
 import { useToast } from "#/lib/toast"
 import { cn } from "#/lib/utils"
@@ -133,6 +134,17 @@ function TaskListView() {
     if (filters.layout) window.localStorage.setItem("pace.layout", filters.layout)
   }, [filters.layout])
 
+  // View setting (P2-07): whether subtasks appear as their own items in the flat views. Default off;
+  // remembered per-device in localStorage (same discipline as the layout).
+  const [showSubtasks, setShowSubtasks] = useState(
+    () =>
+      typeof window !== "undefined" && window.localStorage.getItem("pace.showSubtasks") === "true",
+  )
+  const changeShowSubtasks = (v: boolean) => {
+    setShowSubtasks(v)
+    if (typeof window !== "undefined") window.localStorage.setItem("pace.showSubtasks", String(v))
+  }
+
   // Statuses grouped by their group, so each row's control lists only its group's options.
   const statusesByGroup = useMemo(() => {
     const map = new Map<string, StatusOption[]>()
@@ -163,10 +175,14 @@ function TaskListView() {
   // soon as any facet or search is active it flattens to every matching task at any depth,
   // each with a parent breadcrumb, so a due subtask still surfaces in a date view.
   const flat = hasActiveFilters(filters) || q.length > 0
+  // Subtasks surface as their own items in the flat views (table/board/calendar) when "Show
+  // subtasks" is on, or whenever a filter/search already flattens the list. The list keeps them
+  // nested under their parent.
+  const includeSubtasks = flat || (layout !== "list" && showSubtasks)
   const matched = tasks
     .filter((t) => matchesFilters(t, tagsByTask.get(t.id) ?? [], filters))
     .filter((t) => (q ? t.title.toLowerCase().includes(q) : true))
-    .filter((t) => flat || t.parent_id == null)
+    .filter((t) => includeSubtasks || t.parent_id == null)
 
   // A date smart-view reads as an agenda: sort by due date first, manual order (the sort_order
   // the base query already applied) as the stable tiebreak. Array.sort is stable, and date-only
@@ -225,6 +241,7 @@ function TaskListView() {
           </p>
         </div>
         <LayoutSwitcher current={layout} onChange={(l) => setFilters({ layout: l })} />
+        <ViewSettings showSubtasks={showSubtasks} onShowSubtasksChange={changeShowSubtasks} />
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -238,10 +255,7 @@ function TaskListView() {
 
       <div className="flex-1 overflow-auto px-4 py-6">
         <div
-          className={cn(
-            "mx-auto flex flex-col gap-5",
-            layout === "list" ? "max-w-2xl" : "w-full",
-          )}
+          className={cn("mx-auto flex flex-col gap-5", layout === "list" ? "max-w-2xl" : "w-full")}
         >
           <form onSubmit={add} className="flex gap-2">
             <Input
