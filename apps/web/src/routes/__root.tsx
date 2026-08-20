@@ -64,7 +64,11 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // ThemeScript sets color-scheme / CSS vars on <html> before hydration (to avoid a theme
+    // flash), so the client <html> intentionally differs from the server's. suppressHydrationWarning
+    // is React's escape hatch for exactly that — it silences the mismatch one level deep (only
+    // <html>'s own attributes), not its children.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
         <ConfigScript />
