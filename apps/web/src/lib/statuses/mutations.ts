@@ -70,3 +70,17 @@ export function renameStatus(db: AbstractPowerSyncDatabase, id: string, name: st
 export function deleteStatus(db: AbstractPowerSyncDatabase, id: string) {
   return db.execute("DELETE FROM statuses WHERE id = ?", [id])
 }
+
+// Renumber a group's statuses (P2-07): write position = index across the new order. A handful of
+// statuses, so a full renumber is cheap; each replays as a status update (the connector maps
+// position). Consumers order by position — the board columns and every status dropdown follow.
+export async function reorderStatuses(db: AbstractPowerSyncDatabase, orderedIds: string[]) {
+  const ts = now()
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.execute("UPDATE statuses SET position = ?, updated_at = ? WHERE id = ?", [
+      i,
+      ts,
+      orderedIds[i],
+    ])
+  }
+}
