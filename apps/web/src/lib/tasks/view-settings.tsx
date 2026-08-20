@@ -10,8 +10,9 @@ import {
 } from "#/components/ui/dialog"
 
 // View settings (P2-07): a gear next to the layout switcher opening a small modal. For now it
-// carries one toggle — "Show subtasks" — which decides whether subtasks appear as their own items
-// in the flat views (table / board / calendar). Default off. Persistence is the caller's (localStorage).
+// carries one toggle — "Show subtasks" — which decides whether subtasks are shown by default:
+// expanded inline in the list, and surfaced as their own items in the flat views (table / board /
+// calendar). Default off. Persistence is the caller's (localStorage).
 export function ViewSettings({
   showSubtasks,
   onShowSubtasksChange,
@@ -45,8 +46,8 @@ export function ViewSettings({
           <span className="min-w-0">
             <span className="block text-sm font-medium">Show subtasks</span>
             <span className="block text-xs text-muted-foreground">
-              Include subtasks as their own items in the table, board, and calendar. The list keeps
-              them nested under their parent.
+              Expand subtasks inline in the list, and include them as their own items in the table,
+              board, and calendar. You can still expand or collapse individual tasks in the list.
             </span>
           </span>
         </label>
