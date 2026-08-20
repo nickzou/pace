@@ -11,6 +11,8 @@ import {
   useSensors,
 } from "@dnd-kit/core"
 import {
+  arrayMove,
+  horizontalListSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -18,7 +20,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { usePowerSync } from "@powersync/react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { GripVertical } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { reorderStatuses } from "#/lib/statuses/mutations"
 import { TagChips } from "#/lib/tags/tag-control"
@@ -32,16 +34,20 @@ import type { StatusOption } from "../status-control"
 import type { ListTask, TaskViewProps } from "./types"
 
 // Board (kanban) view (P2-07 · step 4). Columns are the DEFAULT status group's statuses (decision
-// 6). dnd-kit multi-container: drag a card within a column to reorder, or across columns to change
-// its status — committing setTaskStatus (P2-03) + setTaskOrder (P2-06 fractional key) on drop. An
-// optimistic column map moves the card live during the drag so it doesn't snap back.
+// 6). One dnd-kit context handles TWO kinds of drag, told apart by id namespace:
+//   - a CARD (task id) drags within a column to reorder, or across columns to change its status —
+//     setTaskStatus (P2-03) + setTaskOrder (P2-06 fractional key);
+//   - a COLUMN ("col:<statusId>") drags to reorder columns — reorderStatuses (position renumber),
+//     the same write Settings uses, so both stay in lockstep.
+// Category is immutable, so a column move is clamped WITHIN its category band. Optimistic overlays
+// (cards + columns) keep drags from snapping back while the writes round-trip.
 
 type Cols = Record<string, string[]> // statusId -> ordered task ids
 
 // Columns read left→right as a workflow: open → in-progress → done. Within a category we keep the
-// user's status `position` order (the query already sorts by it, and Array.sort is stable). Raw
-// position alone is creation order, which put "Done" before "In Progress".
+// user's status `position` order (the query already sorts by it, and Array.sort is stable).
 const CATEGORY_RANK: Record<string, number> = { open: 0, in_progress: 1, done: 2 }
+const COL = "col:"
 
 export default function BoardView({
   tasks,
@@ -53,11 +59,9 @@ export default function BoardView({
 }: TaskViewProps) {
   const db = usePowerSync()
 
-  // Columns = the default group's statuses (position-ordered, from the shared map).
   const defaultGroupId = allStatuses.find((s) => s.id === defaultStatusId)?.group_id
-  const columns = useMemo<StatusOption[]>(() => {
+  const dbColumns = useMemo<StatusOption[]>(() => {
     const group = defaultGroupId ? (statusesByGroup.get(defaultGroupId) ?? []) : []
-    // Stable sort by category so position order is preserved within each category.
     return [...group].sort(
       (a, b) => (CATEGORY_RANK[a.category] ?? 9) - (CATEGORY_RANK[b.category] ?? 9),
     )
@@ -65,33 +69,44 @@ export default function BoardView({
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
 
-  // The db-truth columns: each status's tasks in sort_order (tasks arrive sort_order-ordered).
+  // ---- Optimistic column order (for the column drag) ----
+  const [colOrder, setColOrder] = useState<string[] | null>(null)
+  useEffect(() => {
+    setColOrder((cur) => {
+      if (!cur) return null
+      const dbIds = dbColumns.map((c) => c.id)
+      const sameSet = cur.length === dbIds.length && cur.every((id) => dbIds.includes(id))
+      return cur.join(",") === dbIds.join(",") || !sameSet ? null : cur
+    })
+  }, [dbColumns])
+  const columns = colOrder
+    ? (colOrder.map((id) => dbColumns.find((c) => c.id === id)).filter(Boolean) as StatusOption[])
+    : dbColumns
+
+  // ---- Optimistic card columns (for the card drag) ----
   const dbCols = useMemo<Cols>(() => {
     const map: Cols = {}
     for (const c of columns) map[c.id] = []
     for (const t of tasks) map[t.status_id]?.push(t.id)
     return map
   }, [columns, tasks])
-
-  // Optimistic override (see P2-06's useOptimisticOrder): render this while a drag/write is in
-  // flight; drop it once the reactive query reflects the move.
   const [override, setOverride] = useState<Cols | null>(null)
   const dbSig = useMemo(() => JSON.stringify(dbCols), [dbCols])
   useEffect(() => {
-    // Hand control back to the query once it reflects the move (the write landed). Reading dbSig
-    // in the body is deliberate — it's the reconcile trigger, not just a dep.
     setOverride((cur) => (cur && JSON.stringify(cur) === dbSig ? null : cur))
   }, [dbSig])
   const cols = override ?? dbCols
 
   const [activeId, setActiveId] = useState<string | null>(null)
+  const draggingColumn = activeId?.startsWith(COL) ?? false
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
-  // Which column holds `id` (a card id), or the column id itself when hovering an empty column.
-  const columnOf = (id: string): string | undefined => {
+  // Normalise any drop target (card id, empty-column id, or "col:" id) to its column's status id.
+  const columnOf = (raw: string): string | undefined => {
+    const id = raw.startsWith(COL) ? raw.slice(COL.length) : raw
     if (id in cols) return id
     return columns.find((c) => cols[c.id]?.includes(id))?.id
   }
@@ -100,11 +115,10 @@ export default function BoardView({
     setActiveId(String(e.active.id))
   }
 
-  // Live cross-column move: pull the card out of its column and drop it into the one under the
-  // cursor, so the card visually follows into the new column mid-drag.
+  // Only CARDS move between columns live; a column drag is left to the horizontal sortable.
   function handleDragOver(e: DragOverEvent) {
     const { active, over } = e
-    if (!over) return
+    if (!over || String(active.id).startsWith(COL)) return
     const from = columnOf(String(active.id))
     const to = columnOf(String(over.id))
     if (!from || !to || from === to) return
@@ -118,19 +132,36 @@ export default function BoardView({
     })
   }
 
-  // Commit on drop: reorder within the final column (override already reflects placement), then
-  // write the fractional key and — if the column changed — the new status.
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e
-    setActiveId(null)
-    if (!over) return setOverride(null)
     const id = String(active.id)
+    setActiveId(null)
+    if (!over) {
+      setOverride(null)
+      setColOrder(null)
+      return
+    }
+
+    // ---- Column reorder (within category band) ----
+    if (id.startsWith(COL)) {
+      const from = id.slice(COL.length)
+      const to = columnOf(String(over.id))
+      if (!to || from === to) return setColOrder(null)
+      const fromCat = columns.find((c) => c.id === from)?.category
+      const toCat = columns.find((c) => c.id === to)?.category
+      if (fromCat !== toCat) return setColOrder(null) // bands stay intact
+      const ids = columns.map((c) => c.id)
+      const newIds = arrayMove(ids, ids.indexOf(from), ids.indexOf(to))
+      setColOrder(newIds)
+      void reorderStatuses(db, newIds)
+      return
+    }
+
+    // ---- Card move (reorder / change status) ----
     const to = columnOf(String(over.id))
     if (!to) return setOverride(null)
-
     const base = override ?? dbCols
     const list = [...(base[to] ?? [])]
-    // Place the card at the over-position within the target column (within-column reorder).
     const cur = list.indexOf(id)
     if (cur >= 0) list.splice(cur, 1)
     const overIdx = list.indexOf(String(over.id))
@@ -149,25 +180,15 @@ export default function BoardView({
     if (taskById.get(id)?.status_id !== to) void setTaskStatus(db, id, to)
   }
 
-  // Reorder columns from the board (P2-07). A status's category is immutable, so this is a
-  // within-band move: swap a column with its same-category neighbour and renumber positions — the
-  // same reorderStatuses that Settings uses, so both stay in lockstep.
-  function moveColumn(i: number, dir: -1 | 1) {
-    const j = i + dir
-    const a = columns[i]
-    const b = columns[j]
-    if (!a || !b) return
-    const ids = columns.map((c) => c.id)
-    ids[i] = b.id
-    ids[j] = a.id
-    void reorderStatuses(db, ids)
-  }
-
   if (columns.length === 0) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">No status columns to show.</p>
     )
   }
+
+  const activeStatus = draggingColumn
+    ? columns.find((c) => c.id === activeId?.slice(COL.length))
+    : undefined
 
   return (
     <DndContext
@@ -179,14 +200,15 @@ export default function BoardView({
       onDragCancel={() => {
         setActiveId(null)
         setOverride(null)
+        setColOrder(null)
       }}
     >
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {columns.map((c, i) => {
-          // Only offer a move when the neighbour is the same category (bands stay intact).
-          const canLeft = columns[i - 1]?.category === c.category
-          const canRight = columns[i + 1]?.category === c.category
-          return (
+      <SortableContext
+        items={columns.map((c) => `${COL}${c.id}`)}
+        strategy={horizontalListSortingStrategy}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {columns.map((c) => (
             <BoardColumn
               key={c.id}
               status={c}
@@ -194,18 +216,53 @@ export default function BoardView({
               taskById={taskById}
               tagsByTask={tagsByTask}
               onOpen={onOpen}
-              onMoveLeft={canLeft ? () => moveColumn(i, -1) : undefined}
-              onMoveRight={canRight ? () => moveColumn(i, 1) : undefined}
             />
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      </SortableContext>
       <DragOverlay>
-        {activeId && taskById.get(activeId) ? (
+        {activeStatus ? (
+          <ColumnHeader status={activeStatus} count={cols[activeStatus.id]?.length ?? 0} dragging />
+        ) : activeId && taskById.get(activeId) ? (
           <Card task={taskById.get(activeId) as ListTask} tagsByTask={tagsByTask} dragging />
         ) : null}
       </DragOverlay>
     </DndContext>
+  )
+}
+
+function ColumnHeader({
+  status,
+  count,
+  handleProps,
+  dragging,
+}: {
+  status: StatusOption
+  count: number
+  handleProps?: Record<string, unknown>
+  dragging?: boolean
+}) {
+  const { theme } = useTheme()
+  const color = statusHex(status.color, theme)
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 border-b border-border px-3 py-2",
+        dragging && "rounded-xl border bg-card shadow-lg",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Reorder ${status.name}`}
+        className="shrink-0 cursor-grab text-muted-foreground/40 transition hover:text-muted-foreground active:cursor-grabbing [&_svg]:size-3.5"
+        {...handleProps}
+      >
+        <GripVertical />
+      </button>
+      <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span className="min-w-0 truncate text-sm font-medium">{status.name}</span>
+      <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+    </div>
   )
 }
 
@@ -215,50 +272,37 @@ function BoardColumn({
   taskById,
   tagsByTask,
   onOpen,
-  onMoveLeft,
-  onMoveRight,
 }: {
   status: StatusOption
   taskIds: string[]
   taskById: Map<string, ListTask>
   tagsByTask: TaskViewProps["tagsByTask"]
   onOpen: (id: string) => void
-  onMoveLeft?: () => void
-  onMoveRight?: () => void
 }) {
-  const { theme } = useTheme()
-  const color = statusHex(status.color, theme)
-  const { setNodeRef } = useSortable({ id: status.id, data: { column: true } })
+  // Column drag (via the header grip).
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `col:${status.id}`,
+    data: { type: "column" },
+  })
+  // The card drop-area (lets cards land on an empty column). Distinct id (the status id).
+  const { setNodeRef: setDropRef } = useSortable({ id: status.id, data: { column: true } })
+
   return (
-    <div className="group/col flex w-72 shrink-0 flex-col rounded-xl border border-border bg-card/50">
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="min-w-0 truncate text-sm font-medium">{status.name}</span>
-        <span className="ml-auto text-xs text-muted-foreground">{taskIds.length}</span>
-        {/* Reorder within the category band. Faint until you hover the column. */}
-        <div className="flex items-center opacity-0 transition-opacity group-hover/col:opacity-100">
-          <button
-            type="button"
-            aria-label={`Move ${status.name} left`}
-            disabled={!onMoveLeft}
-            onClick={onMoveLeft}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30 [&_svg]:size-3.5"
-          >
-            <ChevronLeft />
-          </button>
-          <button
-            type="button"
-            aria-label={`Move ${status.name} right`}
-            disabled={!onMoveRight}
-            onClick={onMoveRight}
-            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30 [&_svg]:size-3.5"
-          >
-            <ChevronRight />
-          </button>
-        </div>
-      </div>
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "flex w-72 shrink-0 flex-col rounded-xl border border-border bg-card/50",
+        isDragging && "opacity-50",
+      )}
+    >
+      <ColumnHeader
+        status={status}
+        count={taskIds.length}
+        handleProps={{ ...attributes, ...listeners }}
+      />
       <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-2 p-2">
+        <div ref={setDropRef} className="flex min-h-24 flex-1 flex-col gap-2 p-2">
           {taskIds.map((id) => {
             const t = taskById.get(id)
             return t ? (
