@@ -18,7 +18,9 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { usePowerSync } from "@powersync/react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { reorderStatuses } from "#/lib/statuses/mutations"
 import { TagChips } from "#/lib/tags/tag-control"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
@@ -147,6 +149,20 @@ export default function BoardView({
     if (taskById.get(id)?.status_id !== to) void setTaskStatus(db, id, to)
   }
 
+  // Reorder columns from the board (P2-07). A status's category is immutable, so this is a
+  // within-band move: swap a column with its same-category neighbour and renumber positions — the
+  // same reorderStatuses that Settings uses, so both stay in lockstep.
+  function moveColumn(i: number, dir: -1 | 1) {
+    const j = i + dir
+    const a = columns[i]
+    const b = columns[j]
+    if (!a || !b) return
+    const ids = columns.map((c) => c.id)
+    ids[i] = b.id
+    ids[j] = a.id
+    void reorderStatuses(db, ids)
+  }
+
   if (columns.length === 0) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">No status columns to show.</p>
@@ -166,16 +182,23 @@ export default function BoardView({
       }}
     >
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {columns.map((c) => (
-          <BoardColumn
-            key={c.id}
-            status={c}
-            taskIds={cols[c.id] ?? []}
-            taskById={taskById}
-            tagsByTask={tagsByTask}
-            onOpen={onOpen}
-          />
-        ))}
+        {columns.map((c, i) => {
+          // Only offer a move when the neighbour is the same category (bands stay intact).
+          const canLeft = columns[i - 1]?.category === c.category
+          const canRight = columns[i + 1]?.category === c.category
+          return (
+            <BoardColumn
+              key={c.id}
+              status={c}
+              taskIds={cols[c.id] ?? []}
+              taskById={taskById}
+              tagsByTask={tagsByTask}
+              onOpen={onOpen}
+              onMoveLeft={canLeft ? () => moveColumn(i, -1) : undefined}
+              onMoveRight={canRight ? () => moveColumn(i, 1) : undefined}
+            />
+          )
+        })}
       </div>
       <DragOverlay>
         {activeId && taskById.get(activeId) ? (
@@ -192,22 +215,47 @@ function BoardColumn({
   taskById,
   tagsByTask,
   onOpen,
+  onMoveLeft,
+  onMoveRight,
 }: {
   status: StatusOption
   taskIds: string[]
   taskById: Map<string, ListTask>
   tagsByTask: TaskViewProps["tagsByTask"]
   onOpen: (id: string) => void
+  onMoveLeft?: () => void
+  onMoveRight?: () => void
 }) {
   const { theme } = useTheme()
   const color = statusHex(status.color, theme)
   const { setNodeRef } = useSortable({ id: status.id, data: { column: true } })
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-xl border border-border bg-card/50">
+    <div className="group/col flex w-72 shrink-0 flex-col rounded-xl border border-border bg-card/50">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-sm font-medium">{status.name}</span>
+        <span className="min-w-0 truncate text-sm font-medium">{status.name}</span>
         <span className="ml-auto text-xs text-muted-foreground">{taskIds.length}</span>
+        {/* Reorder within the category band. Faint until you hover the column. */}
+        <div className="flex items-center opacity-0 transition-opacity group-hover/col:opacity-100">
+          <button
+            type="button"
+            aria-label={`Move ${status.name} left`}
+            disabled={!onMoveLeft}
+            onClick={onMoveLeft}
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30 [&_svg]:size-3.5"
+          >
+            <ChevronLeft />
+          </button>
+          <button
+            type="button"
+            aria-label={`Move ${status.name} right`}
+            disabled={!onMoveRight}
+            onClick={onMoveRight}
+            className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-30 [&_svg]:size-3.5"
+          >
+            <ChevronRight />
+          </button>
+        </div>
       </div>
       <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="flex min-h-24 flex-1 flex-col gap-2 p-2">
