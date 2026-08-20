@@ -4,20 +4,17 @@ import FullCalendar from "@fullcalendar/react"
 import { usePowerSync } from "@powersync/react"
 import { CornerDownRight, X } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
 import { cn } from "#/lib/utils"
-import { combineLocal, DUE_FALLBACK, START_FALLBACK } from "../dates"
 import { updateTask } from "../mutations"
+import { buildCalendarData, rescheduleWrite } from "./calendar-logic"
 import type { ListTask, TaskViewProps } from "./types"
 
 // Calendar view (P2-07 · step 5). FullCalendar month grid over the shared tasks, placed by due_date
 // (a start_date makes it a start→due range — decision 8). Drag/resize an event or drop an
 // unscheduled task onto a day → updateTask (P2-02 dates). Colour follows the task's status. This is
-// the heavy view, lazy-loaded + client-only (§6). FullCalendar v6 auto-injects its own CSS.
-const pad = (n: number) => String(n).padStart(2, "0")
-const localDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-const DAY_MS = 86_400_000
+// the heavy view, lazy-loaded + client-only (§6). FullCalendar v6 auto-injects its own CSS. The
+// event/date math lives in ./calendar-logic (unit-tested).
 
 export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   const db = usePowerSync()
@@ -26,41 +23,7 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   // On mobile the tray becomes a slide-out shelf (there's no room for a side column); this drives it.
   const [shelfOpen, setShelfOpen] = useState(false)
 
-  const { events, unscheduled } = useMemo(() => {
-    const unscheduled = tasks.filter((t) => !t.due_date)
-    const events = tasks
-      .filter((t) => t.due_date)
-      .map((t) => {
-        const allDay = !t.due_has_time
-        const color = statusHex(t.status_color, theme)
-        const due = t.due_date as string
-        // Subtask marker (P2-07): a class prefixes the event title with a subtle ↳ (see styles.css).
-        const classNames = t.parent_id ? ["fc-subtask"] : undefined
-        // A start_date makes it a multi-day range; an all-day end is exclusive (+1 day).
-        if (t.start_date) {
-          return {
-            id: t.id,
-            title: t.title,
-            start: allDay ? localDay(new Date(t.start_date)) : t.start_date,
-            end: allDay ? localDay(new Date(new Date(due).getTime() + DAY_MS)) : due,
-            allDay,
-            backgroundColor: color,
-            borderColor: color,
-            classNames,
-          }
-        }
-        return {
-          id: t.id,
-          title: t.title,
-          start: allDay ? localDay(new Date(due)) : due,
-          allDay,
-          backgroundColor: color,
-          borderColor: color,
-          classNames,
-        }
-      })
-    return { events, unscheduled }
-  }, [tasks, theme])
+  const { events, unscheduled } = useMemo(() => buildCalendarData(tasks, theme), [tasks, theme])
 
   // Wire the unscheduled tray as an external drag source (drop onto a day schedules the task).
   const trayRef = useRef<HTMLDivElement>(null)
@@ -73,24 +36,10 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
     return () => draggable.destroy()
   }, [])
 
-  // Write new dates back through the P2-02 mutation, honouring the app's date convention (date-only
-  // → fallback wall-clock, has_time=false). A range moves both ends; a single event moves the due.
+  // Write new dates back through the P2-02 mutation. The date math (fallback wall-clock, range vs
+  // single, undoing the exclusive end) lives in rescheduleWrite so it can be tested directly.
   function reschedule(t: ListTask, start: Date, end: Date | null, allDay: boolean) {
-    if (t.start_date && end) {
-      const due = allDay ? new Date(end.getTime() - DAY_MS) : end
-      void updateTask(db, t.id, {
-        start_date: allDay
-          ? combineLocal(localDay(start), "", START_FALLBACK)
-          : start.toISOString(),
-        due_date: allDay ? combineLocal(localDay(due), "", DUE_FALLBACK) : due.toISOString(),
-        due_has_time: allDay ? 0 : 1,
-      })
-    } else {
-      void updateTask(db, t.id, {
-        due_date: allDay ? combineLocal(localDay(start), "", DUE_FALLBACK) : start.toISOString(),
-        due_has_time: allDay ? 0 : 1,
-      })
-    }
+    void updateTask(db, t.id, rescheduleWrite(t, start, end, allDay))
   }
 
   return (

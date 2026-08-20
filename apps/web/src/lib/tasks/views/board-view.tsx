@@ -11,7 +11,6 @@ import {
   useSensors,
 } from "@dnd-kit/core"
 import {
-  arrayMove,
   horizontalListSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
@@ -31,6 +30,7 @@ import { dueDayState, formatDate } from "../dates"
 import { setTaskStatus } from "../mutations"
 import { keyBetween, setTaskOrder } from "../order"
 import type { StatusOption } from "../status-control"
+import { reorderColumns, sortColumnsByCategory } from "./board-logic"
 import type { ListTask, TaskViewProps } from "./types"
 
 // Board (kanban) view (P2-07 · step 4). Columns are the DEFAULT status group's statuses (decision
@@ -44,9 +44,8 @@ import type { ListTask, TaskViewProps } from "./types"
 
 type Cols = Record<string, string[]> // statusId -> ordered task ids
 
-// Columns read left→right as a workflow: open → in-progress → done. Within a category we keep the
-// user's status `position` order (the query already sorts by it, and Array.sort is stable).
-const CATEGORY_RANK: Record<string, number> = { open: 0, in_progress: 1, done: 2 }
+// Column ordering (open → in-progress → done, position-stable within a band) and the reorder clamp
+// live in ./board-logic (unit-tested). Card ids are bare task ids; column ids are namespaced COL.
 const COL = "col:"
 
 export default function BoardView({
@@ -62,9 +61,7 @@ export default function BoardView({
   const defaultGroupId = allStatuses.find((s) => s.id === defaultStatusId)?.group_id
   const dbColumns = useMemo<StatusOption[]>(() => {
     const group = defaultGroupId ? (statusesByGroup.get(defaultGroupId) ?? []) : []
-    return [...group].sort(
-      (a, b) => (CATEGORY_RANK[a.category] ?? 9) - (CATEGORY_RANK[b.category] ?? 9),
-    )
+    return sortColumnsByCategory(group)
   }, [defaultGroupId, statusesByGroup])
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks])
@@ -142,16 +139,11 @@ export default function BoardView({
       return
     }
 
-    // ---- Column reorder (within category band) ----
+    // ---- Column reorder (clamped within the category band by reorderColumns) ----
     if (id.startsWith(COL)) {
-      const from = id.slice(COL.length)
       const to = columnOf(String(over.id))
-      if (!to || from === to) return setColOrder(null)
-      const fromCat = columns.find((c) => c.id === from)?.category
-      const toCat = columns.find((c) => c.id === to)?.category
-      if (fromCat !== toCat) return setColOrder(null) // bands stay intact
-      const ids = columns.map((c) => c.id)
-      const newIds = arrayMove(ids, ids.indexOf(from), ids.indexOf(to))
+      const newIds = to ? reorderColumns(columns, id.slice(COL.length), to) : null
+      if (!newIds) return setColOrder(null)
       setColOrder(newIds)
       void reorderStatuses(db, newIds)
       return
