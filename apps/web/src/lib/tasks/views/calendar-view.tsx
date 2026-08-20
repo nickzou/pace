@@ -2,6 +2,7 @@ import dayGridPlugin from "@fullcalendar/daygrid"
 import interactionPlugin, { Draggable } from "@fullcalendar/interaction"
 import FullCalendar from "@fullcalendar/react"
 import { usePowerSync } from "@powersync/react"
+import { CornerDownRight } from "lucide-react"
 import { useEffect, useMemo, useRef } from "react"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
@@ -30,6 +31,8 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
         const allDay = !t.due_has_time
         const color = statusHex(t.status_color, theme)
         const due = t.due_date as string
+        // Subtask marker (P2-07): a class prefixes the event title with a subtle ↳ (see styles.css).
+        const classNames = t.parent_id ? ["fc-subtask"] : undefined
         // A start_date makes it a multi-day range; an all-day end is exclusive (+1 day).
         if (t.start_date) {
           return {
@@ -40,6 +43,7 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
             allDay,
             backgroundColor: color,
             borderColor: color,
+            classNames,
           }
         }
         return {
@@ -49,6 +53,7 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
           allDay,
           backgroundColor: color,
           borderColor: color,
+          classNames,
         }
       })
     return { events, unscheduled }
@@ -134,9 +139,15 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
                 type="button"
                 data-task-id={t.id}
                 onClick={() => onOpen(t.id)}
-                className="cursor-grab truncate rounded-md border border-border bg-card px-2 py-1.5 text-left text-sm active:cursor-grabbing hover:bg-accent/40"
+                className="flex cursor-grab items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1.5 text-left text-sm active:cursor-grabbing hover:bg-accent/40"
               >
-                {t.title}
+                {t.parent_id ? (
+                  <CornerDownRight
+                    aria-label="Subtask"
+                    className="size-3 shrink-0 text-muted-foreground/70"
+                  />
+                ) : null}
+                <span className="min-w-0 truncate">{t.title}</span>
               </button>
             ))
           )}

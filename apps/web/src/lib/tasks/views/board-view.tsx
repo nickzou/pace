@@ -20,7 +20,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { usePowerSync } from "@powersync/react"
-import { GripVertical } from "lucide-react"
+import { CornerDownRight, GripVertical } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { reorderStatuses } from "#/lib/statuses/mutations"
 import { TagChips } from "#/lib/tags/tag-control"
@@ -369,6 +369,13 @@ function Card({
           resolved && "text-muted-foreground line-through",
         )}
       >
+        {/* Subtask marker (P2-07): a subtle ↳ flags a card that's a subtask of another task. */}
+        {t.parent_id ? (
+          <CornerDownRight
+            aria-label="Subtask"
+            className="size-3 shrink-0 text-muted-foreground/70"
+          />
+        ) : null}
         <span className="min-w-0 truncate">{t.title}</span>
         {t.child_count > 0 ? (
           <span className="ml-auto shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">

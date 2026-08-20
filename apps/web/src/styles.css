@@ -83,3 +83,9 @@ body {
 .fc .fc-daygrid-day-frame {
   padding: 2px;
 }
+/* Subtask marker (P2-07): surfaced subtasks read as their own events, so prefix their title with a
+   subtle ↳ — matching the ↳ glyph the other views use. */
+.fc .fc-subtask .fc-event-title::before {
+  content: "↳ ";
+  opacity: 0.75;
+}

@@ -8,7 +8,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react"
+import { ArrowDown, ArrowUp, ChevronsUpDown, CornerDownRight } from "lucide-react"
 import { useMemo, useRef, useState } from "react"
 import { TagChips, TagPicker } from "#/lib/tags/tag-control"
 import { cn } from "#/lib/utils"
@@ -72,6 +72,14 @@ export default function TableView({
               onClick={() => onOpen(t.id)}
               className="flex min-w-0 cursor-pointer items-center gap-2 text-left"
             >
+              {/* Subtask marker (P2-07): surfaced subtasks read as their own rows, so a subtle ↳
+                  flags the ones that live under a parent. */}
+              {t.parent_id ? (
+                <CornerDownRight
+                  aria-label="Subtask"
+                  className="size-3 shrink-0 text-muted-foreground/70"
+                />
+              ) : null}
               <span
                 className={cn(
                   "min-w-0 truncate text-sm hover:underline",
