@@ -59,10 +59,12 @@ function EditableChip({ tag, taskId }: { tag: TagOption; taskId?: string }) {
         <button
           type="button"
           aria-label={`Edit ${tag.name}`}
-          className="rounded-full px-1.5 py-0.5 text-[11px] font-medium text-white transition-opacity hover:opacity-90"
+          title={tag.name}
+          className="flex size-2.5 shrink-0 items-center justify-center rounded-full p-0 text-[11px] font-medium text-white transition-opacity hover:opacity-90 sm:size-auto sm:px-1.5 sm:py-0.5"
           style={{ backgroundColor: statusHex(tag.color, theme) }}
         >
-          {tag.name}
+          {/* On mobile the chip collapses to a colour dot; the name returns at ≥sm. */}
+          <span className="hidden sm:inline">{tag.name}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="flex w-56 flex-col gap-2 p-2">
@@ -151,7 +153,8 @@ export function TagPicker({
             aria-label="Edit tags"
             className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <TagIcon className="size-3" /> Tags
+            {/* Icon-only on narrow screens to save row width; label returns at ≥sm. */}
+            <TagIcon className="size-3" /> <span className="hidden sm:inline">Tags</span>
           </button>
         )}
       </DropdownMenuTrigger>
