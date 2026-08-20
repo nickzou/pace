@@ -30,3 +30,56 @@ body {
     cursor: pointer;
   }
 }
+
+/* FullCalendar (P2-07 calendar view) → app design tokens. FC ships generic greys; map its CSS
+   variables onto our theme (same var(--token, dark-fallback) the Tailwind utilities use, so it's
+   light/dark aware) and refine a few classes so the month grid matches the app. */
+.fc {
+  --fc-border-color: var(--border, #212029);
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: var(--accent, #212029);
+  --fc-today-bg-color: color-mix(in oklab, var(--primary, #60a5fa) 10%, transparent);
+  --fc-button-bg-color: var(--primary, #60a5fa);
+  --fc-button-border-color: transparent;
+  --fc-button-hover-bg-color: color-mix(in oklab, var(--primary, #60a5fa) 88%, black);
+  --fc-button-active-bg-color: color-mix(in oklab, var(--primary, #60a5fa) 76%, black);
+  --fc-button-text-color: var(--primary-foreground, #0b0a14);
+  --fc-event-border-color: transparent;
+  font-size: 0.875rem;
+}
+.fc .fc-toolbar-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.fc .fc-button {
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  box-shadow: none;
+  text-transform: capitalize;
+}
+.fc .fc-button-primary:focus,
+.fc .fc-button-primary:not(:disabled):active:focus {
+  box-shadow: none;
+}
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number {
+  color: var(--muted-foreground, #a7a3c8);
+  font-weight: 500;
+  text-decoration: none;
+  padding: 0.35rem 0.45rem;
+}
+.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number {
+  color: var(--foreground, #f4f2ff);
+  font-weight: 700;
+}
+.fc .fc-daygrid-event {
+  border-radius: 0.375rem;
+  padding: 0.05rem 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.fc .fc-daygrid-day-frame {
+  padding: 2px;
+}
