@@ -13,6 +13,12 @@ export type Filters = {
   notTags?: string[]
 }
 
+// Presentation layout (P2-07 · Multiview). The mobile subset — no table (that stays web-only,
+// decision 4). Held in component state (no URL on native; session-only, decision).
+export type Layout = "list" | "calendar" | "board"
+export const LAYOUTS: Layout[] = ["list", "calendar", "board"]
+export const DEFAULT_LAYOUT: Layout = "list"
+
 type FilterableTask = {
   due_date: string | null
   status_id: string

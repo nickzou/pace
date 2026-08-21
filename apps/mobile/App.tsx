@@ -27,13 +27,18 @@ import { PowerSyncProvider } from "./lib/powersync/provider"
 import { SettingsModal } from "./lib/settings/settings-modal"
 import { TagChips, type TagOption, TagPicker } from "./lib/tags/tag-control"
 import { dueDayState, formatDate } from "./lib/tasks/dates"
-import { matchesFilters } from "./lib/tasks/filter"
-import { createTask, deleteWithUndo, setTaskStatus, type Task } from "./lib/tasks/mutations"
+import { DEFAULT_LAYOUT, type Layout, matchesFilters } from "./lib/tasks/filter"
+import { LayoutSwitcher } from "./lib/tasks/layout-switcher"
+import { createTask, deleteWithUndo, setTaskStatus } from "./lib/tasks/mutations"
 import { useReorder } from "./lib/tasks/reorder"
 import { StatusControl, type StatusOption, statusHex } from "./lib/tasks/status-control"
 import { TaskDetailModal } from "./lib/tasks/task-detail-modal"
+import BoardView from "./lib/tasks/views/board-view"
+import CalendarView from "./lib/tasks/views/calendar-view"
+import type { ListTask } from "./lib/tasks/views/types"
 import { type Palette, ThemeProvider, useTheme, useThemedStyles } from "./lib/theme"
 import { ToastProvider, useToast } from "./lib/toast"
+import { Checkbox } from "./lib/ui/checkbox"
 
 export default function App() {
   return (
@@ -127,17 +132,6 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
   )
 }
 
-// A task joined with its status (P2-03).
-type ListTask = Task & {
-  status_name: string
-  status_color: string
-  status_category: string
-  status_group_id: string
-  // Subtask roll-up (P2-05): counts of this task's direct children, for the progress badge.
-  child_count: number
-  done_count: number
-}
-
 // Reads/writes go straight to local SQLite. useQuery is live — it re-runs on any
 // change to the tasks table (a local write or a row synced down), so there's no
 // cache to invalidate and no optimistic bookkeeping. PowerSync uploads local
@@ -148,6 +142,11 @@ function Tasks() {
   const { scheme, colors } = useTheme()
   const [title, setTitle] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Presentation layout (P2-07). Session-only on native (no URL / persistence, decision).
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT)
+  // Whether subtasks surface as their own items in the calendar/board (default off). The list
+  // always keeps them nested under their parent.
+  const [showSubtasks, setShowSubtasks] = useState(false)
   const { data: tasks, isLoading } = useQuery<ListTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
@@ -201,17 +200,30 @@ function Tasks() {
   // Unfiltered, the list shows only top-level tasks — subtasks live inside their parent. A
   // tag filter flattens to every matching task at any depth, each with a parent breadcrumb.
   const flat = filterTags.length > 0
+  // In the calendar/board a subtask can surface as its own item when "Show subtasks" is on; a tag
+  // filter already flattens everything. The list stays top-level-only (subtasks live in the modal).
+  const includeSubtasks = flat || (layout !== "list" && showSubtasks)
   const visible = tasks
     .filter((t) =>
       matchesFilters(t, tagsByTask.get(t.id) ?? [], {
         tags: filterTags.length ? filterTags : undefined,
       }),
     )
-    .filter((t) => flat || t.parent_id == null)
+    .filter((t) => includeSubtasks || t.parent_id == null)
   // Dragging lives only in the unfiltered top-level list (P2-06); a filtered subset has no
   // defined drop target. The reorder hook adds an optimistic order so a drop doesn't snap back.
   const draggable = !flat
   const { items: ordered, onReorder } = useReorder(db, visible)
+
+  // One derived bundle handed to whichever non-list view is active (mirrors apps/web).
+  const viewProps = {
+    tasks: visible,
+    statusesByGroup,
+    allStatuses,
+    tagsByTask,
+    defaultStatusId,
+    onOpen: setSelectedId,
+  }
   const toggleFilterTag = (id: string) =>
     setFilterTags((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
@@ -226,6 +238,22 @@ function Tasks() {
   return (
     <>
       <Text style={styles.section}>Tasks</Text>
+
+      <View style={styles.switcherRow}>
+        <LayoutSwitcher current={layout} onChange={setLayout} />
+        {layout !== "list" ? (
+          <View style={styles.subtaskToggle}>
+            <Checkbox checked={showSubtasks} onCheckedChange={setShowSubtasks} />
+            <Pressable
+              testID="toggle-subtasks"
+              onPress={() => setShowSubtasks((v) => !v)}
+              hitSlop={6}
+            >
+              <Text style={styles.subtaskToggleText}>Show subtasks</Text>
+            </Pressable>
+          </View>
+        ) : null}
+      </View>
 
       <View style={styles.addRow}>
         <TextInput
@@ -279,6 +307,10 @@ function Tasks() {
 
       {isLoading ? (
         <ActivityIndicator color={colors.textPrimary} style={styles.tasksLoading} />
+      ) : layout === "calendar" ? (
+        <CalendarView {...viewProps} />
+      ) : layout === "board" ? (
+        <BoardView {...viewProps} />
       ) : visible.length === 0 ? (
         <Text style={styles.footer}>
           {filterTags.length
@@ -464,6 +496,16 @@ const makeStyles = (c: Palette) =>
       marginTop: 28,
       marginBottom: 12,
     },
+    switcherRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 12,
+      marginBottom: 12,
+    },
+    subtaskToggle: { flexDirection: "row", alignItems: "center", gap: 8 },
+    subtaskToggleText: { color: c.textSecondary, fontSize: 13 },
     addRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
     input: {
       flex: 1,
