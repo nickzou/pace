@@ -5,7 +5,11 @@ name: Deploy
 # workflow succeeds on main, so deleting a merged branch can't cancel it. Keep this
 # workflow's name ("Deploy") in sync with that file's workflow_run reference.
 on:
-  # Run the checks on every branch push (fast feedback before a PR exists)…
+  # Run the checks on every branch push for fast feedback before a PR exists — EXCEPT
+  # main. A merge is a push to main, and its code already passed (and was required to
+  # pass) full CI on the PR, so re-running the checks just to deploy is wasted work.
+  # On main this workflow only runs the `ready` handoff below, which lets Deploy Prod
+  # fire via workflow_run. (Keep the trigger on main so that handoff still happens.)
   push:
     branches: ["**"]
   # …and on PRs into main — open/update build the PR's preview env, close tears
@@ -21,10 +25,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Gate: bad code never reaches the build/deploy jobs.
+  # The merge → prod handoff. A push to main runs ONLY this (the checks below are
+  # skipped on main — they ran on the PR): a trivial success so the "Deploy" run
+  # completes green and Deploy Prod fires via workflow_run. Kept separate from the
+  # checks so main never re-runs them. See deploy-prod.yml.
+  ready:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Merged to main — CI already green on the PR. Handing off to Deploy Prod."
+
+  # Gate: bad code never reaches the build/deploy jobs. Skipped on a PR-close (which
+  # only tears a preview down) and on the post-merge main push — the PR already ran
+  # (and was required to pass) these, so re-running them just to deploy is wasted work.
   check:
-    # PR-close events only tear a preview down — no need to re-run the checks.
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -42,7 +57,7 @@ jobs:
   # Unit + integration tests (Vitest): the tasks tRPC API against a real
   # Postgres, plus the shared Zod schemas. Fast — no browsers.
   test:
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -84,7 +99,7 @@ jobs:
   # global-setup.ts brings up (a plain service container can't set wal_level).
   # Ports / URLs live in playwright.config.ts.
   e2e:
-    if: github.event.action != 'closed'
+    if: github.event.action != 'closed' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       # The API server needs its auth secret from the environment (no .env in CI);

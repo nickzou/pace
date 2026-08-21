@@ -3,9 +3,11 @@ name: Desktop E2E
 # Drives the packaged Tauri app through its real WebKitWebView with WebdriverIO
 # + tauri-driver. Runs wherever the web checks run — a desktop build is far
 # lighter than the mobile emulator, so it can gate per-push rather than nightly.
+# Not on the main push: a merge already passed this on the PR (mirrors the Deploy
+# workflow), so re-running it just to deploy is wasted work.
 on:
   push:
-    branches: ["**"]
+    branches-ignore: [main]
   pull_request:
     branches: [main]
 
