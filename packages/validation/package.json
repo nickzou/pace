@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./recurrence": "./src/recurrence.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@pace/tokens": "workspace:*",
+    "rrule": "^2.8.1",
     "zod": "^4.4.3"
   }
 }
