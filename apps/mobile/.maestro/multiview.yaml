@@ -1,0 +1,116 @@
+# Mobile Multiview (P2-07): list ⇄ board ⇄ calendar switching, the board's columns/cards, the
+# calendar day-agenda (tap-to-open), and the "Show subtasks" toggle surfacing a subtask. Mirrors the
+# web multiview.spec.ts behaviours, adapted to the native components (no URL/persistence — layout is
+# session state; tap-to-open, no drag).
+#
+# Kept as ONE flow (one app launch) on purpose: the CI emulator's host GPU degrades with repeated
+# pm-clear+launch cycles ("Failed to find ColorBuffer"), so fewer launches keeps the whole suite
+# stable. The post-transition assertions use extendedWaitUntil to ride over a transient glitch.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start (the session persists in secure-store).
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user so the board/list hold only this run's tasks.
+- evalScript: ${output.email = 'maestro-multiview-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Multiview"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a task (Add is disabled until the seeded default status syncs down — wait for it).
+- tapOn:
+    id: "task-input"
+- inputText: "Alpha"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Alpha"
+
+# Board: the default group seeds a To Do (open) and a Done column; the task is a card.
+- tapOn:
+    id: "layout-board"
+- assertVisible: "To Do"
+- assertVisible: "Done"
+- assertVisible: "Alpha"
+
+# Back to the list — same task.
+- tapOn:
+    id: "layout-list"
+- assertVisible: "Alpha"
+
+# Open the task: give it a due date (the native picker defaults to today; OK accepts it) and add a
+# subtask while the detail is open.
+- tapOn: "Alpha"
+- extendedWaitUntil:
+    visible:
+      id: "detail-title"
+    timeout: 15000
+- tapOn:
+    id: "detail-due"
+- tapOn: "OK"
+- assertNotVisible: "Set due date"
+- scrollUntilVisible:
+    element:
+      id: "subtask-input"
+    direction: DOWN
+- tapOn:
+    id: "subtask-input"
+- inputText: "Child"
+- hideKeyboard
+- tapOn:
+    id: "subtask-add"
+- assertVisible:
+    id: "subtask-Child"
+- tapOn:
+    id: "detail-close"
+
+# Calendar: today's agenda shows the now-scheduled task; tapping it opens the detail (tap-to-open).
+- tapOn:
+    id: "layout-calendar"
+- extendedWaitUntil:
+    visible: "Alpha"
+    timeout: 15000
+- tapOn: "Alpha"
+- extendedWaitUntil:
+    visible:
+      id: "detail-title"
+    timeout: 15000
+- tapOn:
+    id: "detail-close"
+
+# Board + "Show subtasks": off by default the subtask is not its own card; on, it surfaces (with a
+# ↳ prefix) as its own card.
+- tapOn:
+    id: "layout-board"
+- assertVisible: "Alpha"
+- assertNotVisible: "Child"
+- tapOn:
+    id: "toggle-subtasks"
+- extendedWaitUntil:
+    visible: "Child"
+    timeout: 15000
