@@ -78,6 +78,13 @@
       "when": 1787338721129,
       "tag": "0010_flowery_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787342031561,
+      "tag": "0011_lyrical_slayback",
+      "breakpoints": true
     }
   ]
 }

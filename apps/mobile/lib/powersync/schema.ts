@@ -59,6 +59,9 @@ const statuses = new Table({
 // One row per user (implicit id = user_id) — the enable toggle.
 const user_settings = new Table({
   custom_statuses_enabled: column.integer,
+  // P2-08: IANA timezone for recurrence math + whether it's auto-detected (0/1).
+  timezone: column.text,
+  timezone_auto: column.integer,
 })
 
 // Tags (P2-04) — a flat, user-scoped tag library (always on, no enable gate).
@@ -97,5 +100,6 @@ export const AppSchema = new Schema({
 // v3 (P2-04): + tags/task_tags tables.
 // v4 (P2-05): + tasks.parent_id (subtask hierarchy).
 // v5 (P2-06): + tasks.sort_order (manual ordering / drag-and-drop).
-// v6 (P2-08): + tasks.recurrence / recurrence_regen (repeating tasks).
+// v6 (P2-08): + tasks.recurrence / recurrence_regen + user_settings.timezone / timezone_auto
+// (repeating tasks: the rule, its regen mode, and the zone recurrence math runs in).
 export const SCHEMA_VERSION = "6"
