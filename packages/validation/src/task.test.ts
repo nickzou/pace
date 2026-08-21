@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { newTaskSchema, setParentSchema, taskSchema, updateTaskSchema } from "./task"
+import {
+  newTaskSchema,
+  setParentSchema,
+  setRecurrenceSchema,
+  taskSchema,
+  updateTaskSchema,
+} from "./task"
 
 const UUID = "11111111-1111-4111-8111-111111111111"
 const STATUS = "22222222-2222-4222-8222-222222222222"
@@ -14,6 +20,8 @@ const validTask = () => ({
   dueDate: null,
   parentId: null,
   sortOrder: "a0",
+  recurrence: null,
+  recurrenceRegen: null,
   createdAt: iso(),
   updatedAt: iso(),
   deletedAt: null,
@@ -53,6 +61,23 @@ describe("taskSchema", () => {
     expect(taskSchema.safeParse({ ...validTask(), sortOrder: undefined }).success).toBe(false)
     expect(taskSchema.safeParse({ ...validTask(), sortOrder: 5 }).success).toBe(false)
   })
+
+  it("carries recurrence (P2-08): a nullable RRULE string + an 'advance'|'duplicate' regen mode", () => {
+    expect(taskSchema.parse(validTask()).recurrence).toBeNull()
+    const r = taskSchema.parse({
+      ...validTask(),
+      recurrence: "FREQ=WEEKLY;INTERVAL=2",
+      recurrenceRegen: "advance",
+    })
+    expect(r.recurrence).toBe("FREQ=WEEKLY;INTERVAL=2")
+    expect(r.recurrenceRegen).toBe("advance")
+    // regen is one of the two modes (or null) — never arbitrary text.
+    expect(taskSchema.safeParse({ ...validTask(), recurrenceRegen: "sometimes" }).success).toBe(
+      false,
+    )
+    // both keys are required (nullable, like the other schedule fields).
+    expect(taskSchema.safeParse({ ...validTask(), recurrence: undefined }).success).toBe(false)
+  })
 })
 
 describe("newTaskSchema", () => {
@@ -89,6 +114,31 @@ describe("setParentSchema", () => {
     expect(setParentSchema.safeParse({ parentId: PARENT }).success).toBe(false)
     expect(setParentSchema.safeParse({ id: UUID }).success).toBe(false)
     expect(setParentSchema.safeParse({ id: UUID, parentId: "nope" }).success).toBe(false)
+  })
+})
+
+describe("setRecurrenceSchema", () => {
+  it("sets a rule + regen mode, or clears both with nulls", () => {
+    const s = setRecurrenceSchema.parse({
+      id: UUID,
+      recurrence: "FREQ=DAILY",
+      recurrenceRegen: "duplicate",
+    })
+    expect(s.recurrence).toBe("FREQ=DAILY")
+    expect(s.recurrenceRegen).toBe("duplicate")
+    expect(
+      setRecurrenceSchema.parse({ id: UUID, recurrence: null, recurrenceRegen: null }).recurrence,
+    ).toBeNull()
+  })
+
+  it("requires id + both fields present, and a valid regen mode", () => {
+    expect(setRecurrenceSchema.safeParse({ recurrence: null, recurrenceRegen: null }).success).toBe(
+      false,
+    )
+    expect(
+      setRecurrenceSchema.safeParse({ id: UUID, recurrence: "FREQ=DAILY", recurrenceRegen: "nope" })
+        .success,
+    ).toBe(false)
   })
 })
 

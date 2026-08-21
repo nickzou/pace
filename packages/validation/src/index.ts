@@ -34,8 +34,12 @@ export {
 export {
   type NewTask,
   newTaskSchema,
+  type Regen,
+  regenSchema,
   type SetParent,
+  type SetRecurrence,
   setParentSchema,
+  setRecurrenceSchema,
   type Task,
   taskIdSchema,
   taskSchema,

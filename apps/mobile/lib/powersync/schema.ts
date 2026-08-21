@@ -28,6 +28,9 @@ const tasks = new Table({
   // Manual ordering (P2-06): the fractional sort key. Tasks list `ORDER BY sort_order, id`
   // within a parent scope; a drag rewrites only this field on the moved task.
   sort_order: column.text,
+  // Recurrence (P2-08): the RRULE body (null when not repeating) + 'advance' | 'duplicate' regen mode.
+  recurrence: column.text,
+  recurrence_regen: column.text,
   created_at: column.text,
   updated_at: column.text,
 })
@@ -94,4 +97,5 @@ export const AppSchema = new Schema({
 // v3 (P2-04): + tags/task_tags tables.
 // v4 (P2-05): + tasks.parent_id (subtask hierarchy).
 // v5 (P2-06): + tasks.sort_order (manual ordering / drag-and-drop).
-export const SCHEMA_VERSION = "5"
+// v6 (P2-08): + tasks.recurrence / recurrence_regen (repeating tasks).
+export const SCHEMA_VERSION = "6"

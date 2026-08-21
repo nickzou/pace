@@ -5,6 +5,7 @@ import { statuses, statusGroups } from "../../db/statuses"
 import { tasks } from "../../db/tasks"
 import {
   newTaskSchema,
+  type Regen,
   setParentSchema,
   type Task,
   taskIdSchema,
@@ -33,6 +34,10 @@ function toTask(row: typeof tasks.$inferSelect): Task {
     dueHasTime: row.dueHasTime,
     parentId: row.parentId,
     sortOrder: row.sortOrder,
+    // Free text in the DB; only ever written through the validated setRecurrence path (P2-08),
+    // so the regen mode is safely one of the enum values (or null when not repeating).
+    recurrence: row.recurrence,
+    recurrenceRegen: row.recurrenceRegen as Regen | null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
