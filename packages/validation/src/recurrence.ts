@@ -1,4 +1,10 @@
-import { RRule, rrulestr } from "rrule"
+import rrulePkg from "rrule"
+
+// rrule ships CommonJS, so a named ESM import (`import { RRule } from "rrule"`) breaks in the API's
+// nitro/ESM runtime with "Named export 'RRule' not found" (vitest tolerates it, the server doesn't).
+// Default-import the module object and destructure — the interop that works across nitro, Vite,
+// Metro, and vitest alike.
+const { RRule, rrulestr } = rrulePkg
 
 // P2-08 recurrence engine — a thin, timezone-correct wrapper over `rrule`.
 //
