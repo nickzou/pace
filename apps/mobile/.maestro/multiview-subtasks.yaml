@@ -1,0 +1,77 @@
+# Mobile Multiview (P2-07): "Show subtasks" surfaces a subtask as its own board card. Mirrors the
+# web show-subtasks behaviour — the native list keeps subtasks nested (they live in the detail), and
+# the toggle governs whether they surface as their own items in the board/calendar.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user.
+- evalScript: ${output.email = 'maestro-mv-sub-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Subtasks View"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a parent task.
+- tapOn:
+    id: "task-input"
+- inputText: "Parent"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Parent"
+
+# Add a subtask through its detail (the Subtasks section is below the fold).
+- tapOn: "Parent"
+- assertVisible:
+    id: "detail-title"
+- scrollUntilVisible:
+    element:
+      id: "subtask-input"
+    direction: DOWN
+- tapOn:
+    id: "subtask-input"
+- inputText: "Child"
+- hideKeyboard
+- tapOn:
+    id: "subtask-add"
+- assertVisible:
+    id: "subtask-Child"
+- tapOn:
+    id: "detail-close"
+
+# Board, subtasks OFF (default): the subtask is not surfaced as its own card.
+- tapOn:
+    id: "layout-board"
+- assertVisible: "Parent"
+- assertNotVisible: "Child"
+
+# Turn "Show subtasks" on → the subtask surfaces as its own card (rendered with a ↳ prefix).
+- tapOn:
+    id: "toggle-subtasks"
+- assertVisible: "Child"

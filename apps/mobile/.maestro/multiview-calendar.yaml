@@ -1,0 +1,71 @@
+# Mobile Multiview (P2-07): a task with a due date shows in the calendar's day agenda, and tapping
+# it opens the detail. Mirrors the web calendar's "placed by due date" behaviour — the native
+# calendar is a month grid + day agenda (no FullCalendar).
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start.
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user.
+- evalScript: ${output.email = 'maestro-mv-cal-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Calendar"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a task.
+- tapOn:
+    id: "task-input"
+- inputText: "Due today"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Due today"
+
+# Give it a due date via the detail — the native picker defaults to today, OK accepts it.
+- tapOn:
+    id: "open-.*"
+- assertVisible:
+    id: "detail-title"
+- tapOn:
+    id: "detail-due"
+- tapOn: "OK"
+- assertNotVisible: "Set due date"
+- tapOn:
+    id: "detail-close"
+
+# Calendar: today is the selected day, so the scheduled task is in the agenda.
+- tapOn:
+    id: "layout-calendar"
+- assertVisible: "Due today"
+
+# Tapping the agenda item opens its detail (tap-to-open, no drag on native).
+- tapOn: "Due today"
+- assertVisible:
+    id: "detail-title"
+- tapOn:
+    id: "detail-close"
