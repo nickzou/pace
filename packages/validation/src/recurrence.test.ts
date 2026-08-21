@@ -25,10 +25,15 @@ function offset(instant: Date, tz: string): number {
     second: "2-digit",
   }).formatToParts(instant))
     p[part.type] = part.value
-  return (
-    (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - instant.getTime()) /
-    60000
+  const asUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
   )
+  return (asUtc - instant.getTime()) / 60000
 }
 function utcFromLocal(tz: string, y: number, mo: number, d: number, h = 0, min = 0): string {
   const guess = Date.UTC(y, mo - 1, d, h, min)

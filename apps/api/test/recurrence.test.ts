@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { withAnchor } from "@pace/validation/recurrence"
+import { withAnchor } from "@pace/validation"
 import { and, eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { db } from "../src/db"

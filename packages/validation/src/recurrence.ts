@@ -1,10 +1,15 @@
-import rrulePkg from "rrule"
+import * as rruleModule from "rrule"
 
-// rrule ships CommonJS, so a named ESM import (`import { RRule } from "rrule"`) breaks in the API's
-// nitro/ESM runtime with "Named export 'RRule' not found" (vitest tolerates it, the server doesn't).
-// Default-import the module object and destructure — the interop that works across nitro, Vite,
-// Metro, and vitest alike.
-const { RRule, rrulestr } = rrulePkg
+// rrule resolves to its CommonJS build under the server's ESM runtime (nitro — which then needs a
+// DEFAULT import; a named `import { RRule }` throws "Named export not found") but to its ESM build
+// under Vite/Rolldown (which needs NAMED imports; a default import throws "default is not exported").
+// Opposite requirements. A namespace import + interop-default covers both: the CJS build exposes
+// everything on `.default`; the ESM build has no default, so we fall back to the namespace itself.
+const rrule = ((rruleModule as { default?: typeof import("rrule") }).default ??
+  rruleModule) as typeof import("rrule")
+const { RRule, rrulestr } = rrule
+// `RRule` is now a value binding, so name the instance type explicitly for annotations.
+type RRuleInstance = InstanceType<typeof RRule>
 
 // P2-08 recurrence engine — a thin, timezone-correct wrapper over `rrule`.
 //
@@ -36,7 +41,14 @@ function tzOffsetMinutes(instant: Date, tz: string): number {
   })
   const p: Record<string, string> = {}
   for (const part of dtf.formatToParts(instant)) p[part.type] = part.value
-  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  const asUtc = Date.UTC(
+    Number(p.year),
+    Number(p.month) - 1,
+    Number(p.day),
+    Number(p.hour),
+    Number(p.minute),
+    Number(p.second),
+  )
   return (asUtc - instant.getTime()) / 60000
 }
 
@@ -53,7 +65,13 @@ function toLocalFields(iso: string, tz: string): LocalFields {
   })
   const p: Record<string, string> = {}
   for (const part of dtf.formatToParts(new Date(iso))) p[part.type] = part.value
-  return { y: +p.year, mo: +p.month, d: +p.day, h: +p.hour, min: +p.minute }
+  return {
+    y: Number(p.year),
+    mo: Number(p.month),
+    d: Number(p.day),
+    h: Number(p.hour),
+    min: Number(p.minute),
+  }
 }
 
 // Local wall-clock fields in `tz` → the real UTC instant. DST-correct: solve for the offset at the
@@ -82,7 +100,7 @@ function fromFakeUtc(d: Date): LocalFields {
 const pad2 = (n: number) => String(n).padStart(2, "0")
 
 // Parse a stored rule (DTSTART + RRULE) to a single RRule. Throws on a rule set or garbage.
-function parse(rule: string): RRule {
+function parse(rule: string): RRuleInstance {
   const r = rrulestr(rule)
   if (!(r instanceof RRule)) throw new Error("expected a single RRULE")
   return r

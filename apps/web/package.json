@@ -25,6 +25,7 @@
     "@fullcalendar/react": "^6.1.21",
     "@pace/api-client": "workspace:*",
     "@pace/tokens": "workspace:*",
+    "@pace/validation": "workspace:*",
     "@powersync/react": "^2.0.0",
     "@powersync/web": "^2.1.1",
     "@radix-ui/react-checkbox": "^1.3.11",

@@ -245,14 +245,19 @@ const items = router({
 // The single per-user settings row (the enable toggle). Upsert.
 const settings = router({
   set: protectedProcedure.input(updateUserSettingsSchema).mutation(async ({ ctx, input }) => {
-    if (input.customStatusesEnabled === undefined) return
+    // Partial: only the fields present in this write are touched, so a timezone write (P2-08) can't
+    // clobber customStatusesEnabled, and vice-versa. The row is seeded per user, so the conflict
+    // branch is the everyday path; the insert values only matter for a would-be first write.
+    const patch: Record<string, unknown> = {}
+    if (input.customStatusesEnabled !== undefined)
+      patch.customStatusesEnabled = input.customStatusesEnabled
+    if (input.timezone !== undefined) patch.timezone = input.timezone
+    if (input.timezoneAuto !== undefined) patch.timezoneAuto = input.timezoneAuto
+    if (Object.keys(patch).length === 0) return
     await ctx.db
       .insert(userSettings)
-      .values({ userId: ctx.userId, customStatusesEnabled: input.customStatusesEnabled })
-      .onConflictDoUpdate({
-        target: userSettings.userId,
-        set: { customStatusesEnabled: input.customStatusesEnabled },
-      })
+      .values({ userId: ctx.userId, ...patch })
+      .onConflictDoUpdate({ target: userSettings.userId, set: patch })
   }),
 })
 

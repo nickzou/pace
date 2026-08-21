@@ -56,6 +56,21 @@ export function setTaskParent(db: AbstractPowerSyncDatabase, id: string, parentI
   ])
 }
 
+// Set (or clear) a task's recurrence (P2-08). Writes only these two columns, so the connector
+// routes it to the guarded setRecurrence procedure (like setTaskParent). `rule` null stops
+// repeating; `rule` carries its own DTSTART anchor (see @pace/validation/recurrence withAnchor).
+export function setTaskRecurrence(
+  db: AbstractPowerSyncDatabase,
+  id: string,
+  rule: string | null,
+  regen: "advance" | "duplicate" | null,
+) {
+  return db.execute(
+    "UPDATE tasks SET recurrence = ?, recurrence_regen = ?, updated_at = ? WHERE id = ?",
+    [rule, regen, new Date().toISOString(), id],
+  )
+}
+
 // Set the task's status. resolved_at is left to the server (derived from the status's
 // category on upload, then synced back), so we only touch status_id here.
 export function setTaskStatus(db: AbstractPowerSyncDatabase, id: string, statusId: string) {

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { advanceSchedule, isValidRule } from "@pace/validation/recurrence"
+import { advanceSchedule, isValidRule } from "@pace/validation"
 import { TRPCError } from "@trpc/server"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { generateKeyBetween } from "fractional-indexing"

@@ -17,17 +17,20 @@ import {
   type Task,
   updateTask,
 } from "#/lib/tasks/mutations"
+import { RecurrenceControl } from "#/lib/tasks/recurrence-control"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { SubtaskSection } from "#/lib/tasks/subtask-section"
 import { useToast } from "#/lib/toast"
 
-// A task joined with its status (P2-03).
+// A task joined with its status (P2-03), plus its recurrence (P2-08).
 type DetailTask = Task & {
   status_name: string
   status_color: string
   status_category: string
   status_group_id: string
+  recurrence: string | null
+  recurrence_regen: string | null
 }
 
 // The single-task view/editor shared by the quick modal and the dedicated
@@ -40,7 +43,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: rows, isLoading } = useQuery<DetailTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-            t.created_at, t.updated_at,
+            t.recurrence, t.recurrence_regen, t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id
      FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
@@ -309,6 +312,14 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           </div>
         </label>
       </div>
+
+      <RecurrenceControl
+        db={db}
+        taskId={id}
+        dueIso={task.due_date}
+        recurrence={task.recurrence}
+        recurrenceRegen={task.recurrence_regen}
+      />
 
       <SubtaskSection parentId={id} depth={depth} />
 
