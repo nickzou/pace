@@ -1,0 +1,119 @@
+# Mobile Multiview (P2-07): list ⇄ board ⇄ calendar switching, the board's columns/cards, the
+# "Show subtasks" toggle surfacing a subtask, and the calendar day-agenda placing a task by its due
+# date. Mirrors the web multiview.spec.ts behaviours, adapted to the native components (no
+# URL/persistence — layout is session state; tap-to-open, no drag).
+#
+# Kept as ONE flow (one app launch): the CI emulator's host GPU degrades with repeated
+# pm-clear+launch cycles ("Failed to find ColorBuffer"), so fewer launches keeps the suite stable.
+# The month grid is tall, so its agenda sits below the fold — scroll it fully into view before
+# touching it, and keep that scroll-sensitive step last.
+appId: app.paceproductivity.mobile
+---
+# Clean signed-out start (the session persists in secure-store).
+- runFlow:
+    when:
+      visible:
+        id: "sign-out"
+    commands:
+      - tapOn:
+          id: "sign-out"
+- assertVisible: "Welcome back"
+
+# Sign up a fresh user so the board/list hold only this run's tasks.
+- evalScript: ${output.email = 'maestro-multiview-' + Date.now() + '@pace.test'}
+- tapOn: "Need an account? Sign up"
+- assertVisible: "Create your account"
+- tapOn:
+    id: "name-input"
+- inputText: "Maestro Multiview"
+- tapOn:
+    id: "email-input"
+- inputText: ${output.email}
+- tapOn:
+    id: "password-input"
+- inputText: "supersecret123"
+- hideKeyboard
+- tapOn:
+    id: "submit-button"
+- assertVisible:
+    id: "signed-in"
+
+# Add a task (Add is disabled until the seeded default status syncs down — wait for it).
+- tapOn:
+    id: "task-input"
+- inputText: "Alpha"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "add-task"
+      enabled: true
+    timeout: 45000
+- tapOn:
+    id: "add-task"
+- assertVisible: "Alpha"
+
+# Switcher → Board: the default group seeds a To Do (open) and a Done column; the task is a card.
+- tapOn:
+    id: "layout-board"
+- assertVisible: "To Do"
+- assertVisible: "Done"
+- assertVisible: "Alpha"
+
+# Switcher → List: same task.
+- tapOn:
+    id: "layout-list"
+- assertVisible: "Alpha"
+
+# Open the task from the list (tap-to-open): give it a due date (native picker defaults to today;
+# OK accepts) and add a subtask while the detail is open.
+- tapOn: "Alpha"
+- extendedWaitUntil:
+    visible:
+      id: "detail-title"
+    timeout: 15000
+- tapOn:
+    id: "detail-due"
+- tapOn: "OK"
+- assertNotVisible: "Set due date"
+- scrollUntilVisible:
+    element:
+      id: "subtask-input"
+    direction: DOWN
+- tapOn:
+    id: "subtask-input"
+- inputText: "Child"
+- hideKeyboard
+- tapOn:
+    id: "subtask-add"
+- assertVisible:
+    id: "subtask-Child"
+- tapOn:
+    id: "detail-close"
+
+# Board + "Show subtasks": off by default the subtask isn't its own card; on, it surfaces (rendered
+# with a ↳ prefix). Board columns sit near the top, so no scroll is needed — extendedWaitUntil
+# retries the read, riding over the emulator's transient GPU glitches (unlike a strict
+# scrollUntilVisible, which fails outright when a "Failed to find ColorBuffer" hits mid-read).
+# The board renders a subtask card with a "↳ " text prefix, and Maestro matches a selector against
+# the element's FULL text — so match ".*Child" (a regex), not "Child", or it never resolves.
+- tapOn:
+    id: "layout-board"
+- assertVisible: "Alpha"
+- assertNotVisible: ".*Child"
+- tapOn:
+    id: "toggle-subtasks"
+- extendedWaitUntil:
+    visible: ".*Child"
+    timeout: 15000
+
+# Calendar (last — the tall month grid pushes the agenda below the fold): the now-scheduled task
+# shows in today's day agenda. Use fixed scrolls (no visibility read during the swipe, so a GPU
+# glitch can't abort them) to bring the agenda up, then a retrying wait for the task. It's the
+# bottom of the content, so over-scrolling just lands on the last row — the task stays in view.
+- tapOn:
+    id: "layout-calendar"
+- scroll
+- scroll
+- extendedWaitUntil:
+    visible: "Alpha"
+    timeout: 15000

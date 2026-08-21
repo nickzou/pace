@@ -1,6 +1,23 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react"
-import { Trash2, X } from "lucide-react"
+import { GripVertical, Trash2, X } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
@@ -16,6 +33,7 @@ import {
   recolorStatus,
   renameGroup,
   renameStatus,
+  reorderStatuses,
   setCustomStatusesEnabled,
 } from "./mutations"
 
@@ -135,14 +153,63 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
         )}
       </div>
 
-      <ul className="flex flex-col gap-1.5">
-        {statuses.map((s) => (
-          <EditableStatus key={s.id} status={s} />
-        ))}
-      </ul>
+      <StatusList statuses={statuses} />
 
       <AddStatus groupId={group.id} nextPosition={statuses.length} />
     </div>
+  )
+}
+
+// Drag-reorder a group's statuses (P2-07): writes new positions on drop; an optimistic order keeps
+// the list from snapping back while the renumber round-trips. Everything that renders statuses
+// orders by position, so the board columns + all status dropdowns follow.
+function StatusList({ statuses }: { statuses: StatusRow[] }) {
+  const db = usePowerSync()
+  const [order, setOrder] = useState<string[] | null>(null)
+  useEffect(() => {
+    setOrder((cur) => {
+      if (!cur) return null
+      const dbIds = statuses.map((s) => s.id)
+      const sameSet = cur.length === dbIds.length && cur.every((id) => dbIds.includes(id))
+      // Clear once the query's order matches ours (write landed) or the row set changed.
+      return cur.join(",") === dbIds.join(",") || !sameSet ? null : cur
+    })
+  }, [statuses])
+
+  const ordered: StatusRow[] = order
+    ? (order.map((id) => statuses.find((s) => s.id === id)).filter(Boolean) as StatusRow[])
+    : statuses
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    const oldIndex = ordered.findIndex((s) => s.id === active.id)
+    const newIndex = ordered.findIndex((s) => s.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    const ids = arrayMove(
+      ordered.map((s) => s.id),
+      oldIndex,
+      newIndex,
+    )
+    setOrder(ids)
+    void reorderStatuses(db, ids)
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      <SortableContext items={ordered.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <ul className="flex flex-col gap-1.5">
+          {ordered.map((s) => (
+            <EditableStatus key={s.id} status={s} />
+          ))}
+        </ul>
+      </SortableContext>
+    </DndContext>
   )
 }
 
@@ -156,6 +223,9 @@ function EditableStatus({ status }: { status: StatusRow }) {
   const { theme } = useTheme()
   const [name, setName] = useState(status.name)
   const [picking, setPicking] = useState(false)
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: status.id,
+  })
   // Re-seed if the row changes under us (e.g. a rename synced from another device) — but
   // not mid-typing, since no local write lands until blur.
   useEffect(() => setName(status.name), [status.name])
@@ -167,8 +237,21 @@ function EditableStatus({ status }: { status: StatusRow }) {
   }
 
   return (
-    <li className="flex flex-col gap-1.5">
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("flex flex-col gap-1.5", isDragging && "opacity-60")}
+    >
       <div className="flex items-center gap-2 text-sm">
+        <button
+          type="button"
+          aria-label={`Reorder ${status.name}`}
+          className="shrink-0 cursor-grab text-muted-foreground/40 transition hover:text-muted-foreground active:cursor-grabbing [&_svg]:size-3.5"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical />
+        </button>
         <button
           type="button"
           aria-label={`Change ${status.name} colour`}
