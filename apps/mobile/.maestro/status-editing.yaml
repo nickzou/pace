@@ -45,8 +45,7 @@ appId: app.paceproductivity.mobile
     id: "statuses-toggle"
 # add-status-input lives inside a group block, which only renders once the seeded default
 # status_groups COLD-SYNC down via PowerSync after signup — an async round-trip that can outlast
-# a short wait (the earlier flakes: sometimes present, sometimes not). Scroll it into view with a
-# sync-sized timeout + settle between scrolls (mirrors the web spec's test.slow patience). (flake fix)
+# a short wait. Scroll it into view with a sync-sized timeout + settle between scrolls.
 - scrollUntilVisible:
     element:
       id: "add-status-input"
@@ -54,9 +53,16 @@ appId: app.paceproductivity.mobile
     timeout: 60000
     waitToSettleTimeoutMs: 1000
 
-# Add a status (space-free name to keep the testID selectors simple).
-- tapOn:
-    id: "add-status-input"
+# Add a status (space-free name to keep the testID selectors simple). The default statuses are still
+# streaming in, so the group list re-renders and this input can unmount for a frame right as we tap
+# (scroll finds it, the tap a beat later misses). Retry the tap with a settle so it lands once the
+# syncing list stops churning. (flake fix)
+- retry:
+    maxRetries: 4
+    commands:
+      - tapOn:
+          id: "add-status-input"
+          waitToSettleTimeoutMs: 2000
 - inputText: "QA"
 - hideKeyboard
 - tapOn:
