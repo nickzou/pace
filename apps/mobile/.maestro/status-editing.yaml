@@ -41,25 +41,27 @@ appId: app.paceproductivity.mobile
       id: "statuses-toggle"
       enabled: true
     timeout: 45000
-- tapOn:
-    id: "statuses-toggle"
-# add-status-input lives inside a group block, which only renders once the seeded default
-# status_groups COLD-SYNC down via PowerSync after signup — an async round-trip that can outlast
-# a short wait. Scroll it into view with a sync-sized timeout + settle between scrolls.
-- scrollUntilVisible:
-    element:
-      id: "add-status-input"
-    direction: DOWN
-    timeout: 60000
-    waitToSettleTimeoutMs: 1000
-
-# Add a status (space-free name to keep the testID selectors simple). The default statuses are still
-# streaming in, so the group list re-renders and this input can unmount for a frame right as we tap
-# (scroll finds it, the tap a beat later misses). Retry the tap with a settle so it lands once the
-# syncing list stops churning. (flake fix)
+# Enabling is racy during the initial cold sync: tapping the toggle sets custom_statuses_enabled=1
+# LOCALLY, but the still-arriving user_settings snapshot (=0) can land afterwards and revert it —
+# the section collapses back to the "Turn this on" hint and add-status-input vanishes (the flake).
+# So make enabling parity-safe: only tap the toggle while the off-hint is showing, then require the
+# section (add-status-input) to actually appear — retrying re-enables it if the snapshot reverts,
+# converging once the sync settles. Then add a status. (flake fix — cold-sync toggle revert)
 - retry:
-    maxRetries: 4
+    maxRetries: 6
     commands:
+      - runFlow:
+          when:
+            visible: "Turn this on"
+          commands:
+            - tapOn:
+                id: "statuses-toggle"
+      - scrollUntilVisible:
+          element:
+            id: "add-status-input"
+          direction: DOWN
+          timeout: 15000
+          waitToSettleTimeoutMs: 1000
       - tapOn:
           id: "add-status-input"
           waitToSettleTimeoutMs: 2000
