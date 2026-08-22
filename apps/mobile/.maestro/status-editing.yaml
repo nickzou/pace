@@ -41,14 +41,16 @@ appId: app.paceproductivity.mobile
       id: "statuses-toggle"
       enabled: true
     timeout: 45000
-# Enabling is racy during the initial cold sync: tapping the toggle sets custom_statuses_enabled=1
-# LOCALLY, but the still-arriving user_settings snapshot (=0) can land afterwards and revert it —
-# the section collapses back to the "Turn this on" hint and add-status-input vanishes (the flake).
-# So make enabling parity-safe: only tap the toggle while the off-hint is showing, then require the
-# section (add-status-input) to actually appear — retrying re-enables it if the snapshot reverts,
-# converging once the sync settles. Then add a status. (flake fix — cold-sync toggle revert)
+# Enabling is doubly racy during the initial cold sync. (1) Tapping the toggle sets
+# custom_statuses_enabled=1 LOCALLY, but the still-arriving user_settings snapshot (=0) can land
+# afterwards and revert it — the section collapses back to the "Turn this on" hint. (2) Even enabled,
+# add-status-input lives inside a group block that only renders once the seeded default status_groups
+# cold-sync down — and under parallel CI load that latency is effectively unbounded (seen >70s).
+# So loop with a large total budget: each pass re-enables if the snapshot reverted (parity-safe:
+# only tap while the off-hint shows), then waits for the groups to arrive. Converges once sync
+# settles — ~8 passes × 20s ≈ 200s of patience. Then add a status. (flake fix — cold-sync latency)
 - retry:
-    maxRetries: 6
+    maxRetries: 8
     commands:
       - runFlow:
           when:
@@ -60,7 +62,7 @@ appId: app.paceproductivity.mobile
           element:
             id: "add-status-input"
           direction: DOWN
-          timeout: 15000
+          timeout: 20000
           waitToSettleTimeoutMs: 1000
       - tapOn:
           id: "add-status-input"
