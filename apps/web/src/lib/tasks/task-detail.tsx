@@ -1,3 +1,4 @@
+import { presetDueDays } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
 import { lazy, Suspense, useMemo, useRef, useState } from "react"
@@ -17,11 +18,13 @@ import {
   type Task,
   updateTask,
 } from "#/lib/tasks/mutations"
+
 // Lazy so rrule (a CommonJS module) never enters the server-render / main bundle — it loads with
 // the detail modal, client-only (P2-08).
 const RecurrenceControl = lazy(() =>
   import("#/lib/tasks/recurrence-control").then((m) => ({ default: m.RecurrenceControl })),
 )
+
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { SubtaskSection } from "#/lib/tasks/subtask-section"
@@ -313,6 +316,28 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               onChange={(event) => saveDue(dueDay, event.target.value)}
               className={`w-28 shrink-0 rounded-lg border bg-background px-2 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
             />
+          </div>
+          {/* Preset quick-dates (P2-08 · R4) — one tap to a common due day; keeps any picked time. */}
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {presetDueDays(new Date()).map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => saveDue(p.day, dueTime)}
+                className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+              >
+                {p.label}
+              </button>
+            ))}
+            {dueDay ? (
+              <button
+                type="button"
+                onClick={() => saveDue("", "")}
+                className="rounded-full border border-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-destructive"
+              >
+                Clear
+              </button>
+            ) : null}
           </div>
         </label>
       </div>

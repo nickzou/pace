@@ -1,3 +1,4 @@
+import { presetDueDays } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
 import { useEffect, useRef, useState } from "react"
@@ -443,6 +444,29 @@ function Detail({
             ) : null}
           </View>
 
+          {/* Preset quick-dates (P2-08 · R4) — one tap to a common due day; keeps any picked time. */}
+          <View style={styles.presetRow}>
+            {presetDueDays(new Date()).map((p) => {
+              const [py, pm, pd] = p.day.split("-").map(Number)
+              const date = new Date(py as number, (pm as number) - 1, pd as number)
+              return (
+                <Pressable
+                  key={p.key}
+                  testID={`due-preset-${p.key}`}
+                  onPress={() =>
+                    saveDue(
+                      combineDay(date, task.due_date, !!task.due_has_time, DUE_FALLBACK),
+                      !!task.due_has_time,
+                    )
+                  }
+                  style={styles.presetChip}
+                >
+                  <Text style={styles.presetText}>{p.label}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+
           {iosPicker ? (
             <DateTimePicker
               value={iosPicker.value}
@@ -576,4 +600,13 @@ const makeStyles = (c: Palette) =>
     },
     timeText: { color: c.textPrimary, fontSize: 15 },
     addTimeText: { color: c.textMuted, fontSize: 13 },
+    presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 44 },
+    presetChip: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 999,
+      paddingVertical: 5,
+      paddingHorizontal: 11,
+    },
+    presetText: { color: c.textMuted, fontSize: 12 },
   })
