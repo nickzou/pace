@@ -1,3 +1,4 @@
+import { occurrencesBetween } from "@pace/validation"
 import { combineLocal, DUE_FALLBACK, START_FALLBACK } from "../dates"
 import { statusHex } from "../status-control"
 import type { ListTask } from "./types"
@@ -20,7 +21,11 @@ export type CalendarEvent = {
   backgroundColor: string
   borderColor: string
   classNames?: string[]
+  editable?: boolean
 }
+
+// The prefix on a ghost event's id (P2-08). Strip it to recover the real task id on click.
+export const GHOST_PREFIX = "ghost:"
 
 // One task → its FullCalendar event. Placed by due_date; a start_date makes it a start→due range.
 // For all-day events the end is EXCLUSIVE, so a range that ends "on" the due day extends to due+1.
@@ -58,6 +63,44 @@ export function buildCalendarData(tasks: ListTask[], theme: "dark" | "light") {
   const unscheduled = tasks.filter((t) => !t.due_date)
   const events = tasks.filter((t) => t.due_date).map((t) => buildEvent(t, theme))
   return { events, unscheduled }
+}
+
+// Faded, non-draggable projections of each repeating task's UPCOMING occurrences within the visible
+// window (P2-08 §8) — virtual, never stored. The real current occurrence renders via buildEvent; a
+// ghost is every occurrence strictly after it, computed tz-correctly by the recurrence engine. Click
+// still opens the task (the id keeps the GHOST_PREFIX so the view can recover it).
+export function buildGhosts(
+  tasks: ListTask[],
+  windowStartIso: string,
+  windowEndIso: string,
+  theme: "dark" | "light",
+  tz: string,
+): CalendarEvent[] {
+  const ghosts: CalendarEvent[] = []
+  for (const t of tasks) {
+    if (!t.recurrence || !t.due_date) continue
+    const color = statusHex(t.status_color, theme)
+    const classNames = ["fc-ghost", ...(t.parent_id ? ["fc-subtask"] : [])]
+    for (const iso of occurrencesBetween(
+      t.recurrence,
+      t.due_date,
+      windowStartIso,
+      windowEndIso,
+      tz,
+    )) {
+      ghosts.push({
+        id: `${GHOST_PREFIX}${t.id}:${iso}`,
+        title: t.title,
+        start: t.due_has_time ? iso : localDay(new Date(iso)),
+        allDay: !t.due_has_time,
+        backgroundColor: color,
+        borderColor: color,
+        classNames,
+        editable: false,
+      })
+    }
+  }
+  return ghosts
 }
 
 export type RescheduleWrite = {

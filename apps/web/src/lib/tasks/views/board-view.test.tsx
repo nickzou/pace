@@ -37,6 +37,7 @@ const task = (over: Partial<ListTask>): ListTask => ({
   status_group_id: "g1",
   child_count: 0,
   done_count: 0,
+  recurrence: null,
   ...over,
 })
 

@@ -89,3 +89,14 @@ body {
   content: "↳ ";
   opacity: 0.75;
 }
+
+/* Ghost occurrences (P2-08): faded, hollow projections of a repeating task's upcoming dates. Muted
+   and outline-only so they read as "coming up", not real events; still clickable. */
+.fc .fc-ghost {
+  opacity: 0.45;
+  background-color: transparent !important;
+  border-style: dashed;
+}
+.fc .fc-ghost .fc-daygrid-event-dot {
+  opacity: 0.6;
+}
