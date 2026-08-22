@@ -1,8 +1,8 @@
-import { presetDueDays } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
 import { lazy, Suspense, useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
+import { DatePickerField } from "#/lib/tasks/date-picker-field"
 import {
   combineLocal,
   DUE_FALLBACK,
@@ -269,26 +269,17 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           Start
-          <div className="flex gap-2">
-            <input
-              type="date"
-              aria-label="Start date"
-              value={startDay}
-              onChange={(event) => saveStart(event.target.value, startTime)}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-            />
-            <input
-              type="time"
-              aria-label="Start time"
-              value={startTime}
-              onChange={(event) => saveStart(startDay, event.target.value)}
-              className="w-28 shrink-0 rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-ring"
-            />
-          </div>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <DatePickerField
+            day={startDay}
+            time={startTime}
+            onChange={saveStart}
+            dateAriaLabel="Start date"
+            timeAriaLabel="Start time"
+          />
+        </div>
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
             Due
             {dueState === "overdue" ? (
@@ -301,45 +292,16 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               </span>
             ) : null}
           </span>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              aria-label="Due date"
-              value={dueDay}
-              onChange={(event) => saveDue(event.target.value, dueTime)}
-              className={`min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
-            />
-            <input
-              type="time"
-              aria-label="Due time"
-              value={dueTime}
-              onChange={(event) => saveDue(dueDay, event.target.value)}
-              className={`w-28 shrink-0 rounded-lg border bg-background px-2 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
-            />
-          </div>
-          {/* Preset quick-dates (P2-08 · R4) — one tap to a common due day; keeps any picked time. */}
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {presetDueDays(new Date()).map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => saveDue(p.day, dueTime)}
-                className="rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
-              >
-                {p.label}
-              </button>
-            ))}
-            {dueDay ? (
-              <button
-                type="button"
-                onClick={() => saveDue("", "")}
-                className="rounded-full border border-transparent px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-destructive"
-              >
-                Clear
-              </button>
-            ) : null}
-          </div>
-        </label>
+          <DatePickerField
+            day={dueDay}
+            time={dueTime}
+            onChange={saveDue}
+            dateAriaLabel="Due date"
+            timeAriaLabel="Due time"
+            fieldClass={dueFieldClass}
+            showPresets
+          />
+        </div>
       </div>
 
       <Suspense fallback={null}>

@@ -100,3 +100,39 @@ body {
 .fc .fc-ghost .fc-daygrid-event-dot {
   opacity: 0.6;
 }
+
+/* react-day-picker (P2-08 · R5) — layout comes from the library CSS (imported by the Calendar
+   component); here we re-theme it to our design tokens, mirroring the FullCalendar block above. */
+.rdp-root {
+  --rdp-accent-color: var(--primary, #60a5fa);
+  --rdp-accent-background-color: color-mix(in oklab, var(--primary, #60a5fa) 15%, transparent);
+  --rdp-today-color: var(--primary, #60a5fa);
+  --rdp-day-width: 2.25rem;
+  --rdp-day-height: 2.25rem;
+  --rdp-day_button-width: 2.25rem;
+  --rdp-day_button-height: 2.25rem;
+  --rdp-day_button-border-radius: 0.5rem;
+  --rdp-selected-border: none;
+  --rdp-outside-opacity: 0.4;
+  --rdp-disabled-opacity: 0.35;
+  --rdp-weekday-opacity: 0.7;
+  color: var(--foreground, #f4f2ff);
+  font-size: 0.875rem;
+}
+.rdp-root .rdp-weekday {
+  font-weight: 500;
+  color: var(--muted-foreground, #a7a3c8);
+}
+.rdp-root .rdp-day_button:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--accent, #212029) 70%, transparent);
+}
+/* The library only borders the selected day; we want a filled pill in our primary colour. */
+.rdp-root .rdp-selected {
+  font-size: inherit;
+}
+.rdp-root .rdp-selected .rdp-day_button {
+  background-color: var(--primary, #60a5fa);
+  color: var(--primary-foreground, #0b0a14);
+  border: none;
+  font-weight: 600;
+}
