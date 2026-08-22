@@ -116,3 +116,27 @@ test("an explicit time equal to the no-time default (11:59 PM) is kept, not swal
   await expect(page.getByLabel("Due date")).toHaveValue("2030-06-15")
   await expect(page.getByLabel("Due time")).toHaveValue("23:59")
 })
+
+test("the calendar popover + a preset chip set the due date (P2-08 · R5/R4)", async ({ page }) => {
+  await page.goto("/")
+  await expectSignedIn(page)
+
+  const title = `Pick a date ${Date.now()}`
+  await page.getByPlaceholder("Add a task…").fill(title)
+  await page.getByRole("button", { name: "Add" }).click()
+  await expect(page.getByText(title)).toBeVisible()
+
+  // Open the detail, then the react-day-picker popover from the calendar button.
+  await page.getByText(title).click()
+  await page.getByTestId("due-date-calendar").click()
+  await expect(page.getByRole("grid")).toBeVisible() // the month grid rendered
+
+  // The "Today" preset chip (exact, so it can't match a day cell whose name contains "Today")
+  // sets the due date to the local today and closes the popover.
+  await page.getByRole("button", { name: "Today", exact: true }).click()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const now = new Date()
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  await expect(page.getByLabel("Due date")).toHaveValue(today)
+  await expect(page.getByRole("grid")).toBeHidden() // popover closed after the pick
+})

@@ -57,9 +57,11 @@ export function DatePickerField({
             <button
               type="button"
               // Deliberately not "…{dateAriaLabel}…": a substring of the input's label would make
-              // getByLabel("Due date") ambiguous (input + button). Kept generic + distinct.
+              // getByLabel("Due date") ambiguous (input + button). Kept generic for a11y; a testid
+              // (e.g. "due-date-calendar") disambiguates the two fields for the e2e.
               aria-label="Open calendar"
               title="Open calendar"
+              data-testid={`${dateAriaLabel.replace(/\s+/g, "-").toLowerCase()}-calendar`}
               className="px-2.5 py-2 text-muted-foreground transition-colors hover:text-foreground"
             >
               <CalendarIcon className="size-4" />
