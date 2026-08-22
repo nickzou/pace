@@ -1,6 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
-import { useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import {
   combineLocal,
@@ -17,7 +17,11 @@ import {
   type Task,
   updateTask,
 } from "#/lib/tasks/mutations"
-import { RecurrenceControl } from "#/lib/tasks/recurrence-control"
+// Lazy so rrule (a CommonJS module) never enters the server-render / main bundle — it loads with
+// the detail modal, client-only (P2-08).
+const RecurrenceControl = lazy(() =>
+  import("#/lib/tasks/recurrence-control").then((m) => ({ default: m.RecurrenceControl })),
+)
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { SubtaskSection } from "#/lib/tasks/subtask-section"
@@ -313,13 +317,15 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         </label>
       </div>
 
-      <RecurrenceControl
-        db={db}
-        taskId={id}
-        dueIso={task.due_date}
-        recurrence={task.recurrence}
-        recurrenceRegen={task.recurrence_regen}
-      />
+      <Suspense fallback={null}>
+        <RecurrenceControl
+          db={db}
+          taskId={id}
+          dueIso={task.due_date}
+          recurrence={task.recurrence}
+          recurrenceRegen={task.recurrence_regen}
+        />
+      </Suspense>
 
       <SubtaskSection parentId={id} depth={depth} />
 
