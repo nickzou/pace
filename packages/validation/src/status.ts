@@ -74,6 +74,10 @@ export type UpdateStatus = z.infer<typeof updateStatusSchema>
 // Per-user preferences that sync — P2-03 introduces the first (`customStatusesEnabled`).
 export const userSettingsSchema = z.object({
   customStatusesEnabled: z.boolean().default(false),
+  // P2-08: the user's IANA timezone for recurrence math (auto-detected + overridable in Settings);
+  // `timezoneAuto` keeps auto-detection on until they pin one. null timezone = not yet detected.
+  timezone: z.string().nullable().default(null),
+  timezoneAuto: z.boolean().default(true),
 })
 export type UserSettings = z.infer<typeof userSettingsSchema>
 

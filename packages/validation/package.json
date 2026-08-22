@@ -2,6 +2,7 @@
   "name": "@pace/validation",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": "./src/index.ts"
   },
@@ -16,6 +17,7 @@
   },
   "dependencies": {
     "@pace/tokens": "workspace:*",
+    "rrule": "^2.8.1",
     "zod": "^4.4.3"
   }
 }

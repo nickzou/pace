@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarDays, ListTodo, LogOut, Menu, Sun } from "lucide
 import { type ReactNode, useEffect, useState } from "react"
 import { signOut, useSession } from "#/lib/auth-client"
 import { RequireLocalDb } from "#/lib/powersync/require-db"
+import { TimezoneSync } from "#/lib/statuses/timezone-sync"
 import { dueDayState } from "#/lib/tasks/dates"
 import { statusHex } from "#/lib/tasks/status-control"
 import { useTheme } from "#/lib/theme"
@@ -103,6 +104,8 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen">
+      {/* Keeps the user's timezone auto-detected for recurrence math (P2-08). Renders nothing. */}
+      <TimezoneSync />
       {/* Desktop rail */}
       <aside className="hidden w-60 shrink-0 flex-col gap-6 border-r border-border bg-card/40 p-4 md:flex">
         <SidebarNav {...nav} />

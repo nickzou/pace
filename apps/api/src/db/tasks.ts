@@ -65,6 +65,13 @@ export const tasks = pgTable(
     // (migration 0009) with spaced keys preserving today's created_at DESC order. The empty
     // default only exists so the ADD COLUMN is non-blocking; the backfill overwrites it.
     sortOrder: text("sort_order").notNull().default(""),
+    // Recurrence (P2-08): a nullable RRULE (RFC 5545) body, anchored to due_date — NULL means the
+    // task doesn't repeat. `recurrenceRegen` picks what completing it does: 'advance' reschedules
+    // this same task to the next occurrence; 'duplicate' leaves it done and the server mints a fresh
+    // task for the next occurrence. Generation is event-driven on the non-done → done transition
+    // (tasks router), so there's no scheduled job; future occurrences are computed, never stored.
+    recurrence: text("recurrence"),
+    recurrenceRegen: text("recurrence_regen"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()

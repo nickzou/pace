@@ -41,14 +41,24 @@ appId: app.paceproductivity.mobile
       id: "statuses-toggle"
       enabled: true
     timeout: 45000
+# Enable custom statuses. A fresh signup starts OFF, and the app now holds the toggle ON optimistically
+# through the cold-sync window (see status-settings.tsx), so a plain tap sticks — no parity guard, which
+# previously skipped the tap when the section hadn't rendered its hint yet right after opening Settings.
 - tapOn:
     id: "statuses-toggle"
-- assertVisible:
-    id: "add-status-input"
-
-# Add a status (space-free name to keep the testID selectors simple).
+# add-status-input lives inside a group block that only renders once the seeded default status_groups
+# COLD-SYNC down — under parallel CI load that latency is large (seen ~60s). Wait for it with a single,
+# long-timeout scroll: retry() caps its own total near ~90s, but a lone scrollUntilVisible honours its
+# full timeout. ~180s of patience outlasts the slow-CI default-group sync. Then add a status.
+- scrollUntilVisible:
+    element:
+      id: "add-status-input"
+    direction: DOWN
+    timeout: 180000
+    waitToSettleTimeoutMs: 1000
 - tapOn:
     id: "add-status-input"
+    waitToSettleTimeoutMs: 2000
 - inputText: "QA"
 - hideKeyboard
 - tapOn:
@@ -59,6 +69,8 @@ appId: app.paceproductivity.mobile
 # Recolour it: open its picker and pick blue (the recolorStatus path — the gap this fixes).
 - tapOn:
     id: "status-color-QA"
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "status-swatch-blue"
 
@@ -100,11 +112,31 @@ appId: app.paceproductivity.mobile
     id: "settings-close"
 - tapOn:
     id: "settings-open"
+# Reopening remounts the section, so the optimistic override resets and the toggle reflects the local
+# DB — which can still read disabled if the enable hasn't converged server→client under CI load. Scroll
+# the toggle into view and re-enable if the off-hint shows (sticky again for this mount) so the persisted
+# QAdone/Sprint2 rows are on screen. Parity-safe: only taps while disabled, and the section is rendered
+# first (so the hint check can't race an un-rendered section as it did right after opening Settings).
+- scrollUntilVisible:
+    element:
+      id: "statuses-toggle"
+    direction: DOWN
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Turn this on"
+    commands:
+      - tapOn:
+          id: "statuses-toggle"
 - scrollUntilVisible:
     element:
       id: "status-name-QAdone"
     direction: DOWN
+    timeout: 60000
+    waitToSettleTimeoutMs: 1000
 - scrollUntilVisible:
     element:
       id: "group-name-Sprint2"
     direction: DOWN
+    timeout: 60000
+    waitToSettleTimeoutMs: 1000

@@ -1,7 +1,8 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
-import { useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
+import { DatePickerField } from "#/lib/tasks/date-picker-field"
 import {
   combineLocal,
   DUE_FALLBACK,
@@ -17,17 +18,26 @@ import {
   type Task,
   updateTask,
 } from "#/lib/tasks/mutations"
+
+// Lazy so rrule (a CommonJS module) never enters the server-render / main bundle — it loads with
+// the detail modal, client-only (P2-08).
+const RecurrenceControl = lazy(() =>
+  import("#/lib/tasks/recurrence-control").then((m) => ({ default: m.RecurrenceControl })),
+)
+
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { SubtaskSection } from "#/lib/tasks/subtask-section"
 import { useToast } from "#/lib/toast"
 
-// A task joined with its status (P2-03).
+// A task joined with its status (P2-03), plus its recurrence (P2-08).
 type DetailTask = Task & {
   status_name: string
   status_color: string
   status_category: string
   status_group_id: string
+  recurrence: string | null
+  recurrence_regen: string | null
 }
 
 // The single-task view/editor shared by the quick modal and the dedicated
@@ -40,7 +50,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: rows, isLoading } = useQuery<DetailTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-            t.created_at, t.updated_at,
+            t.recurrence, t.recurrence_regen, t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id
      FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
@@ -259,26 +269,17 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           Start
-          <div className="flex gap-2">
-            <input
-              type="date"
-              aria-label="Start date"
-              value={startDay}
-              onChange={(event) => saveStart(event.target.value, startTime)}
-              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-            />
-            <input
-              type="time"
-              aria-label="Start time"
-              value={startTime}
-              onChange={(event) => saveStart(startDay, event.target.value)}
-              className="w-28 shrink-0 rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground outline-none focus:border-ring"
-            />
-          </div>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <DatePickerField
+            day={startDay}
+            time={startTime}
+            onChange={saveStart}
+            dateAriaLabel="Start date"
+            timeAriaLabel="Start time"
+          />
+        </div>
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-2">
             Due
             {dueState === "overdue" ? (
@@ -291,24 +292,27 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
               </span>
             ) : null}
           </span>
-          <div className="flex gap-2">
-            <input
-              type="date"
-              aria-label="Due date"
-              value={dueDay}
-              onChange={(event) => saveDue(event.target.value, dueTime)}
-              className={`min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
-            />
-            <input
-              type="time"
-              aria-label="Due time"
-              value={dueTime}
-              onChange={(event) => saveDue(dueDay, event.target.value)}
-              className={`w-28 shrink-0 rounded-lg border bg-background px-2 py-2 text-sm outline-none focus:border-ring ${dueFieldClass}`}
-            />
-          </div>
-        </label>
+          <DatePickerField
+            day={dueDay}
+            time={dueTime}
+            onChange={saveDue}
+            dateAriaLabel="Due date"
+            timeAriaLabel="Due time"
+            fieldClass={dueFieldClass}
+            showPresets
+          />
+        </div>
       </div>
+
+      <Suspense fallback={null}>
+        <RecurrenceControl
+          db={db}
+          taskId={id}
+          dueIso={task.due_date}
+          recurrence={task.recurrence}
+          recurrenceRegen={task.recurrence_regen}
+        />
+      </Suspense>
 
       <SubtaskSection parentId={id} depth={depth} />
 

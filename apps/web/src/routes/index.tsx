@@ -71,7 +71,7 @@ export const Route = createFileRoute("/")({
 const TASKS_SQL = `
   SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
          t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-         t.sort_order, t.created_at, t.updated_at,
+         t.sort_order, t.recurrence, t.created_at, t.updated_at,
          s.name AS status_name, s.color AS status_color,
          s.category AS status_category, s.group_id AS status_group_id,
          (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,

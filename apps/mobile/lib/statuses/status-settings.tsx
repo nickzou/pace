@@ -42,7 +42,16 @@ export function StatusesSection() {
     "SELECT id, custom_statuses_enabled FROM user_settings LIMIT 1",
   )
   const settings = settingsRows[0]
-  const enabled = !!settings?.custom_statuses_enabled
+  const enabledSynced = !!settings?.custom_statuses_enabled
+  // Optimistic override for the enable toggle (P2-08 — fixes a cold-sync revert). Tapping writes
+  // custom_statuses_enabled=1 locally, but the in-flight first-sync snapshot (=0) can land afterwards
+  // and revert it before the post-write checkpoint arrives — flickering the whole section back to
+  // disabled (and, in CI, losing the just-revealed editor). Once the user sets the toggle, keep showing
+  // their choice for this mount. NOT auto-cleared on a transient match: the clobber can land AFTER the
+  // local write reads back true but before the server checkpoint, so clearing then would re-expose it.
+  // A fresh mount (reopen/reload) starts null and reflects the persisted value.
+  const [intent, setIntent] = useState<boolean | null>(null)
+  const enabled = intent ?? enabledSynced
   const { data: groups } = useQuery<GroupRow>(
     "SELECT id, name, is_default FROM status_groups ORDER BY position, created_at",
   )
@@ -58,7 +67,11 @@ export function StatusesSection() {
           testID="statuses-toggle"
           disabled={!settings}
           value={enabled}
-          onValueChange={(next) => settings && void setCustomStatusesEnabled(db, settings.id, next)}
+          onValueChange={(next) => {
+            if (!settings) return
+            setIntent(next)
+            void setCustomStatusesEnabled(db, settings.id, next)
+          }}
           trackColor={{ true: colors.primary }}
         />
       </View>

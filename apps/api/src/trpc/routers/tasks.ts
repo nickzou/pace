@@ -1,11 +1,16 @@
+import { randomUUID } from "node:crypto"
+import { advanceSchedule, isValidRule } from "@pace/validation"
 import { TRPCError } from "@trpc/server"
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm"
 import { generateKeyBetween } from "fractional-indexing"
-import { statuses, statusGroups } from "../../db/statuses"
+import { statuses, statusGroups, userSettings } from "../../db/statuses"
+import { taskTags } from "../../db/tags"
 import { tasks } from "../../db/tasks"
 import {
   newTaskSchema,
+  type Regen,
   setParentSchema,
+  setRecurrenceSchema,
   type Task,
   taskIdSchema,
   updateTaskSchema,
@@ -33,6 +38,10 @@ function toTask(row: typeof tasks.$inferSelect): Task {
     dueHasTime: row.dueHasTime,
     parentId: row.parentId,
     sortOrder: row.sortOrder,
+    // Free text in the DB; only ever written through the validated setRecurrence path (P2-08),
+    // so the regen mode is safely one of the enum values (or null when not repeating).
+    recurrence: row.recurrence,
+    recurrenceRegen: row.recurrenceRegen as Regen | null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
@@ -93,6 +102,31 @@ async function bottomOfScopeKey(ctx: ProtectedCtx, parentId: string | null): Pro
     )
   const max = row?.max && row.max !== "" ? row.max : null
   return generateKeyBetween(max, null)
+}
+
+// The user's IANA timezone for recurrence math (P2-08). Falls back to UTC before the client has
+// auto-detected one — a repeating task needs a due date and is set from the loaded app (autodetect
+// has run by then), so a null zone is an edge; UTC keeps generation deterministic.
+async function userTimezone(ctx: ProtectedCtx): Promise<string> {
+  const [row] = await ctx.db
+    .select({ tz: userSettings.timezone })
+    .from(userSettings)
+    .where(eq(userSettings.userId, ctx.userId))
+  return row?.tz ?? "UTC"
+}
+
+// Copy a task's tag links onto another task (P2-08 'duplicate' regen carries tags forward).
+async function copyTaskTags(ctx: ProtectedCtx, fromId: string, toId: string): Promise<void> {
+  const links = await ctx.db
+    .select({ tagId: taskTags.tagId })
+    .from(taskTags)
+    .where(and(eq(taskTags.taskId, fromId), eq(taskTags.userId, ctx.userId)))
+  if (links.length === 0) return
+  await ctx.db
+    .insert(taskTags)
+    .values(
+      links.map((l) => ({ id: randomUUID(), taskId: toId, tagId: l.tagId, userId: ctx.userId })),
+    )
 }
 
 // The subtask nesting ceiling (P2-05). Top-level is level 1.
@@ -260,18 +294,43 @@ export const tasksRouter = router({
 
   update: protectedProcedure.input(updateTaskSchema).mutation(async ({ ctx, input }) => {
     const { id, statusId, startDate, dueDate, ...fields } = input
-    // A status change re-derives resolved_at: entering `done` stamps it (COALESCE keeps
-    // the first time); anything else clears it. Verify the status is the user's first.
-    const statusPatch =
-      statusId !== undefined
-        ? {
-            statusId,
-            resolvedAt:
-              (await categoryOf(ctx, statusId)) === "done"
-                ? sql`coalesce(${tasks.resolvedAt}, now())`
-                : null,
+
+    // A status change re-derives resolved_at: entering `done` stamps it (COALESCE keeps the first
+    // time); anything else clears it. And completing a *repeating* task (P2-08) fires generation —
+    // but only on the non-done → done edge, so we read the prior state just for that case.
+    let statusPatch: Record<string, unknown> = {}
+    let completed: { rule: string; regen: Regen; dueDate: Date; startDate: Date | null } | null =
+      null
+    if (statusId !== undefined) {
+      const newCategory = await categoryOf(ctx, statusId)
+      statusPatch = {
+        statusId,
+        resolvedAt: newCategory === "done" ? sql`coalesce(${tasks.resolvedAt}, now())` : null,
+      }
+      if (newCategory === "done") {
+        const [cur] = await ctx.db
+          .select({
+            statusId: tasks.statusId,
+            recurrence: tasks.recurrence,
+            recurrenceRegen: tasks.recurrenceRegen,
+            dueDate: tasks.dueDate,
+            startDate: tasks.startDate,
+          })
+          .from(tasks)
+          .where(and(eq(tasks.id, id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
+        // Fire only when a rule + due exist AND the task wasn't already done (no double-generation
+        // on a re-synced/duplicated completion op).
+        if (cur?.recurrence && cur.dueDate && (await categoryOf(ctx, cur.statusId)) !== "done") {
+          completed = {
+            rule: cur.recurrence,
+            regen: (cur.recurrenceRegen ?? "advance") as Regen,
+            dueDate: cur.dueDate,
+            startDate: cur.startDate,
           }
-        : {}
+        }
+      }
+    }
+
     const [row] = await ctx.db
       .update(tasks)
       .set({
@@ -282,6 +341,89 @@ export const tasksRouter = router({
         ...(dueDate !== undefined ? { dueDate: dueDate ? new Date(dueDate) : null } : {}),
       })
       .where(and(eq(tasks.id, id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
+      .returning()
+    if (!row) throw new TRPCError({ code: "NOT_FOUND" })
+
+    // A repeating task just completed → generate its next occurrence (P2-08 §5).
+    if (completed) {
+      const tz = await userTimezone(ctx)
+      const next = advanceSchedule(
+        completed.rule,
+        completed.dueDate.toISOString(),
+        completed.startDate?.toISOString() ?? null,
+        tz,
+      )
+      if (next) {
+        const open = await defaultStatus(ctx)
+        if (completed.regen === "advance") {
+          // Reschedule THIS task forward and reopen it — the one task lives on.
+          const [reopened] = await ctx.db
+            .update(tasks)
+            .set({
+              statusId: open.id,
+              resolvedAt: null,
+              dueDate: new Date(next.dueIso),
+              startDate: next.startIso ? new Date(next.startIso) : null,
+            })
+            .where(and(eq(tasks.id, id), eq(tasks.userId, ctx.userId)))
+            .returning()
+          return toTask(reopened ?? row)
+        }
+        // 'duplicate': the completed task keeps its done state but loses the rule (a finished
+        // instance); a fresh open task carries the rule + tags to the next occurrence.
+        await ctx.db
+          .update(tasks)
+          .set({ recurrence: null, recurrenceRegen: null })
+          .where(and(eq(tasks.id, id), eq(tasks.userId, ctx.userId)))
+        const sortOrder = await bottomOfScopeKey(ctx, row.parentId)
+        const [fresh] = await ctx.db
+          .insert(tasks)
+          .values({
+            userId: ctx.userId,
+            title: row.title,
+            description: row.description,
+            statusId: open.id,
+            dueDate: new Date(next.dueIso),
+            startDate: next.startIso ? new Date(next.startIso) : null,
+            startHasTime: row.startHasTime,
+            dueHasTime: row.dueHasTime,
+            parentId: row.parentId,
+            sortOrder,
+            recurrence: completed.rule,
+            recurrenceRegen: completed.regen,
+          })
+          .returning()
+        if (fresh) await copyTaskTags(ctx, id, fresh.id)
+        // Return the original (completed) task the client's update targeted; the new task and this
+        // one's cleared rule arrive via the sync stream.
+        return toTask({ ...row, recurrence: null, recurrenceRegen: null })
+      }
+      // Rule exhausted (past COUNT/UNTIL) → the completion simply stands.
+    }
+    return toTask(row)
+  }),
+
+  // Set (or clear) a task's recurrence (P2-08). Isolated like setParent so the connector maps a
+  // clean op and the guards live in one place: the rule must parse, carry a regen mode, and the
+  // task must have a due date to anchor the schedule to. `recurrence: null` stops repeating.
+  setRecurrence: protectedProcedure.input(setRecurrenceSchema).mutation(async ({ ctx, input }) => {
+    if (input.recurrence !== null) {
+      if (!isValidRule(input.recurrence))
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid recurrence rule" })
+      if (input.recurrenceRegen === null)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A recurring task needs a regen mode" })
+      const [t] = await ctx.db
+        .select({ dueDate: tasks.dueDate })
+        .from(tasks)
+        .where(and(eq(tasks.id, input.id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
+      if (!t) throw new TRPCError({ code: "NOT_FOUND" })
+      if (!t.dueDate)
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A repeating task needs a due date" })
+    }
+    const [row] = await ctx.db
+      .update(tasks)
+      .set({ recurrence: input.recurrence, recurrenceRegen: input.recurrenceRegen })
+      .where(and(eq(tasks.id, input.id), eq(tasks.userId, ctx.userId), isNull(tasks.deletedAt)))
       .returning()
     if (!row) throw new TRPCError({ code: "NOT_FOUND" })
     return toTask(row)

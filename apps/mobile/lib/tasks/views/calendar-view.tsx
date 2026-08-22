@@ -1,3 +1,4 @@
+import { occurrencesBetween } from "@pace/validation"
 import { useMemo, useState } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { type Palette, useTheme, useThemedStyles } from "../../theme"
@@ -67,6 +68,25 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
     return map
   }, [tasks])
 
+  // Ghost occurrences (P2-08): a repeating task's UPCOMING dates across the visible month — faded
+  // dots + muted agenda rows, never stored. Recomputed as the month (or tasks) change.
+  const tz = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
+  const ghostByDay = useMemo(() => {
+    const map = new Map<string, ListTask[]>()
+    const start = new Date(cursor.y, cursor.m, 1).toISOString()
+    const end = new Date(cursor.y, cursor.m + 1, 0, 23, 59).toISOString()
+    for (const t of tasks) {
+      if (!t.recurrence || !t.due_date) continue
+      for (const iso of occurrencesBetween(t.recurrence, t.due_date, start, end, tz)) {
+        const key = localDayOf(iso)
+        const arr = map.get(key) ?? []
+        arr.push(t)
+        map.set(key, arr)
+      }
+    }
+    return map
+  }, [tasks, cursor, tz])
+
   // Leading blanks to the 1st's weekday, then each day, then trailing blanks to fill the last week.
   const cells = useMemo(() => {
     const startWeekday = new Date(cursor.y, cursor.m, 1).getDay()
@@ -86,6 +106,7 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   const next = () => setCursor((c) => (c.m === 11 ? { y: c.y + 1, m: 0 } : { y: c.y, m: c.m + 1 }))
 
   const agenda = byDay.get(selected) ?? []
+  const ghostAgenda = ghostByDay.get(selected) ?? []
 
   return (
     <View>
@@ -114,6 +135,7 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
           if (!cell.day) return <View key={cell.key} style={styles.cell} />
           const key = cell.day
           const has = (byDay.get(key)?.length ?? 0) > 0
+          const hasGhost = !has && (ghostByDay.get(key)?.length ?? 0) > 0
           const isSel = key === selected
           const isToday = key === todayKey
           return (
@@ -132,40 +154,67 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
               >
                 {Number(key.slice(-2))}
               </Text>
-              <View style={[styles.dot, has ? (isSel ? styles.dotSel : styles.dotOn) : null]} />
+              <View
+                style={[
+                  styles.dot,
+                  has ? (isSel ? styles.dotSel : styles.dotOn) : hasGhost ? styles.dotGhost : null,
+                ]}
+              />
             </Pressable>
           )
         })}
       </View>
 
       <Text style={styles.agendaHeader}>{prettyDay(selected)}</Text>
-      {agenda.length === 0 ? (
+      {agenda.length === 0 && ghostAgenda.length === 0 ? (
         <Text style={styles.empty}>Nothing due.</Text>
       ) : (
-        agenda.map((t) => (
-          <Pressable
-            key={t.id}
-            testID={`cal-task-${t.id}`}
-            onPress={() => onOpen(t.id)}
-            style={styles.agendaRow}
-          >
-            <View
-              style={[styles.statusDot, { backgroundColor: statusHex(t.status_color, scheme) }]}
-            />
-            <View style={styles.agendaBody}>
-              <Text
-                style={[styles.agendaTitle, t.status_category === "done" ? styles.done : null]}
-                numberOfLines={1}
-              >
-                {t.parent_id ? "↳ " : ""}
-                {t.title}
-              </Text>
-              {t.due_has_time ? (
-                <Text style={styles.agendaMeta}>{formatDate(t.due_date, true)}</Text>
-              ) : null}
-            </View>
-          </Pressable>
-        ))
+        <>
+          {agenda.map((t) => (
+            <Pressable
+              key={t.id}
+              testID={`cal-task-${t.id}`}
+              onPress={() => onOpen(t.id)}
+              style={styles.agendaRow}
+            >
+              <View
+                style={[styles.statusDot, { backgroundColor: statusHex(t.status_color, scheme) }]}
+              />
+              <View style={styles.agendaBody}>
+                <Text
+                  style={[styles.agendaTitle, t.status_category === "done" ? styles.done : null]}
+                  numberOfLines={1}
+                >
+                  {t.parent_id ? "↳ " : ""}
+                  {t.title}
+                </Text>
+                {t.due_has_time ? (
+                  <Text style={styles.agendaMeta}>{formatDate(t.due_date, true)}</Text>
+                ) : null}
+              </View>
+            </Pressable>
+          ))}
+          {/* Ghost occurrences — upcoming repeats, muted (P2-08). Tap opens the underlying task. */}
+          {ghostAgenda.map((t) => (
+            <Pressable
+              key={`ghost-${t.id}`}
+              testID={`cal-ghost-${t.id}`}
+              onPress={() => onOpen(t.id)}
+              style={[styles.agendaRow, styles.ghostRow]}
+            >
+              <View
+                style={[styles.statusDot, { backgroundColor: statusHex(t.status_color, scheme) }]}
+              />
+              <View style={styles.agendaBody}>
+                <Text style={styles.ghostTitle} numberOfLines={1}>
+                  {t.parent_id ? "↳ " : ""}
+                  {t.title}
+                </Text>
+                <Text style={styles.agendaMeta}>Upcoming</Text>
+              </View>
+            </Pressable>
+          ))}
+        </>
       )}
     </View>
   )
@@ -247,4 +296,8 @@ const makeStyles = (c: Palette) =>
     agendaTitle: { color: c.textPrimary, fontSize: 15 },
     agendaMeta: { color: c.textMuted, fontSize: 12 },
     done: { color: c.textMuted, textDecorationLine: "line-through" },
+    // Ghost occurrences (P2-08): a faded dot on the grid + a dashed, translucent agenda row.
+    dotGhost: { backgroundColor: c.textFaint, opacity: 0.6 },
+    ghostRow: { opacity: 0.55, borderStyle: "dashed", backgroundColor: "transparent" },
+    ghostTitle: { color: c.textSecondary, fontSize: 15 },
   })

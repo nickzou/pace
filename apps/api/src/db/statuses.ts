@@ -79,6 +79,10 @@ export const userSettings = pgTable("user_settings", {
     .primaryKey()
     .references(() => user.id, { onDelete: "cascade" }),
   customStatusesEnabled: boolean("custom_statuses_enabled").notNull().default(false),
+  // Recurrence (P2-08) needs the user's local calendar day: an IANA timezone, auto-detected by the
+  // client and overridable in Settings. `timezoneAuto` keeps auto-detection on until they pin one.
+  timezone: text("timezone"),
+  timezoneAuto: boolean("timezone_auto").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()

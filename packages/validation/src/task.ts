@@ -8,6 +8,11 @@ import { z } from "zod"
 //   - id:        a client-minted uuid, so a device can create tasks offline
 //   - updatedAt: lets sync answer "what changed since?"
 //   - deletedAt: a tombstone, so a delete propagates instead of a row vanishing
+// How a repeating task regenerates on completion (P2-08): 'advance' reschedules the same task to
+// its next occurrence; 'duplicate' leaves the completed task done and the server mints a fresh one.
+export const regenSchema = z.enum(["advance", "duplicate"])
+export type Regen = z.infer<typeof regenSchema>
+
 export const taskSchema = z.object({
   id: z.uuid(),
   title: z.string().min(1).max(500),
@@ -31,6 +36,10 @@ export const taskSchema = z.object({
   // `ORDER BY sortOrder, id` within a sibling scope (parentId); a drag rewrites only
   // this field on the moved task, so reorders are O(1) and converge under offline sync.
   sortOrder: z.string(),
+  // Recurrence (P2-08): an RRULE (RFC 5545) body anchored to dueDate, or null when the task doesn't
+  // repeat. recurrenceRegen decides what completion does (see regenSchema); null when not repeating.
+  recurrence: z.string().nullable(),
+  recurrenceRegen: regenSchema.nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
@@ -62,6 +71,10 @@ export const newTaskSchema = taskSchema
     // Optional on create: clients mint a bottom-of-scope key; if omitted, the server
     // assigns one (queries the scope's current max key).
     sortOrder: taskSchema.shape.sortOrder.optional(),
+    // Optional on create: a task may be born repeating (usually set later via setRecurrence). Both
+    // ride create so the server can mint the next occurrence in 'duplicate' mode.
+    recurrence: taskSchema.shape.recurrence.optional(),
+    recurrenceRegen: taskSchema.shape.recurrenceRegen.optional(),
   })
 
 export type NewTask = z.infer<typeof newTaskSchema>
@@ -98,3 +111,15 @@ export const setParentSchema = z.object({
 })
 
 export type SetParent = z.infer<typeof setParentSchema>
+
+// Set (or clear) a task's recurrence (P2-08). Like setParent, recurrence changes go through their
+// own mutation — the connector maps a clean single-purpose op, and the server guards it (the RRULE
+// parses; the task has a dueDate to anchor to). `recurrence: null` stops repeating; `recurrenceRegen`
+// is required alongside a rule and null when clearing.
+export const setRecurrenceSchema = z.object({
+  id: z.uuid(),
+  recurrence: z.string().nullable(),
+  recurrenceRegen: regenSchema.nullable(),
+})
+
+export type SetRecurrence = z.infer<typeof setRecurrenceSchema>

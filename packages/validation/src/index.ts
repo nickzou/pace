@@ -1,3 +1,8 @@
+// The recurrence engine (P2-08). Re-exported from the barrel — rolldown (web) doesn't resolve an
+// exports subpath, and `sideEffects: false` lets bundlers tree-shake rrule out of schema-only
+// consumers regardless.
+export * from "./presets"
+export * from "./recurrence"
 export {
   type NewStatus,
   type NewStatusGroup,
@@ -34,8 +39,12 @@ export {
 export {
   type NewTask,
   newTaskSchema,
+  type Regen,
+  regenSchema,
   type SetParent,
+  type SetRecurrence,
   setParentSchema,
+  setRecurrenceSchema,
   type Task,
   taskIdSchema,
   taskSchema,

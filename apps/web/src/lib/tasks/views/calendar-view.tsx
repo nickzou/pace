@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useTheme } from "#/lib/theme"
 import { cn } from "#/lib/utils"
 import { updateTask } from "../mutations"
-import { buildCalendarData, rescheduleWrite } from "./calendar-logic"
+import { buildCalendarData, buildGhosts, GHOST_PREFIX, rescheduleWrite } from "./calendar-logic"
 import type { ListTask, TaskViewProps } from "./types"
 
 // Calendar view (P2-07 · step 5). FullCalendar month grid over the shared tasks, placed by due_date
@@ -24,6 +24,16 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   const [shelfOpen, setShelfOpen] = useState(false)
 
   const { events, unscheduled } = useMemo(() => buildCalendarData(tasks, theme), [tasks, theme])
+
+  // Ghost occurrences (P2-08 §8): faded projections of each repeating task across the visible month.
+  // FullCalendar reports the visible window via datesSet; recompute when it (or the tasks) change.
+  const tz = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, [])
+  const [range, setRange] = useState<{ start: string; end: string } | null>(null)
+  const ghosts = useMemo(
+    () => (range ? buildGhosts(tasks, range.start, range.end, theme, tz) : []),
+    [tasks, range, theme, tz],
+  )
+  const allEvents = useMemo(() => [...events, ...ghosts], [events, ghosts])
 
   // Wire the unscheduled tray as an external drag source (drop onto a day schedules the task).
   const trayRef = useRef<HTMLDivElement>(null)
@@ -53,10 +63,18 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
           editable
           droppable
           dayMaxEvents
-          events={events}
+          events={allEvents}
+          datesSet={(info) =>
+            setRange({ start: info.start.toISOString(), end: info.end.toISOString() })
+          }
           eventClick={(info) => {
             info.jsEvent.preventDefault()
-            onOpen(info.event.id)
+            // A ghost's id is `ghost:<taskId>:<iso>` — recover the task id so a click still opens it.
+            const raw = info.event.id
+            const id = raw.startsWith(GHOST_PREFIX)
+              ? raw.slice(GHOST_PREFIX.length).split(":")[0]
+              : raw
+            if (id) onOpen(id)
           }}
           eventDrop={(info) => {
             const t = taskById.get(info.event.id)

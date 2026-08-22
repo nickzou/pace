@@ -63,7 +63,15 @@ export function StatusesSettings() {
     "SELECT id, custom_statuses_enabled FROM user_settings LIMIT 1",
   )
   const settings = settingsRows[0]
-  const enabled = !!settings?.custom_statuses_enabled
+  // Optimistic override for the enable toggle (P2-08 — fixes a cold-sync revert). Tapping writes
+  // custom_statuses_enabled=1 locally, but the in-flight first-sync snapshot (=0) can land afterwards
+  // and revert it before the post-write checkpoint arrives — flickering the section back to disabled.
+  // Once the user sets the toggle, keep showing their choice for this mount. NOT auto-cleared on a
+  // transient match: the clobber can land AFTER the local write reads back true but before the server
+  // checkpoint, so clearing then would re-expose it. A fresh mount reflects the persisted value.
+  const enabledSynced = !!settings?.custom_statuses_enabled
+  const [intent, setIntent] = useState<boolean | null>(null)
+  const enabled = intent ?? enabledSynced
 
   const { data: groups } = useQuery<GroupRow>(
     "SELECT id, name, is_default, position FROM status_groups ORDER BY position, created_at",
@@ -92,9 +100,11 @@ export function StatusesSettings() {
           aria-label="Enable custom statuses"
           disabled={!settings}
           checked={enabled}
-          onCheckedChange={(next) =>
-            settings && void setCustomStatusesEnabled(db, settings.id, next)
-          }
+          onCheckedChange={(next) => {
+            if (!settings) return
+            setIntent(next)
+            void setCustomStatusesEnabled(db, settings.id, next)
+          }}
         />
       </div>
 

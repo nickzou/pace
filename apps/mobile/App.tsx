@@ -25,6 +25,7 @@ import { ApiProvider } from "./lib/api"
 import { hasStoredSession, signOut, useSession } from "./lib/auth-client"
 import { PowerSyncProvider } from "./lib/powersync/provider"
 import { SettingsModal } from "./lib/settings/settings-modal"
+import { TimezoneSync } from "./lib/statuses/timezone-sync"
 import { TagChips, type TagOption, TagPicker } from "./lib/tags/tag-control"
 import { dueDayState, formatDate } from "./lib/tasks/dates"
 import { DEFAULT_LAYOUT, type Layout, matchesFilters } from "./lib/tasks/filter"
@@ -120,6 +121,8 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
       <Text style={styles.tag}>set your own pace</Text>
 
       <PowerSyncProvider>
+        {/* Keeps the user's timezone auto-detected for recurrence math (P2-08). Renders nothing. */}
+        <TimezoneSync />
         <Tasks />
         {/* Inside the provider so the settings status-management can query the local DB. */}
         <SettingsModal
@@ -150,7 +153,7 @@ function Tasks() {
   const { data: tasks, isLoading } = useQuery<ListTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-            t.sort_order, t.created_at, t.updated_at,
+            t.sort_order, t.recurrence, t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id,
             (SELECT count(*) FROM tasks c WHERE c.parent_id = t.id) AS child_count,

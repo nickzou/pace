@@ -1,6 +1,14 @@
+import { withAnchor } from "@pace/validation"
 import { describe, expect, it } from "vitest"
 import { toDateInput } from "../dates"
-import { buildCalendarData, buildEvent, localDay, rescheduleWrite } from "./calendar-logic"
+import {
+  buildCalendarData,
+  buildEvent,
+  buildGhosts,
+  GHOST_PREFIX,
+  localDay,
+  rescheduleWrite,
+} from "./calendar-logic"
 import type { ListTask } from "./types"
 
 // The date math is where calendar bugs hide (all-day ends are exclusive, date-only values carry a
@@ -30,6 +38,7 @@ const task = (over: Partial<ListTask> = {}): ListTask => ({
   status_group_id: "g1",
   child_count: 0,
   done_count: 0,
+  recurrence: null,
   ...over,
 })
 
@@ -113,5 +122,36 @@ describe("rescheduleWrite — writes", () => {
 describe("localDay", () => {
   it("formats a local date as YYYY-MM-DD with zero-padding", () => {
     expect(localDay(new Date(2026, 0, 5))).toBe("2026-01-05")
+  })
+})
+
+describe("buildGhosts", () => {
+  it("projects a repeating task's upcoming occurrences in the window, excluding the current due", () => {
+    const due = "2026-08-03T09:00:00.000Z" // Mon 09:00 UTC
+    const t = task({
+      id: "r",
+      due_date: due,
+      due_has_time: 1,
+      recurrence: withAnchor("FREQ=WEEKLY", due, "UTC"),
+    })
+    const ghosts = buildGhosts(
+      [t],
+      "2026-08-01T00:00:00.000Z",
+      "2026-08-31T23:59:00.000Z",
+      "dark",
+      "UTC",
+    )
+    // Aug 10, 17, 24, 31 — the current Aug 3 due is excluded (it's the real event).
+    expect(ghosts).toHaveLength(4)
+    expect(ghosts[0]?.id.startsWith(GHOST_PREFIX)).toBe(true)
+    expect(ghosts.every((g) => g.editable === false)).toBe(true)
+    expect(ghosts.every((g) => g.classNames?.includes("fc-ghost"))).toBe(true)
+  })
+
+  it("returns nothing for a non-repeating task", () => {
+    const t = task({ due_date: "2026-08-03T09:00:00.000Z", recurrence: null })
+    expect(
+      buildGhosts([t], "2026-08-01T00:00:00.000Z", "2026-08-31T00:00:00.000Z", "dark", "UTC"),
+    ).toEqual([])
   })
 })

@@ -65,6 +65,17 @@ async function uploadOp(
             id,
             parentId: data.parent_id != null ? String(data.parent_id) : null,
           })
+        } else if (data.recurrence !== undefined) {
+          // Recurrence is an isolated write (setTaskRecurrence writes only these two columns) →
+          // the guarded setRecurrence procedure, like setParent. null stops repeating.
+          await trpc.tasks.setRecurrence.mutate({
+            id,
+            recurrence: data.recurrence != null ? String(data.recurrence) : null,
+            recurrenceRegen:
+              data.recurrence_regen != null
+                ? (String(data.recurrence_regen) as "advance" | "duplicate")
+                : null,
+          })
         } else {
           await trpc.tasks.update.mutate({
             id,
@@ -132,10 +143,17 @@ async function uploadOp(
       return
 
     case "user_settings":
-      // One durable row per user — never deleted; PUT and PATCH both upsert the toggle.
+      // One durable row per user — never deleted; PUT and PATCH both upsert. Send only the columns
+      // this write touched so a timezone write (P2-08) and the toggle don't clobber each other.
       if (type !== UpdateType.DELETE) {
         await trpc.statuses.settings.set.mutate({
-          customStatusesEnabled: !!data.custom_statuses_enabled,
+          ...(data.custom_statuses_enabled !== undefined
+            ? { customStatusesEnabled: !!data.custom_statuses_enabled }
+            : {}),
+          ...(data.timezone !== undefined
+            ? { timezone: data.timezone != null ? String(data.timezone) : null }
+            : {}),
+          ...(data.timezone_auto !== undefined ? { timezoneAuto: !!data.timezone_auto } : {}),
         })
       }
       return
