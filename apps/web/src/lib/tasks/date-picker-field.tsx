@@ -56,7 +56,10 @@ export function DatePickerField({
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label={`Open ${dateAriaLabel} calendar`}
+              // Deliberately not "…{dateAriaLabel}…": a substring of the input's label would make
+              // getByLabel("Due date") ambiguous (input + button). Kept generic + distinct.
+              aria-label="Open calendar"
+              title="Open calendar"
               className="px-2.5 py-2 text-muted-foreground transition-colors hover:text-foreground"
             >
               <CalendarIcon className="size-4" />
