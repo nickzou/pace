@@ -43,15 +43,16 @@ appId: app.paceproductivity.mobile
     timeout: 45000
 - tapOn:
     id: "statuses-toggle"
-# Toggling on reveals the status-editing section, which extends below the fold and is still
-# settling for a beat. Scroll the add-status field into view before interacting — a bare
-# assertVisible/tap races the reveal (it fails either at the assert or the tap depending on
-# timing). scrollUntilVisible waits + scrolls until it's genuinely on-screen. (flake fix)
+# add-status-input lives inside a group block, which only renders once the seeded default
+# status_groups COLD-SYNC down via PowerSync after signup — an async round-trip that can outlast
+# a short wait (the earlier flakes: sometimes present, sometimes not). Scroll it into view with a
+# sync-sized timeout + settle between scrolls (mirrors the web spec's test.slow patience). (flake fix)
 - scrollUntilVisible:
     element:
       id: "add-status-input"
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
+    waitToSettleTimeoutMs: 1000
 
 # Add a status (space-free name to keep the testID selectors simple).
 - tapOn:
