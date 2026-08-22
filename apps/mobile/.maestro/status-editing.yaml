@@ -41,32 +41,28 @@ appId: app.paceproductivity.mobile
       id: "statuses-toggle"
       enabled: true
     timeout: 45000
-# Enabling is doubly racy during the initial cold sync. (1) Tapping the toggle sets
-# custom_statuses_enabled=1 LOCALLY, but the still-arriving user_settings snapshot (=0) can land
-# afterwards and revert it — the section collapses back to the "Turn this on" hint. (2) Even enabled,
-# add-status-input lives inside a group block that only renders once the seeded default status_groups
-# cold-sync down — and under parallel CI load that latency is effectively unbounded (seen >70s).
-# So loop with a large total budget: each pass re-enables if the snapshot reverted (parity-safe:
-# only tap while the off-hint shows), then waits for the groups to arrive. Converges once sync
-# settles — ~8 passes × 20s ≈ 200s of patience. Then add a status. (flake fix — cold-sync latency)
-- retry:
-    maxRetries: 8
+# Enable custom statuses (parity-safe: only tap while the off-hint shows, so a re-run can't toggle a
+# already-enabled section back off).
+- runFlow:
+    when:
+      visible: "Turn this on"
     commands:
-      - runFlow:
-          when:
-            visible: "Turn this on"
-          commands:
-            - tapOn:
-                id: "statuses-toggle"
-      - scrollUntilVisible:
-          element:
-            id: "add-status-input"
-          direction: DOWN
-          timeout: 20000
-          waitToSettleTimeoutMs: 1000
       - tapOn:
-          id: "add-status-input"
-          waitToSettleTimeoutMs: 2000
+          id: "statuses-toggle"
+# add-status-input lives inside a group block that only renders once the seeded default status_groups
+# COLD-SYNC down — and under parallel CI load that latency is effectively unbounded (seen >70s). Wait
+# for it with a single, long-timeout scroll: retry() caps its own total time near ~90s (so bumping
+# maxRetries did nothing), but a single scrollUntilVisible honours its full timeout. ~180s of patience
+# outlasts the slow-CI default-group sync. Then add a status. (flake fix — cold-sync latency)
+- scrollUntilVisible:
+    element:
+      id: "add-status-input"
+    direction: DOWN
+    timeout: 180000
+    waitToSettleTimeoutMs: 1000
+- tapOn:
+    id: "add-status-input"
+    waitToSettleTimeoutMs: 2000
 - inputText: "QA"
 - hideKeyboard
 - tapOn:
