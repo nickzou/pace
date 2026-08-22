@@ -20,6 +20,21 @@ export function setCustomStatusesEnabled(
   ])
 }
 
+// Set the user's timezone + whether it stays auto-detected (P2-08). Writes only these columns; the
+// connector's settings.set is partial, so it never touches custom_statuses_enabled.
+export function setTimezone(
+  db: AbstractPowerSyncDatabase,
+  settingsId: string,
+  timezone: string,
+  auto: boolean,
+) {
+  return db.execute("UPDATE user_settings SET timezone = ?, timezone_auto = ? WHERE id = ?", [
+    timezone,
+    auto ? 1 : 0,
+    settingsId,
+  ])
+}
+
 export function createGroup(db: AbstractPowerSyncDatabase, name: string, position: number) {
   const ts = now()
   return db.execute(

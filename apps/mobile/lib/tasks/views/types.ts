@@ -12,6 +12,8 @@ export type ListTask = Task & {
   // Subtask roll-up (P2-05): counts of this task's direct children, for the progress badge.
   child_count: number
   done_count: number
+  // Recurrence (P2-08): the stored rule, or null — drives the calendar's ghost occurrences.
+  recurrence: string | null
 }
 
 // The already-derived data every view renders. Computed once on the home screen and handed to
