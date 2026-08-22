@@ -112,11 +112,31 @@ appId: app.paceproductivity.mobile
     id: "settings-close"
 - tapOn:
     id: "settings-open"
+# Reopening remounts the section, so the optimistic override resets and the toggle reflects the local
+# DB — which can still read disabled if the enable hasn't converged server→client under CI load. Scroll
+# the toggle into view and re-enable if the off-hint shows (sticky again for this mount) so the persisted
+# QAdone/Sprint2 rows are on screen. Parity-safe: only taps while disabled, and the section is rendered
+# first (so the hint check can't race an un-rendered section as it did right after opening Settings).
+- scrollUntilVisible:
+    element:
+      id: "statuses-toggle"
+    direction: DOWN
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "Turn this on"
+    commands:
+      - tapOn:
+          id: "statuses-toggle"
 - scrollUntilVisible:
     element:
       id: "status-name-QAdone"
     direction: DOWN
+    timeout: 60000
+    waitToSettleTimeoutMs: 1000
 - scrollUntilVisible:
     element:
       id: "group-name-Sprint2"
     direction: DOWN
+    timeout: 60000
+    waitToSettleTimeoutMs: 1000
