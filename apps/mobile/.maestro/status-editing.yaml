@@ -43,6 +43,11 @@ appId: app.paceproductivity.mobile
     timeout: 45000
 - tapOn:
     id: "statuses-toggle"
+# Toggling on reveals the status-editing section; let that reveal/layout settle before
+# interacting. Without this the next tap races the re-render — the element asserts visible but
+# has moved by the time the tap lands ("element not found"). (flake fix)
+- waitForAnimationToEnd:
+    timeout: 5000
 - assertVisible:
     id: "add-status-input"
 
@@ -59,6 +64,8 @@ appId: app.paceproductivity.mobile
 # Recolour it: open its picker and pick blue (the recolorStatus path — the gap this fixes).
 - tapOn:
     id: "status-color-QA"
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     id: "status-swatch-blue"
 
