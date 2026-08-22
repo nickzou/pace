@@ -41,19 +41,15 @@ appId: app.paceproductivity.mobile
       id: "statuses-toggle"
       enabled: true
     timeout: 45000
-# Enable custom statuses (parity-safe: only tap while the off-hint shows, so a re-run can't toggle a
-# already-enabled section back off).
-- runFlow:
-    when:
-      visible: "Turn this on"
-    commands:
-      - tapOn:
-          id: "statuses-toggle"
+# Enable custom statuses. A fresh signup starts OFF, and the app now holds the toggle ON optimistically
+# through the cold-sync window (see status-settings.tsx), so a plain tap sticks — no parity guard, which
+# previously skipped the tap when the section hadn't rendered its hint yet right after opening Settings.
+- tapOn:
+    id: "statuses-toggle"
 # add-status-input lives inside a group block that only renders once the seeded default status_groups
-# COLD-SYNC down — and under parallel CI load that latency is effectively unbounded (seen >70s). Wait
-# for it with a single, long-timeout scroll: retry() caps its own total time near ~90s (so bumping
-# maxRetries did nothing), but a single scrollUntilVisible honours its full timeout. ~180s of patience
-# outlasts the slow-CI default-group sync. Then add a status. (flake fix — cold-sync latency)
+# COLD-SYNC down — under parallel CI load that latency is large (seen ~60s). Wait for it with a single,
+# long-timeout scroll: retry() caps its own total near ~90s, but a lone scrollUntilVisible honours its
+# full timeout. ~180s of patience outlasts the slow-CI default-group sync. Then add a status.
 - scrollUntilVisible:
     element:
       id: "add-status-input"
