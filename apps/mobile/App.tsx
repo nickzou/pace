@@ -4,6 +4,7 @@ import "@azure/core-asynciterator-polyfill"
 
 import { usePowerSync, useQuery } from "@powersync/react"
 import { StatusBar } from "expo-status-bar"
+import { X } from "lucide-react-native"
 import { type ComponentProps, useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -384,6 +385,7 @@ function TaskRow({
   const db = usePowerSync()
   const toast = useToast()
   const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
   const resolved = task.status_category === "done"
   const dueState = dueDayState(task.due_date, resolved)
   return (
@@ -452,8 +454,9 @@ function TaskRow({
         testID={`delete-${task.id}`}
         onPress={() => void deleteWithUndo(db, task, toast)}
         hitSlop={8}
+        style={styles.delete}
       >
-        <Text style={styles.delete}>✕</Text>
+        <X size={16} color={colors.textFaint} />
       </Pressable>
     </View>
   )
@@ -572,6 +575,6 @@ const makeStyles = (c: Palette) =>
     taskDueOverdue: { color: c.dangerText },
     taskDueToday: { color: c.warning },
     taskTextDone: { color: c.textMuted, textDecorationLine: "line-through" },
-    delete: { color: c.textFaint, fontSize: 16, paddingHorizontal: 4 },
+    delete: { paddingHorizontal: 4 },
     footer: { color: c.textFaint, fontSize: 12, marginTop: 12, lineHeight: 18 },
   })

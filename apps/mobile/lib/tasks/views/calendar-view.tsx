@@ -1,4 +1,5 @@
 import { occurrencesBetween } from "@pace/validation"
+import { ChevronLeft, ChevronRight } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { type Palette, useTheme, useThemedStyles } from "../../theme"
@@ -47,7 +48,7 @@ function prettyDay(key: string): string {
 }
 
 export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
-  const { scheme } = useTheme()
+  const { scheme, colors } = useTheme()
   const styles = useThemedStyles(makeStyles)
   const today = useMemo(() => new Date(), [])
   const todayKey = dayKey(today.getFullYear(), today.getMonth(), today.getDate())
@@ -111,14 +112,14 @@ export default function CalendarView({ tasks, onOpen }: TaskViewProps) {
   return (
     <View>
       <View style={styles.header}>
-        <Pressable testID="cal-prev" onPress={prev} hitSlop={12}>
-          <Text style={styles.nav}>‹</Text>
+        <Pressable testID="cal-prev" onPress={prev} hitSlop={12} style={styles.nav}>
+          <ChevronLeft size={26} color={colors.primary} />
         </Pressable>
         <Text style={styles.title}>
           {MONTHS[cursor.m]} {cursor.y}
         </Text>
-        <Pressable testID="cal-next" onPress={next} hitSlop={12}>
-          <Text style={styles.nav}>›</Text>
+        <Pressable testID="cal-next" onPress={next} hitSlop={12} style={styles.nav}>
+          <ChevronRight size={26} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -228,7 +229,7 @@ const makeStyles = (c: Palette) =>
       justifyContent: "space-between",
       marginBottom: 8,
     },
-    nav: { color: c.primary, fontSize: 26, fontWeight: "700", paddingHorizontal: 10 },
+    nav: { paddingHorizontal: 10 },
     title: { color: c.textPrimary, fontSize: 17, fontWeight: "700" },
     weekRow: { flexDirection: "row" },
     weekday: {

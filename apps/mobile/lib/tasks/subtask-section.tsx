@@ -1,4 +1,5 @@
 import { usePowerSync, useQuery } from "@powersync/react"
+import { X } from "lucide-react-native"
 import { type ComponentProps, useMemo, useState } from "react"
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { NestedReorderableList, useReorderableDrag } from "react-native-reorderable-list"
@@ -157,6 +158,7 @@ function SubtaskRow({
   const db = usePowerSync()
   const toast = useToast()
   const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
   const done = c.status_category === "done"
   return (
     <View style={styles.row}>
@@ -194,7 +196,7 @@ function SubtaskRow({
         onPress={() => void deleteWithUndo(db, { id: c.id } as Task, toast)}
         hitSlop={8}
       >
-        <Text style={styles.del}>✕</Text>
+        <X size={16} color={colors.dangerText} />
       </Pressable>
     </View>
   )
@@ -230,7 +232,6 @@ const makeStyles = (c: Palette) =>
     title: { color: c.textPrimary, fontSize: 15 },
     titleDone: { color: c.textMuted, textDecorationLine: "line-through" },
     meta: { color: c.textMuted, fontSize: 12 },
-    del: { color: c.dangerText, fontSize: 14 },
     hint: { color: c.textSecondary, fontSize: 13 },
     addRow: { flexDirection: "row", gap: 8, alignItems: "center" },
     input: {

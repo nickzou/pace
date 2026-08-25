@@ -1,6 +1,7 @@
 import { presetDueDays } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
+import { X } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
 import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
@@ -374,7 +375,7 @@ function Detail({
                     onPress={() => clearTime(task.start_date, START_FALLBACK, saveStart)}
                     hitSlop={8}
                   >
-                    <Text style={styles.dateClear}>✕</Text>
+                    <X size={14} color={colors.textMuted} />
                   </Pressable>
                 ) : null}
                 <Pressable
@@ -425,7 +426,7 @@ function Detail({
                     onPress={() => clearTime(task.due_date, DUE_FALLBACK, saveDue)}
                     hitSlop={8}
                   >
-                    <Text style={styles.dateClear}>✕</Text>
+                    <X size={14} color={colors.textMuted} />
                   </Pressable>
                 ) : null}
                 <Pressable
@@ -589,7 +590,6 @@ const makeStyles = (c: Palette) =>
     dateToday: { color: c.warning },
     overdueBadge: { color: c.dangerText, fontSize: 11, fontWeight: "600" },
     todayBadge: { color: c.warning, fontSize: 11, fontWeight: "600" },
-    dateClear: { color: c.textMuted, fontSize: 13 },
     timeChip: {
       borderWidth: 1,
       borderColor: c.border,

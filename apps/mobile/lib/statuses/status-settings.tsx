@@ -1,5 +1,6 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react-native"
+import { X } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native"
 import { statusHex } from "../tasks/status-control"
@@ -172,7 +173,7 @@ function EditableStatus({ status }: { status: StatusRow }) {
         <Text style={styles.cat}>{status.category.replace("_", " ")}</Text>
         {status.is_system ? null : (
           <Pressable onPress={() => void deleteStatus(db, status.id)} hitSlop={8}>
-            <Text style={styles.del}>✕</Text>
+            <X size={14} color={colors.dangerText} />
           </Pressable>
         )}
       </View>
@@ -324,7 +325,6 @@ const makeStyles = (c: Palette) =>
       paddingVertical: 2,
     },
     groupDefault: { color: c.textMuted, fontSize: 13 },
-    del: { color: c.dangerText, fontSize: 13 },
     statusItem: { gap: 6 },
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     dot: { width: 12, height: 12, borderRadius: 6 },
