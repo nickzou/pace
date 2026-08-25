@@ -1,5 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
+import { X } from "lucide-react"
 import { useMemo, useState } from "react"
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { useToast } from "../toast"
@@ -82,9 +83,9 @@ function SubtaskRow({
         type="button"
         aria-label={`Delete ${c.title}`}
         onClick={onDelete}
-        className="shrink-0 text-xs text-muted-foreground transition hover:text-destructive"
+        className="shrink-0 text-muted-foreground transition hover:text-destructive"
       >
-        ✕
+        <X className="size-3.5" />
       </button>
     </li>
   )

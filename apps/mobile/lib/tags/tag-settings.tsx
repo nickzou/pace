@@ -1,5 +1,6 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync, useQuery } from "@powersync/react-native"
+import { X } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { statusHex } from "../tasks/status-control"
@@ -30,7 +31,7 @@ export function TagsSection() {
 
 function EditableTag({ tag }: { tag: TagRow }) {
   const db = usePowerSync()
-  const { scheme } = useTheme()
+  const { scheme, colors } = useTheme()
   const styles = useThemedStyles(makeStyles)
   const [name, setName] = useState(tag.name)
   const [picking, setPicking] = useState(false)
@@ -50,7 +51,7 @@ function EditableTag({ tag }: { tag: TagRow }) {
         </Pressable>
         <TextInput value={name} onChangeText={setName} onBlur={saveName} style={styles.nameInput} />
         <Pressable onPress={() => void deleteTag(db, tag.id)} hitSlop={8}>
-          <Text style={styles.del}>✕</Text>
+          <X size={14} color={colors.dangerText} />
         </Pressable>
       </View>
       {picking ? (
@@ -143,7 +144,6 @@ const makeStyles = (c: Palette) =>
     row: { flexDirection: "row", alignItems: "center", gap: 8 },
     dot: { width: 12, height: 12, borderRadius: 6 },
     nameInput: { color: c.textPrimary, fontSize: 14, flex: 1, paddingVertical: 2 },
-    del: { color: c.dangerText, fontSize: 13 },
     addBox: { gap: 8, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 8 },
     addRow: { flexDirection: "row", gap: 8 },
     input: {

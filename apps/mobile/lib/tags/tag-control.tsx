@@ -1,5 +1,6 @@
 import { STATUS_COLORS } from "@pace/tokens"
 import { usePowerSync } from "@powersync/react"
+import { Check } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { assignTag, createTag, recolorTag, renameTag, unassignTag } from "../tags/mutations"
@@ -159,7 +160,9 @@ export function TagPicker({
             ) : (
               allTags.map((t) => (
                 <Pressable key={t.id} onPress={() => toggle(t.id)} style={styles.menuRow}>
-                  <Text style={styles.check}>{assignedIds.has(t.id) ? "✓" : "  "}</Text>
+                  <View style={styles.check}>
+                    {assignedIds.has(t.id) ? <Check size={14} color={colors.primary} /> : null}
+                  </View>
                   <View style={[styles.dot, { backgroundColor: statusHex(t.color, scheme) }]} />
                   <Text style={styles.menuText} numberOfLines={1}>
                     {t.name}
@@ -238,7 +241,7 @@ const makeStyles = (c: Palette) =>
     remove: { color: c.dangerText, fontSize: 13, paddingTop: 2 },
     empty: { color: c.textSecondary, fontSize: 13 },
     menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
-    check: { color: c.primary, fontSize: 14, width: 16 },
+    check: { width: 16, alignItems: "center" },
     dot: { width: 12, height: 12, borderRadius: 6 },
     menuText: { color: c.textPrimary, fontSize: 15, flexShrink: 1 },
     createRow: {

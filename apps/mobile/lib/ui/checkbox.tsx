@@ -1,8 +1,9 @@
 import { color, radius } from "@pace/tokens"
-import { Pressable, StyleSheet, Text, type ViewStyle } from "react-native"
+import { Check } from "lucide-react-native"
+import { Pressable, StyleSheet, type ViewStyle } from "react-native"
 
 // The RN twin of the web shadcn Checkbox — RN has no native checkbox, so this is a
-// Pressable box with a ✓ when checked (matching the app's existing checkbox look).
+// Pressable box with a Lucide check when checked (matching the app's existing checkbox look).
 export function Checkbox({
   checked,
   onCheckedChange,
@@ -27,7 +28,7 @@ export function Checkbox({
         style,
       ]}
     >
-      {checked ? <Text style={styles.mark}>✓</Text> : null}
+      {checked ? <Check size={14} color={color.onPrimary} strokeWidth={3} /> : null}
     </Pressable>
   )
 }
@@ -43,6 +44,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   checked: { backgroundColor: color.primary },
-  mark: { color: color.onPrimary, fontSize: 13, fontWeight: "700" },
   disabled: { opacity: 0.5 },
 })
