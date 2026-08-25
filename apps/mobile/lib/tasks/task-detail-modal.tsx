@@ -600,6 +600,7 @@ const makeStyles = (c: Palette) =>
     },
     timeText: { color: c.textPrimary, fontSize: 15 },
     addTimeText: { color: c.textMuted, fontSize: 13 },
+    dateClear: { color: c.textMuted, fontSize: 13 },
     presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 44 },
     presetChip: {
       borderWidth: 1,

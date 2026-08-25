@@ -330,6 +330,7 @@ const makeStyles = (c: Palette) =>
     dot: { width: 12, height: 12, borderRadius: 6 },
     statusNameInput: { color: c.textPrimary, fontSize: 14, flex: 1, paddingVertical: 2 },
     cat: { color: c.textMuted, fontSize: 12 },
+    del: { color: c.dangerText, fontSize: 13 },
     addBox: { gap: 8, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 8 },
     addRow: { flexDirection: "row", gap: 8 },
     input: {
