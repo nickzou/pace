@@ -3,14 +3,11 @@ name: Mobile E2E
 # Runs the Maestro flows against a headless Android emulator. Building an APK +
 # booting an emulator is slow, so this does NOT gate every push like the web and
 # desktop suites. Instead it runs:
-#   - nightly, as a catch-all;
 #   - on PRs touching the mobile app or the shared packages/deps it's built on
 #     (see paths) — the changes that can break mobile while web + desktop stay
 #     green: a shared client change, the single-React override, a Renovate bump;
 #   - on demand from the Actions tab (workflow_dispatch).
 on:
-  schedule:
-    - cron: "0 7 * * *" # 07:00 UTC
   pull_request:
     branches: [main]
     paths:
@@ -27,8 +24,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Per-ref so a new push to a PR cancels its own in-flight run; but let a
-  # scheduled nightly finish (only PR events cancel in progress).
+  # Per-ref so a new push to a PR cancels its own in-flight run; a manual
+  # (workflow_dispatch) run is left to finish (only PR events cancel in progress).
   group: mobile-e2e-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
