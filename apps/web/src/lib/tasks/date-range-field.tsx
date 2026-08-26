@@ -5,6 +5,7 @@ import type { DateRange } from "react-day-picker"
 import { Calendar } from "#/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "#/components/ui/popover"
 import { formatDayLabel, formatMonthDay } from "#/lib/tasks/dates"
+import { RecurrenceControl } from "#/lib/tasks/recurrence-control"
 import { cn } from "#/lib/utils"
 
 // The task's schedule as ONE control (Fix Date Selector). A single styled button shows the
@@ -31,6 +32,7 @@ export function DateRangeField({
   onChangeStart,
   onChangeDue,
   buttonClass,
+  taskId,
 }: {
   startDay: string
   startTime: string
@@ -40,6 +42,8 @@ export function DateRangeField({
   onChangeDue: (day: string, time: string) => void
   // Overdue/today border tint from the caller (dueDayState) — mirrors the old fieldClass.
   buttonClass?: string
+  // Renders the Repeat control in the popover below the times; it reads its own row by id.
+  taskId: string
 }) {
   const [open, setOpen] = useState(false)
 
@@ -111,21 +115,30 @@ export function DateRangeField({
           />
 
           {/* Quick-date presets fill the space beside the calendar — each sets the DUE
-              date, leaving any start in place. */}
+              date, leaving any start in place. Today/Tomorrow are the common picks, so they
+              get a primary tint to stand out from the muted rest. */}
           <div className="flex flex-col gap-1.5 self-start">
-            {presetDueDays(new Date()).map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => {
-                  onChangeDue(p.day, dueTime)
-                  setOpen(false)
-                }}
-                className="rounded-full border border-border px-2.5 py-1 text-center text-[11px] text-muted-foreground transition-all duration-200 ease-out hover:scale-105 hover:border-ring hover:text-foreground"
-              >
-                {p.label}
-              </button>
-            ))}
+            {presetDueDays(new Date()).map((p) => {
+              const emphasized = p.key === "today" || p.key === "tomorrow"
+              return (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => {
+                    onChangeDue(p.day, dueTime)
+                    setOpen(false)
+                  }}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-center text-[11px] transition-all duration-200 ease-out hover:scale-105 hover:border-ring hover:text-foreground",
+                    emphasized
+                      ? "border-primary/40 bg-primary/10 font-medium text-foreground"
+                      : "border-border text-muted-foreground",
+                  )}
+                >
+                  {p.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -158,6 +171,10 @@ export function DateRangeField({
             ) : null}
           </div>
         ) : null}
+
+        <div className="mt-1 border-t border-border pt-3">
+          <RecurrenceControl taskId={taskId} />
+        </div>
 
         {hasAny ? (
           <button

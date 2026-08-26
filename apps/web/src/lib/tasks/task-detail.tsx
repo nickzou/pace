@@ -1,6 +1,6 @@
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
-import { lazy, Suspense, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
 import { DateRangeField } from "#/lib/tasks/date-range-field"
 import {
@@ -18,26 +18,18 @@ import {
   type Task,
   updateTask,
 } from "#/lib/tasks/mutations"
-
-// Lazy so rrule (a CommonJS module) never enters the server-render / main bundle — it loads with
-// the detail modal, client-only (P2-08).
-const RecurrenceControl = lazy(() =>
-  import("#/lib/tasks/recurrence-control").then((m) => ({ default: m.RecurrenceControl })),
-)
-
 import { StatusControl, type StatusOption } from "#/lib/tasks/status-control"
 import { openStatusForGroup } from "#/lib/tasks/status-group"
 import { SubtaskSection } from "#/lib/tasks/subtask-section"
 import { useToast } from "#/lib/toast"
 
-// A task joined with its status (P2-03), plus its recurrence (P2-08).
+// A task joined with its status (P2-03). Recurrence (P2-08) is read separately by the
+// RecurrenceControl inside the date popover, so it isn't selected here.
 type DetailTask = Task & {
   status_name: string
   status_color: string
   status_category: string
   status_group_id: string
-  recurrence: string | null
-  recurrence_regen: string | null
 }
 
 // The single-task view/editor shared by the quick modal and the dedicated
@@ -50,7 +42,7 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
   const { data: rows, isLoading } = useQuery<DetailTask>(
     `SELECT t.id, t.title, t.description, t.status_id, t.resolved_at,
             t.start_date, t.due_date, t.start_has_time, t.due_has_time, t.parent_id,
-            t.recurrence, t.recurrence_regen, t.created_at, t.updated_at,
+            t.created_at, t.updated_at,
             s.name AS status_name, s.color AS status_color,
             s.category AS status_category, s.group_id AS status_group_id
      FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE t.id = ?`,
@@ -289,18 +281,9 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
           onChangeStart={saveStart}
           onChangeDue={saveDue}
           buttonClass={dueFieldClass}
+          taskId={id}
         />
       </div>
-
-      <Suspense fallback={null}>
-        <RecurrenceControl
-          db={db}
-          taskId={id}
-          dueIso={task.due_date}
-          recurrence={task.recurrence}
-          recurrenceRegen={task.recurrence_regen}
-        />
-      </Suspense>
 
       <SubtaskSection parentId={id} depth={depth} />
 
