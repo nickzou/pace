@@ -88,7 +88,7 @@ export function DateRangeField({
           aria-label="Due date"
           data-testid="due-date-button"
           className={cn(
-            "flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-left text-sm outline-none transition-colors hover:border-ring focus-visible:border-ring",
+            "flex w-full items-center gap-2 rounded-lg border bg-background px-2.5 py-2 text-left text-sm outline-none transition-colors duration-200 ease-out hover:border-ring hover:bg-accent/40 focus-visible:border-ring",
             buttonClass ?? "border-border",
           )}
         >
@@ -121,7 +121,7 @@ export function DateRangeField({
                   onChangeDue(p.day, dueTime)
                   setOpen(false)
                 }}
-                className="rounded-full border border-border px-2.5 py-1 text-center text-[11px] text-muted-foreground transition-colors hover:border-ring hover:text-foreground"
+                className="rounded-full border border-border px-2.5 py-1 text-center text-[11px] text-muted-foreground transition-all duration-200 ease-out hover:scale-105 hover:border-ring hover:text-foreground"
               >
                 {p.label}
               </button>
@@ -167,7 +167,7 @@ export function DateRangeField({
               onChangeDue("", "")
               setOpen(false)
             }}
-            className="mt-2 w-full rounded-lg px-2.5 py-1.5 text-center text-xs text-muted-foreground transition-colors hover:text-destructive"
+            className="mt-2 w-full rounded-lg px-2.5 py-1.5 text-center text-xs text-muted-foreground transition-colors duration-200 ease-out hover:text-destructive"
           >
             Clear dates
           </button>

@@ -102,8 +102,11 @@ body {
 }
 
 /* react-day-picker (P2-08 · R5) — layout comes from the library CSS (imported by the Calendar
-   component); here we re-theme it to our design tokens, mirroring the FullCalendar block above. */
-.rdp-root {
+   component); here we re-theme it to our design tokens, mirroring the FullCalendar block above.
+   Doubled `.rdp-root.rdp-root` so these token overrides outrank the library's own `.rdp-root`
+   variable defaults (e.g. the light `#f0f0ff` accent background) regardless of import order —
+   the library stylesheet is bundled after this file, so a plain `.rdp-root` would lose the tie. */
+.rdp-root.rdp-root {
   --rdp-accent-color: var(--primary, #60a5fa);
   --rdp-accent-background-color: color-mix(in oklab, var(--primary, #60a5fa) 15%, var(--background, #0b0a14));
   --rdp-today-color: var(--primary, #60a5fa);
@@ -123,18 +126,41 @@ body {
   font-weight: 500;
   color: var(--muted-foreground, #a7a3c8);
 }
+.rdp-root .rdp-day_button {
+  /* Ease colour + scale so hover states (below) animate in rather than snapping. */
+  transition:
+    background-color 0.2s ease-out,
+    transform 0.15s ease-out;
+}
 .rdp-root .rdp-day_button:hover:not(:disabled) {
   /* Inverted, solid hover: mixing the foreground into the background contrasts with the
      surface in both themes — light-grey on dark, dark-grey on light — never washed out. */
   background-color: color-mix(in oklab, var(--foreground, #f4f2ff) 14%, var(--background, #0b0a14));
 }
-/* The library only borders the selected day; we want a filled pill in our primary colour. */
+/* The library only borders the selected day; we want a filled pill in our primary colour.
+   `:not(.rdp-range_middle)` keeps this to the range ENDPOINTS (and a lone selected day) — the
+   middle days sit on the subtle range bar, so filling them primary would box them in. */
 .rdp-root .rdp-selected {
   font-size: inherit;
 }
-.rdp-root .rdp-selected .rdp-day_button {
+.rdp-root .rdp-selected:not(.rdp-range_middle) .rdp-day_button {
   background-color: var(--primary, #60a5fa);
   color: var(--primary-foreground, #0b0a14);
   border: none;
   font-weight: 600;
+}
+/* Middle-of-range days: transparent button over the tinted bar, foreground text so they stay
+   legible (the library defaults them to `inherit`, which our endpoint rule would otherwise skew). */
+.rdp-root .rdp-range_middle .rdp-day_button {
+  background-color: transparent;
+  color: var(--foreground, #f4f2ff);
+  font-weight: 500;
+}
+/* The range endpoints (and a lone selected day) are the primary pills — lift them slightly on
+   hover so grabbing either end of the range feels responsive. Keep the fill colour; just scale. */
+.rdp-root .rdp-range_start .rdp-day_button:hover:not(:disabled),
+.rdp-root .rdp-range_end .rdp-day_button:hover:not(:disabled),
+.rdp-root .rdp-selected:not(.rdp-range_middle) .rdp-day_button:hover:not(:disabled) {
+  background-color: var(--primary, #60a5fa);
+  transform: scale(1.12);
 }
