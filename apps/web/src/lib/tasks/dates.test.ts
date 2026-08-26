@@ -4,6 +4,8 @@ import {
   DUE_FALLBACK,
   dueDayState,
   formatDate,
+  formatDayLabel,
+  formatMonthDay,
   START_FALLBACK,
   toDateInput,
   toTimeInput,
@@ -87,5 +89,54 @@ describe("dueDayState", () => {
     expect(dueDayState(daysFromNow(-1), false)).toBe("overdue")
     expect(dueDayState(daysFromNow(0), false)).toBe("today")
     expect(dueDayState(daysFromNow(1), false)).toBe("upcoming")
+  })
+})
+
+// The date-range button labels. Anchored on Tue 2026-08-25 (Aug 24 2026 is a Monday,
+// see presets.test); weekday/month names assume the en-US default locale, as elsewhere.
+const now = new Date(2026, 7, 25)
+
+describe("formatMonthDay", () => {
+  it("is month + day within the current year", () => {
+    expect(formatMonthDay("2026-08-18", now)).toBe("Aug 18")
+    expect(formatMonthDay("2026-09-01", now)).toBe("Sep 1")
+  })
+
+  it("adds the year when the day is not in the current year", () => {
+    expect(formatMonthDay("2027-08-18", now)).toBe("Aug 18, 2027")
+    expect(formatMonthDay("2025-12-31", now)).toBe("Dec 31, 2025")
+  })
+
+  it("is empty for a blank day", () => {
+    expect(formatMonthDay("", now)).toBe("")
+  })
+})
+
+describe("formatDayLabel", () => {
+  it("uses the weekday within the coming week (0–6 days out)", () => {
+    expect(formatDayLabel("2026-08-25", "", now)).toBe("Tuesday") // today
+    expect(formatDayLabel("2026-08-28", "", now)).toBe("Friday") // +3
+    expect(formatDayLabel("2026-08-31", "", now)).toBe("Monday") // +6, last day in-window
+  })
+
+  it("falls back to month/day at a week out or beyond", () => {
+    expect(formatDayLabel("2026-09-01", "", now)).toBe("Sep 1") // +7
+    expect(formatDayLabel("2026-10-15", "", now)).toBe("Oct 15")
+  })
+
+  it("uses month/day for past dates, never a this-week weekday", () => {
+    expect(formatDayLabel("2026-08-24", "", now)).toBe("Aug 24") // yesterday
+    expect(formatDayLabel("2020-01-01", "", now)).toBe("Jan 1, 2020")
+  })
+
+  it("appends a set time", () => {
+    // The AM/PM style is locale-dependent (like formatDate's test) — pin only the
+    // stable base + numeric time, not the "PM" vs "p.m." rendering.
+    expect(formatDayLabel("2026-08-28", "13:00", now)).toMatch(/^Friday, 1:00\b/)
+    expect(formatDayLabel("2026-10-15", "09:30", now)).toMatch(/^Oct 15, 9:30\b/)
+  })
+
+  it("is empty for a blank day", () => {
+    expect(formatDayLabel("", "13:00", now)).toBe("")
   })
 })

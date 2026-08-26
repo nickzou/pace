@@ -2,7 +2,7 @@ import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
 import { lazy, Suspense, useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
-import { DatePickerField } from "#/lib/tasks/date-picker-field"
+import { DateRangeField } from "#/lib/tasks/date-range-field"
 import {
   combineLocal,
   DUE_FALLBACK,
@@ -268,40 +268,28 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
       />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          Start
-          <DatePickerField
-            day={startDay}
-            time={startTime}
-            onChange={saveStart}
-            dateAriaLabel="Start date"
-            timeAriaLabel="Start time"
-          />
-        </div>
-        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2">
-            Due
-            {dueState === "overdue" ? (
-              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-                Overdue
-              </span>
-            ) : dueState === "today" ? (
-              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                Today
-              </span>
-            ) : null}
-          </span>
-          <DatePickerField
-            day={dueDay}
-            time={dueTime}
-            onChange={saveDue}
-            dateAriaLabel="Due date"
-            timeAriaLabel="Due time"
-            fieldClass={dueFieldClass}
-            showPresets
-          />
-        </div>
+      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-2">
+          Due
+          {dueState === "overdue" ? (
+            <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+              Overdue
+            </span>
+          ) : dueState === "today" ? (
+            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+              Today
+            </span>
+          ) : null}
+        </span>
+        <DateRangeField
+          startDay={startDay}
+          startTime={startTime}
+          dueDay={dueDay}
+          dueTime={dueTime}
+          onChangeStart={saveStart}
+          onChangeDue={saveDue}
+          buttonClass={dueFieldClass}
+        />
       </div>
 
       <Suspense fallback={null}>

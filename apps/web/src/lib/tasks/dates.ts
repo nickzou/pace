@@ -46,6 +46,47 @@ export function formatDate(iso: string | null, hasTime = false): string {
   })
 }
 
+// A local "YYYY-MM-DD" day → a local Date at midnight (the inverse of toDateInput's
+// formatting). Used by the button-label formatters below, which work off day strings.
+function dayToLocal(day: string): Date {
+  const [y, m, d] = day.split("-").map(Number)
+  return new Date(y as number, (m as number) - 1, d as number)
+}
+
+// "Aug 18", adding the year (", 2027") only when the day isn't in `now`'s year — the
+// range-picker button's compact form for each end of a range. No weekday.
+export function formatMonthDay(day: string, now = new Date()): string {
+  if (!day) return ""
+  const d = dayToLocal(day)
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  })
+}
+
+// The date-range button's label for a SINGLE date. Within the coming week (0–6 days
+// out) it reads as the weekday ("Friday") — "use day if less than a week from now";
+// otherwise it's formatMonthDay ("Aug 18", + year when not the current year). A set
+// time is appended ("Friday, 1:00 PM"). Past dates always use the month/day form.
+export function formatDayLabel(day: string, time = "", now = new Date()): string {
+  if (!day) return ""
+  const d = dayToLocal(day)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((d.getTime() - today.getTime()) / 86_400_000)
+  const base =
+    diffDays >= 0 && diffDays < 7
+      ? d.toLocaleDateString(undefined, { weekday: "long" })
+      : formatMonthDay(day, now)
+  if (!time) return base
+  const [h, min] = time.split(":").map(Number)
+  const t = new Date(2000, 0, 1, h as number, min as number).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  return `${base}, ${t}`
+}
+
 // The due date's state relative to TODAY, by local CALENDAR DAY (not clock time):
 // "overdue" before today, "today" on today, "upcoming" in the future — used to
 // colour the list (red / yellow / neutral). null when there's no date or the task is
