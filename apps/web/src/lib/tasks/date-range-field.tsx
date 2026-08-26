@@ -100,6 +100,17 @@ export function DateRangeField({
     }
   }
 
+  const today = new Date()
+  const todayDay = dateToDay(today)
+
+  // Least-friction default: opening the picker on an empty field sets the due date to TODAY right
+  // away (the common case), so it's already chosen and the calendar centres on it. Adjusting from
+  // there is a normal pick; Clear removes it. Only fires when nothing is set yet.
+  const handleOpenChange = (next: boolean) => {
+    if (next && !hasAny) onChangeDue(todayDay, dueTime)
+    setOpen(next)
+  }
+
   const trigger = (
     <button
       type="button"
@@ -128,7 +139,7 @@ export function DateRangeField({
           mode="range"
           autoFocus
           selected={selected}
-          defaultMonth={selected?.from}
+          defaultMonth={selected?.from ?? today}
           onSelect={selectRange}
           className="mx-auto sm:mx-0"
         />
@@ -213,7 +224,7 @@ export function DateRangeField({
 
   if (isDesktop) {
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent align="start" className="w-auto">
           {body}
@@ -226,7 +237,7 @@ export function DateRangeField({
   // scroll, sliding up from the bottom. Built from the Radix Dialog primitives (reusing the app's
   // themed overlay) rather than the centered DialogContent, so it anchors to the bottom edge.
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogPortal>
         <DialogOverlay />
