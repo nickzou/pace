@@ -58,8 +58,8 @@ test("weekly repeat (advance): completing reschedules the task one week out and 
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
 
-  // The reschedule round-trips through the server; reload to sync it down, then reopen and assert the
-  // due date moved a week out and the task is open again (To Do), not done.
+  // The reschedule round-trips through the server; reload to pull it back down, then reopen and
+  // assert the due moved a week out and the task is open again (To Do), not done.
   await expect(async () => {
     await page.reload()
     await expectSignedIn(page)
