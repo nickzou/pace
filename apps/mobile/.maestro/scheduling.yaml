@@ -79,12 +79,24 @@ appId: app.paceproductivity.mobile
 - assertNotVisible:
     id: "detail-due-time-clear"
 
-# Make it repeat weekly → the human-readable summary appears.
+# Make it repeat weekly — the Repeat control sits below the calendar in the modal, so scroll to it.
+# Selecting a frequency reveals the on-completion chips (regen-*), confirming a rule is set.
+- scrollUntilVisible:
+    element:
+      id: "repeat-weekly"
+    direction: DOWN
 - tapOn:
     id: "repeat-weekly"
-- assertVisible: "Repeats"
+- scrollUntilVisible:
+    element:
+      id: "regen-advance"
+    direction: DOWN
 
 # Close the modal — a due date is now set, so the "Set date" placeholder is gone.
+- scrollUntilVisible:
+    element:
+      id: "detail-schedule-done"
+    direction: DOWN
 - tapOn:
     id: "detail-schedule-done"
 - assertNotVisible: "Set date"
@@ -96,9 +108,13 @@ appId: app.paceproductivity.mobile
     id: "open-.*"
 - assertNotVisible: "Set date"
 
-# Clear the whole schedule → back to unset.
+# Clear the whole schedule → back to unset. Clear sits at the bottom of the modal, so scroll to it.
 - tapOn:
     id: "detail-schedule"
+- scrollUntilVisible:
+    element:
+      id: "detail-clear"
+    direction: DOWN
 - tapOn:
     id: "detail-clear"
 - assertVisible: "Set date"
