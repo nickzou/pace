@@ -2,7 +2,7 @@ import { fontSize, fontWeight, radius, space } from "@pace/tokens"
 import { presetDueDays, resolveScheduleRange } from "@pace/validation"
 import NativeTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
 import dayjs from "dayjs"
-import { X } from "lucide-react-native"
+import { Calendar, X } from "lucide-react-native"
 import { useState } from "react"
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import UiDatePicker, { type DateType, useDefaultStyles } from "react-native-ui-datepicker"
@@ -140,6 +140,9 @@ export function DateRangeField({
   return (
     <>
       <Pressable testID="detail-schedule" onPress={openSheet} style={styles.trigger}>
+        <View style={styles.iconBox}>
+          <Calendar size={14} color={colors.textMuted} />
+        </View>
         <Text
           style={[
             styles.triggerLabel,
@@ -283,6 +286,12 @@ const makeStyles = (c: Palette) =>
       backgroundColor: c.surfaceInput,
       paddingHorizontal: space[3],
       paddingVertical: space[3],
+    },
+    iconBox: {
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
     triggerLabel: { flex: 1, fontSize: fontSize.base, color: c.textPrimary },
     placeholder: { color: c.textFaint },
