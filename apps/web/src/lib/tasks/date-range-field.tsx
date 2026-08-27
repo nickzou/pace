@@ -1,7 +1,7 @@
 import { presetDueDays } from "@pace/validation"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Calendar as CalendarIcon } from "lucide-react"
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import type { DateRange } from "react-day-picker"
 import { Calendar } from "#/components/ui/calendar"
 import {
@@ -13,9 +13,16 @@ import {
 } from "#/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "#/components/ui/popover"
 import { formatDayLabel, formatMonthDay } from "#/lib/tasks/dates"
-import { RecurrenceControl } from "#/lib/tasks/recurrence-control"
 import { useMediaQuery } from "#/lib/use-media-query"
 import { cn } from "#/lib/utils"
+
+// Lazy, and NOT just for bundle size: RecurrenceControl pulls in rrule (a CommonJS module whose
+// ESM-default interop breaks under the SSR build). A static import drags rrule into task-detail's
+// server bundle and crashes renderToReadableStream, so it must stay behind a dynamic import —
+// keeping rrule client-only. Loads with the popover, which only opens on demand (P2-08).
+const RecurrenceControl = lazy(() =>
+  import("#/lib/tasks/recurrence-control").then((m) => ({ default: m.RecurrenceControl })),
+)
 
 // The task's schedule as ONE control (Fix Date Selector). A single styled button shows the
 // state — placeholder / a due date / a start→due range — and opens a react-day-picker RANGE
@@ -86,12 +93,14 @@ export function DateRangeField({
   const selectRange = (range: DateRange | undefined) => {
     const from = range?.from ? dateToDay(range.from) : ""
     const to = range?.to ? dateToDay(range.to) : ""
-    if (from && to) {
-      // Two ends → a range: earlier is the start, later is the due date.
+    if (from && to && from !== to) {
+      // Two DISTINCT ends → a range: earlier is the start, later is the due date.
       onChangeStart(from, startTime)
       onChangeDue(to, dueTime)
     } else if (from) {
-      // A single pick is the DUE date; no separate start.
+      // A single pick — or the same day clicked twice (collapsing the range to one day) — is a
+      // lone DUE date with no start. This is how you set a single day once today is auto-selected:
+      // the first click makes a today→day range, the second click on that day collapses it back.
       onChangeStart("", "")
       onChangeDue(from, dueTime)
     } else {
@@ -203,7 +212,9 @@ export function DateRangeField({
       ) : null}
 
       <div className="mt-1 border-t border-border pt-3">
-        <RecurrenceControl taskId={taskId} />
+        <Suspense fallback={null}>
+          <RecurrenceControl taskId={taskId} />
+        </Suspense>
       </div>
 
       {hasAny ? (
