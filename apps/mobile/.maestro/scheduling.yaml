@@ -1,13 +1,12 @@
-# Mobile scheduling flow: sign up -> add a task -> set a due date (date-only) ->
-# add a time -> clear the time -> confirm the date persists -> clear the date.
+# Mobile scheduling flow: sign up -> add a task -> open the unified Schedule control -> set a due
+# date via a preset -> add/clear a time -> set it to repeat -> confirm it persists -> clear it.
 #
-# Parity note: the web/desktop Playwright specs type an exact past date to assert
-# "Overdue" and reload-round-trip. Maestro can't drive the native OS date/time
-# pickers to a specific value, so this accepts each picker's default and asserts the
-# UI STATE instead — the date-only vs with-time distinction (the has_time flag) and
-# that the date survives closing/reopening the detail (read back from local SQLite).
-# Assertions match the unique placeholder text (Maestro text matching is anchored,
-# so the copy is distinct per field: "Set due date" / "Add due time").
+# Parity note: scheduling is now one control (DateRangeField) — a button that opens a modal with a
+# range calendar, quick-date presets, per-end times, and the Repeat control (matches the web flow).
+# Maestro can't drive the range calendar or the native OS time picker to a *specific* value, so we
+# set dates via the deterministic PRESET chips and assert UI STATE: the trigger's placeholder ("Set
+# date") disappearing, the has_time flag (the time-clear affordance), the repeat summary, and that
+# the schedule survives closing/reopening the detail (read back from local SQLite).
 appId: app.paceproductivity.mobile
 ---
 # Reach a clean signed-out start — the session persists in secure-store.
@@ -58,37 +57,48 @@ appId: app.paceproductivity.mobile
 - tapOn:
     id: "open-.*"
 
-# Due starts unset.
-- assertVisible: "Set due date"
+# The schedule starts unset.
+- assertVisible: "Set date"
 
-# Set a date — accept the native date picker's default via OK.
+# Open the Schedule control (auto-selects today) and pick a due date via the Tomorrow preset.
 - tapOn:
-    id: "detail-due"
-- tapOn: "OK"
-# Date-only now: the placeholder is gone and the time offers to be added.
-- assertNotVisible: "Set due date"
-- assertVisible: "Add due time"
+    id: "detail-schedule"
+- tapOn:
+    id: "due-preset-tomorrow"
 
-# Add a time — accept the native time picker's default via OK.
+# Add a time — accept the native time picker's default via OK. The time-clear affordance appears.
 - tapOn:
     id: "detail-due-time"
 - tapOn: "OK"
-# The chip now shows a real time, so the "add time" affordance is gone.
-- assertNotVisible: "Add due time"
+- assertVisible:
+    id: "detail-due-time-clear"
 
-# Clear just the time → back to date-only.
+# Clear just the time → back to date-only (the time-clear affordance is gone).
 - tapOn:
     id: "detail-due-time-clear"
-- assertVisible: "Add due time"
+- assertNotVisible:
+    id: "detail-due-time-clear"
 
-# The date persists across closing + reopening the detail (read from local SQLite).
+# Make it repeat weekly → the human-readable summary appears.
+- tapOn:
+    id: "repeat-weekly"
+- assertVisible: "Repeats"
+
+# Close the modal — a due date is now set, so the "Set date" placeholder is gone.
+- tapOn:
+    id: "detail-schedule-done"
+- assertNotVisible: "Set date"
+
+# The schedule persists across closing + reopening the detail (read from local SQLite).
 - tapOn:
     id: "detail-close"
 - tapOn:
     id: "open-.*"
-- assertNotVisible: "Set due date"
+- assertNotVisible: "Set date"
 
-# Clear the whole date → back to unset.
+# Clear the whole schedule → back to unset.
 - tapOn:
-    id: "detail-due-clear"
-- assertVisible: "Set due date"
+    id: "detail-schedule"
+- tapOn:
+    id: "detail-clear"
+- assertVisible: "Set date"

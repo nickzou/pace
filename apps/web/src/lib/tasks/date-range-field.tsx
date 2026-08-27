@@ -1,4 +1,4 @@
-import { presetDueDays } from "@pace/validation"
+import { presetDueDays, resolveScheduleRange } from "@pace/validation"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { lazy, Suspense, useState } from "react"
@@ -91,22 +91,14 @@ export function DateRangeField({
         formatDayLabel(dueDay || startDay, dueDay ? dueTime : startTime)
 
   const selectRange = (range: DateRange | undefined) => {
-    const from = range?.from ? dateToDay(range.from) : ""
-    const to = range?.to ? dateToDay(range.to) : ""
-    if (from && to && from !== to) {
-      // Two DISTINCT ends → a range: earlier is the start, later is the due date.
-      onChangeStart(from, startTime)
-      onChangeDue(to, dueTime)
-    } else if (from) {
-      // A single pick — or the same day clicked twice (collapsing the range to one day) — is a
-      // lone DUE date with no start. This is how you set a single day once today is auto-selected:
-      // the first click makes a today→day range, the second click on that day collapses it back.
-      onChangeStart("", "")
-      onChangeDue(from, dueTime)
-    } else {
-      onChangeStart("", "")
-      onChangeDue("", "")
-    }
+    // Range → (start, due) is the shared flow rule (single = due, distinct days = range, same day
+    // twice = single due) — see resolveScheduleRange, used by mobile too so the two can't drift.
+    const { start, due } = resolveScheduleRange(
+      range?.from ? dateToDay(range.from) : "",
+      range?.to ? dateToDay(range.to) : "",
+    )
+    onChangeStart(start, start ? startTime : "")
+    onChangeDue(due, due ? dueTime : "")
   }
 
   const today = new Date()

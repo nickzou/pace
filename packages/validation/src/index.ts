@@ -3,6 +3,7 @@
 // consumers regardless.
 export * from "./presets"
 export * from "./recurrence"
+export * from "./schedule"
 export {
   type NewStatus,
   type NewStatusGroup,
