@@ -196,7 +196,7 @@ export function SubtaskSection({ parentId, depth }: { parentId: string; depth: n
             type="button"
             aria-label="Add subtask"
             onClick={() => void add()}
-            disabled={!title.trim()}
+            disabled={!title.trim() || !defaultStatusId}
             className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
           >
             Add

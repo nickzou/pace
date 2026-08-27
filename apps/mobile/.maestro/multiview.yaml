@@ -64,17 +64,18 @@ appId: app.paceproductivity.mobile
     id: "layout-list"
 - assertVisible: "Alpha"
 
-# Open the task from the list (tap-to-open): give it a due date (native picker defaults to today;
-# OK accepts) and add a subtask while the detail is open.
+# Open the task from the list (tap-to-open): give it a due date (opening the Schedule control
+# auto-selects today) and add a subtask while the detail is open.
 - tapOn: "Alpha"
 - extendedWaitUntil:
     visible:
       id: "detail-title"
     timeout: 15000
 - tapOn:
-    id: "detail-due"
-- tapOn: "OK"
-- assertNotVisible: "Set due date"
+    id: "detail-schedule"
+- tapOn:
+    id: "detail-schedule-done"
+- assertNotVisible: "Set date"
 - scrollUntilVisible:
     element:
       id: "subtask-input"

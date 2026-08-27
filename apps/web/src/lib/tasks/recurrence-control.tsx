@@ -1,5 +1,5 @@
 import { describe, monthlyRuleBody, withAnchor } from "@pace/validation"
-import type { AbstractPowerSyncDatabase } from "@powersync/web"
+import { usePowerSync, useQuery } from "@powersync/react"
 import { setTaskRecurrence } from "#/lib/tasks/mutations"
 
 // The "Repeat" control in the task detail (P2-08). A frequency picker + an on-completion mode, over
@@ -50,19 +50,20 @@ function freqOf(rule: string | null): string {
   return "none"
 }
 
-export function RecurrenceControl({
-  db,
-  taskId,
-  dueIso,
-  recurrence,
-  recurrenceRegen,
-}: {
-  db: AbstractPowerSyncDatabase
-  taskId: string
-  dueIso: string | null
-  recurrence: string | null
-  recurrenceRegen: string | null
-}) {
+export function RecurrenceControl({ taskId }: { taskId: string }) {
+  // Read this task's recurrence straight from local SQLite — PowerSync is the state layer, so the
+  // control stays self-contained (only a taskId) and reflects edits reactively without prop-drilling.
+  const db = usePowerSync()
+  const { data: rows } = useQuery<{
+    due_date: string | null
+    recurrence: string | null
+    recurrence_regen: string | null
+  }>("SELECT due_date, recurrence, recurrence_regen FROM tasks WHERE id = ?", [taskId])
+  const row = rows[0]
+  const dueIso = row?.due_date ?? null
+  const recurrence = row?.recurrence ?? null
+  const recurrenceRegen = row?.recurrence_regen ?? null
+
   if (!dueIso) {
     return (
       <div className="flex flex-col gap-1 text-xs text-muted-foreground">

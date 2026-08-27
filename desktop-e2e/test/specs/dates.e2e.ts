@@ -86,6 +86,13 @@ async function addTask(title: string) {
 // covered by the web Playwright e2e (e2e/tests/tasks.spec.ts) on the same React bundle, so
 // desktop coverage is redundant. Re-enable once desktop PowerSync-reload stability is
 // sorted — see the "Desktop e2e: PowerSync webview reload crashes" backlog item.
+//
+// STALE UI (Fix Date Selector): the scheduling control is no longer a native <input type="date">
+// (the DUE_DATE/DUE_TIME selectors below, and setControlledInput). It's now a button that opens a
+// react-day-picker calendar popover — a single day is picked by clicking it twice. Before
+// re-enabling, port the interaction to the calendar the way the Playwright specs did (see
+// e2e/tests/date-picker.ts): open the picker, navigate to the month, click the day twice; the time
+// input still lives inside the popover.
 describe.skip("desktop scheduling", () => {
   it("a past due DATE only saves, flags Overdue, and round-trips a reload", async () => {
     const email = uniqueEmail("desktop-dates")

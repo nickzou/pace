@@ -1,26 +1,13 @@
-import { presetDueDays } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
-import DateTimePicker, { DateTimePickerAndroid } from "@react-native-community/datetimepicker"
-import { X } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
-import { Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ScrollViewContainer } from "react-native-reorderable-list"
 import { TagChips, type TagOption, TagPicker } from "../tags/tag-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
 import { useToast } from "../toast"
-import {
-  combineDay,
-  combineTime,
-  DUE_FALLBACK,
-  dueDayState,
-  formatDate,
-  formatTime,
-  START_FALLBACK,
-  toDate,
-} from "./dates"
+import { DateRangeField } from "./date-range-field"
 import { deleteWithUndo, setTaskParent, setTaskStatus, type Task, updateTask } from "./mutations"
-import { RecurrenceControl } from "./recurrence-control"
 import { StatusControl, type StatusOption } from "./status-control"
 import { openStatusForGroup } from "./status-group"
 import { SubtaskSection } from "./subtask-section"
@@ -150,55 +137,17 @@ function Detail({
       void updateTask(db, id, { title: task.title, description })
   }
 
-  // Scheduling (P2-02). Date + optional time (mirrors web). Dates read straight from
-  // the live row (no seeded state to clobber). A date always stores a full
-  // timestamp; *_has_time records whether a real time was picked. iOS shows a
-  // spinner in the chosen mode; Android opens the native dialog imperatively.
+  // Scheduling (P2-08). start/due dates + optional times + Repeat all live in the DateRangeField
+  // modal now; here we just supply the current values and the save handlers. A date always stores a
+  // full UTC timestamp; *_has_time records whether a real time was picked.
   type Save = (iso: string | null, hasTime: boolean) => void
-  type Fallback = { hours: number; minutes: number }
-
-  const [iosPicker, setIosPicker] = useState<{
-    mode: "date" | "time"
-    value: Date
-    onPick: (picked?: Date) => void
-  } | null>(null)
-
-  const openPicker = (mode: "date" | "time", value: Date, onPick: (picked?: Date) => void) => {
-    if (Platform.OS === "android") {
-      DateTimePickerAndroid.open({
-        value,
-        mode,
-        onChange: (_e, picked) => onPick(picked ?? undefined),
-      })
-    } else {
-      setIosPicker({ mode, value, onPick })
-    }
-  }
-
   const saveStart: Save = (iso, hasTime) => {
     void updateTask(db, id, { start_date: iso, start_has_time: hasTime ? 1 : 0 })
   }
   const saveDue: Save = (iso, hasTime) => {
     void updateTask(db, id, { due_date: iso, due_has_time: hasTime ? 1 : 0 })
   }
-
-  // Pick/replace the day (keeps an existing time); pick/replace the time (marks
-  // hasTime); clear just the time (back to date-only). Clearing the date is inline.
-  const pickDay = (current: string | null, hasTime: boolean, fallback: Fallback, save: Save) =>
-    openPicker("date", toDate(current) ?? new Date(), (picked) => {
-      if (picked) save(combineDay(picked, current, hasTime, fallback), hasTime)
-    })
-  const pickTime = (current: string | null, save: Save) =>
-    openPicker("time", toDate(current) ?? new Date(), (picked) => {
-      if (picked) save(combineTime(picked, current), true)
-    })
-  const clearTime = (current: string | null, fallback: Fallback, save: Save) => {
-    const day = toDate(current)
-    if (day) save(combineDay(day, current, false, fallback), false)
-  }
-
   const resolved = task ? task.status_category === "done" : false
-  const dueState = task ? dueDayState(task.due_date, resolved) : null
 
   // Move the task to another status list. The group is derived from status_id, so switching
   // points the task at the target group's first open status (see openStatusForGroup).
@@ -345,147 +294,15 @@ function Detail({
             style={styles.notes}
           />
 
-          <View style={styles.dateRow}>
-            <Text style={styles.dateLabel}>Start</Text>
-            <Pressable
-              testID="detail-start"
-              onPress={() =>
-                pickDay(task.start_date, !!task.start_has_time, START_FALLBACK, saveStart)
-              }
-              style={styles.dateValueBtn}
-            >
-              <Text style={styles.dateValue}>
-                {task.start_date ? formatDate(task.start_date, false) : "Set start date"}
-              </Text>
-            </Pressable>
-            {task.start_date ? (
-              <>
-                <Pressable
-                  testID="detail-start-time"
-                  onPress={() => pickTime(task.start_date, saveStart)}
-                  style={styles.timeChip}
-                >
-                  <Text style={task.start_has_time ? styles.timeText : styles.addTimeText}>
-                    {task.start_has_time ? formatTime(task.start_date) : "Add start time"}
-                  </Text>
-                </Pressable>
-                {task.start_has_time ? (
-                  <Pressable
-                    testID="detail-start-time-clear"
-                    onPress={() => clearTime(task.start_date, START_FALLBACK, saveStart)}
-                    hitSlop={8}
-                  >
-                    <X size={14} color={colors.textMuted} />
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  testID="detail-start-clear"
-                  onPress={() => saveStart(null, false)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.dateClear}>Clear</Text>
-                </Pressable>
-              </>
-            ) : null}
-          </View>
-
-          <View style={styles.dateRow}>
-            <Text style={styles.dateLabel}>Due</Text>
-            <Pressable
-              testID="detail-due"
-              onPress={() => pickDay(task.due_date, !!task.due_has_time, DUE_FALLBACK, saveDue)}
-              style={styles.dateValueBtn}
-            >
-              <Text
-                style={[
-                  styles.dateValue,
-                  dueState === "overdue"
-                    ? styles.dateOverdue
-                    : dueState === "today"
-                      ? styles.dateToday
-                      : null,
-                ]}
-              >
-                {task.due_date ? formatDate(task.due_date, false) : "Set due date"}
-              </Text>
-            </Pressable>
-            {task.due_date ? (
-              <>
-                <Pressable
-                  testID="detail-due-time"
-                  onPress={() => pickTime(task.due_date, saveDue)}
-                  style={styles.timeChip}
-                >
-                  <Text style={task.due_has_time ? styles.timeText : styles.addTimeText}>
-                    {task.due_has_time ? formatTime(task.due_date) : "Add due time"}
-                  </Text>
-                </Pressable>
-                {task.due_has_time ? (
-                  <Pressable
-                    testID="detail-due-time-clear"
-                    onPress={() => clearTime(task.due_date, DUE_FALLBACK, saveDue)}
-                    hitSlop={8}
-                  >
-                    <X size={14} color={colors.textMuted} />
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  testID="detail-due-clear"
-                  onPress={() => saveDue(null, false)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.dateClear}>Clear</Text>
-                </Pressable>
-              </>
-            ) : null}
-            {dueState === "overdue" ? (
-              <Text style={styles.overdueBadge}>Overdue</Text>
-            ) : dueState === "today" ? (
-              <Text style={styles.todayBadge}>Today</Text>
-            ) : null}
-          </View>
-
-          {/* Preset quick-dates (P2-08 · R4) — one tap to a common due day; keeps any picked time. */}
-          <View style={styles.presetRow}>
-            {presetDueDays(new Date()).map((p) => {
-              const [py, pm, pd] = p.day.split("-").map(Number)
-              const date = new Date(py as number, (pm as number) - 1, pd as number)
-              return (
-                <Pressable
-                  key={p.key}
-                  testID={`due-preset-${p.key}`}
-                  onPress={() =>
-                    saveDue(
-                      combineDay(date, task.due_date, !!task.due_has_time, DUE_FALLBACK),
-                      !!task.due_has_time,
-                    )
-                  }
-                  style={styles.presetChip}
-                >
-                  <Text style={styles.presetText}>{p.label}</Text>
-                </Pressable>
-              )
-            })}
-          </View>
-
-          {iosPicker ? (
-            <DateTimePicker
-              value={iosPicker.value}
-              mode={iosPicker.mode}
-              onChange={(_e, picked) => {
-                const { onPick } = iosPicker
-                setIosPicker(null)
-                onPick(picked ?? undefined)
-              }}
-            />
-          ) : null}
-
-          <RecurrenceControl
-            db={db}
+          <DateRangeField
             taskId={id}
+            startIso={task.start_date}
             dueIso={task.due_date}
-            recurrence={task.recurrence}
-            recurrenceRegen={task.recurrence_regen}
+            startHasTime={!!task.start_has_time}
+            dueHasTime={!!task.due_has_time}
+            resolved={resolved}
+            onChangeStart={saveStart}
+            onChangeDue={saveDue}
           />
 
           <SubtaskSection parentId={id} depth={depth} onOpenTask={onOpenTask} />
@@ -573,41 +390,4 @@ const makeStyles = (c: Palette) =>
       paddingHorizontal: 16,
     },
     deleteText: { color: c.textSecondary, fontSize: 15 },
-    dateRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10 },
-    dateLabel: { color: c.textSecondary, fontSize: 13, width: 44 },
-    dateValueBtn: {
-      flexGrow: 1,
-      flexBasis: 120,
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.surfaceInput,
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-    },
-    dateValue: { color: c.textPrimary, fontSize: 15 },
-    dateOverdue: { color: c.dangerText },
-    dateToday: { color: c.warning },
-    overdueBadge: { color: c.dangerText, fontSize: 11, fontWeight: "600" },
-    todayBadge: { color: c.warning, fontSize: 11, fontWeight: "600" },
-    timeChip: {
-      borderWidth: 1,
-      borderColor: c.border,
-      backgroundColor: c.surfaceInput,
-      borderRadius: 10,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-    },
-    timeText: { color: c.textPrimary, fontSize: 15 },
-    addTimeText: { color: c.textMuted, fontSize: 13 },
-    dateClear: { color: c.textMuted, fontSize: 13 },
-    presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginLeft: 44 },
-    presetChip: {
-      borderWidth: 1,
-      borderColor: c.border,
-      borderRadius: 999,
-      paddingVertical: 5,
-      paddingHorizontal: 11,
-    },
-    presetText: { color: c.textMuted, fontSize: 12 },
   })
