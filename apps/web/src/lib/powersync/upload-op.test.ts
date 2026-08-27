@@ -1,6 +1,6 @@
+import { type TrpcClient, uploadOp } from "@pace/api-client"
 import { UpdateType } from "@powersync/web"
 import { describe, expect, it, vi } from "vitest"
-import { type TrpcClient, uploadOp } from "./upload-op"
 
 // A tRPC client whose procedures are all spies. We cast to TrpcClient and only assert on the
 // handful the tests exercise — enough to pin the op → mutation mapping without a real backend.

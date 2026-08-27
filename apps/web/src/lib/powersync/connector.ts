@@ -1,7 +1,7 @@
+import { type TrpcClient, uploadOp } from "@pace/api-client"
 import type { AbstractPowerSyncDatabase, PowerSyncBackendConnector } from "@powersync/web"
 import { authClient } from "../auth-client"
 import { getConfig } from "../config"
-import { type TrpcClient, uploadOp } from "./upload-op"
 
 // tRPC error codes that a retry can't fix (bad input, gone, not ours). We drop the
 // offending change instead of blocking the upload queue forever. Everything else

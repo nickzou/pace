@@ -1,20 +1,18 @@
-import type { useTRPCClient } from "@pace/api-client"
 import type { StatusColor } from "@pace/tokens"
-import { UpdateType } from "@powersync/web"
+import { UpdateType } from "@powersync/common"
+import type { useTRPCClient } from "./react"
 
-// The imperative tRPC client (from useTRPCClient) — the write path PowerSync replays
-// local mutations through. No new backend: the same API the UI used, now driven by the
-// sync engine.
+// The single source of truth for replaying a local PowerSync write through the tRPC API — shared by
+// both apps (apps/web + apps/mobile) so the mapping can't drift between platforms. The only
+// platform-specific bit is the connector wiring (auth client + PowerSync URL), which stays in each
+// app's powersync/connector.ts. `UpdateType` comes from @powersync/common (the core both
+// @powersync/web and @powersync/react-native build on), so this works under Vite and Metro alike.
 export type TrpcClient = ReturnType<typeof useTRPCClient>
 type StatusCategory = "open" | "in_progress" | "done"
 
 // Map one local row op to the matching tRPC procedure. Split by table; each table's PUT
 // (create — upserts on the client-minted id) / PATCH (partial update) / DELETE (soft
-// delete) mirrors its router. resolved_at is server-owned, so we never upload it — the
-// server derives it from the status category.
-//
-// Kept separate from the connector wiring (auth/transport) so this pure op→mutation mapping
-// is unit-testable with a mocked client — see upload-op.test.ts.
+// delete) mirrors its router. resolved_at is server-owned, so we never upload it.
 export async function uploadOp(
   trpc: TrpcClient,
   table: string,
@@ -38,9 +36,9 @@ export async function uploadOp(
           ...(data.sort_order != null ? { sortOrder: String(data.sort_order) } : {}),
         })
       } else if (type === UpdateType.PATCH) {
-        // A re-parent is an isolated change to parent_id (setTaskParent writes only that
-        // column), so it routes to the guarded setParent procedure — not the generic update,
-        // which deliberately can't touch the hierarchy. null promotes to top-level.
+        // A re-parent is an isolated parent_id change (setTaskParent writes only that column),
+        // so it routes to the guarded setParent procedure — not the generic update. null
+        // promotes to top-level.
         if (data.parent_id !== undefined) {
           await trpc.tasks.setParent.mutate({
             id,
@@ -128,8 +126,8 @@ export async function uploadOp(
       return
 
     case "user_settings":
-      // One durable row per user — never deleted; PUT and PATCH both upsert. Send only the columns
-      // this write touched so a timezone write (P2-08) and the toggle don't clobber each other.
+      // Send only the columns this write touched so a timezone write (P2-08) and the toggle don't
+      // clobber each other (settings.set is partial server-side).
       if (type !== UpdateType.DELETE) {
         await trpc.statuses.settings.set.mutate({
           ...(data.custom_statuses_enabled !== undefined
