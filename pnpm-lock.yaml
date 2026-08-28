@@ -96,7 +96,7 @@ importers:
         version: 2.0.0(@powersync/common@2.0.0)(react@19.2.8)
       '@powersync/react-native':
         specifier: ^2.0.2
-        version: 2.0.2(@op-engineering/op-sqlite@17.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(@powersync/common@2.0.0)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
+        version: 2.1.0(@op-engineering/op-sqlite@17.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
       '@react-native-community/datetimepicker':
         specifier: 9.1.0
         version: 9.1.0(expo@57.0.9)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
@@ -2151,11 +2151,11 @@ packages:
   '@powersync/common@2.0.0':
     resolution: {integrity: sha512-GuWmk0w0Y6I1HDwX4uGFzzw1e4E4bkvDSSCpVikdTEIk1xcW5NNnqTX8xfDheZdoQZunm/XushrR/LsIp1Yc/g==}
 
-  '@powersync/react-native@2.0.2':
-    resolution: {integrity: sha512-W34xQWrLTtVO98oGONGqGPER21v1GUfwNNFvXsR3EzxbSUXyEtcm/Ni/XmWTPVoNIuDxVlrHvvoHoeCajKCXKw==}
+  '@powersync/react-native@2.1.0':
+    resolution: {integrity: sha512-IMpCgExjA9AwrJXa9FZ0iraD8AZlmu0pqq0riwow3pZiJV+V+MfrS1oJmXMcrexJfQYI4Mrg6kdbLiRfqp79WQ==}
     peerDependencies:
       '@op-engineering/op-sqlite': ^17.1.0
-      '@powersync/common': ^2.0.0
+      '@powersync/common': ^2.1.0
       react: 19.2.8
       react-native: '*'
 
@@ -3795,8 +3795,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.11.19:
-    resolution: {integrity: sha512-Grytf1xOxOEMTGRwx6rLGKkTabd4vMg3VrKdj/7joCmV0qgh4QwMMO6xh34YEXQqirAuUdgQGa5orJQQ+69RBw==}
+  baseline-browser-mapping@2.11.20:
+    resolution: {integrity: sha512-H0ulySigv6icDJ1F7SjtdCD6PrhTpdYCmP0CactWy1+ekh0AFd0o1Wn5T8b+hnTmdBx19u9yhL6wvCylXMY7zw==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -9307,10 +9307,9 @@ snapshots:
 
   '@powersync/common@2.0.0': {}
 
-  '@powersync/react-native@2.0.2(@op-engineering/op-sqlite@17.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(@powersync/common@2.0.0)(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
+  '@powersync/react-native@2.1.0(@op-engineering/op-sqlite@17.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8))(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@op-engineering/op-sqlite': 17.2.0(react-native@0.86.2(@babel/core@7.29.7)(@react-native/metro-config@0.86.2(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.8))(react@19.2.8)
-      '@powersync/common': 2.0.0
       '@powersync/react': 2.0.0(@powersync/common@2.0.0)(react@19.2.8)
       '@powersync/shared-internals': 1.1.1(@powersync/common@2.0.0)
       react: 19.2.8
@@ -11268,7 +11267,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.11.19: {}
+  baseline-browser-mapping@2.11.20: {}
 
   basic-ftp@5.3.1: {}
 
@@ -11417,7 +11416,7 @@ snapshots:
 
   browserslist@4.28.8:
     dependencies:
-      baseline-browser-mapping: 2.11.19
+      baseline-browser-mapping: 2.11.20
       caniuse-lite: 1.0.30001810
       electron-to-chromium: 1.5.415
       node-releases: 2.0.54
