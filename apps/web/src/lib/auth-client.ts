@@ -45,6 +45,13 @@ export const authClient = createAuthClient({
 
 export const { signIn, signUp, useSession } = authClient
 
+// (Re)send the verification email. The API rewrites the link's callbackURL to the
+// public web /verified page regardless of what we pass, so one link works from
+// web, desktop, and mobile — we just name the destination here for clarity.
+export function resendVerificationEmail(email: string) {
+  return authClient.sendVerificationEmail({ email, callbackURL: "/verified" })
+}
+
 // On desktop there's no cookie for the browser to drop, so clear the stored
 // token ourselves. Wrap signOut so callers don't need to know which mode we're in.
 export async function signOut() {

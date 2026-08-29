@@ -2,7 +2,7 @@ import { isPasswordValid, passwordChecks } from "@pace/validation"
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { Check, Circle, Eye, EyeOff } from "lucide-react"
 import { type FormEvent, useState } from "react"
-import { signUp } from "#/lib/auth-client"
+import { resendVerificationEmail, signUp } from "#/lib/auth-client"
 import { cn } from "#/lib/utils"
 
 export const Route = createFileRoute("/sign-up")({ component: SignUp })
@@ -15,6 +15,9 @@ function SignUp() {
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Set once sign-up succeeds but no session was created — i.e. the account needs
+  // email verification before it can be used. Swaps the form for a prompt.
+  const [awaitingVerification, setAwaitingVerification] = useState(false)
 
   const passwordsMatch = password === confirm
   const canSubmit = isPasswordValid(password) && passwordsMatch
@@ -29,7 +32,18 @@ function SignUp() {
       setError(result.error.message ?? "Could not create account")
       return
     }
-    navigate({ to: "/" })
+    // With the verification gate on, sign-up returns no session token — the user
+    // must verify before signing in. Without the gate, a token means they're in.
+    const signedIn = Boolean((result.data as { token?: string | null } | null)?.token)
+    if (signedIn) {
+      navigate({ to: "/" })
+      return
+    }
+    setAwaitingVerification(true)
+  }
+
+  if (awaitingVerification) {
+    return <CheckYourEmail email={email} />
   }
 
   return (
@@ -182,6 +196,51 @@ export function PasswordField({
         </ul>
       ) : null}
     </div>
+  )
+}
+
+// Shown after sign-up (and reused when an unverified user tries to sign in): the
+// account exists but is gated until the emailed link is clicked. Offers a resend
+// with a short cooldown so the button can't be spammed.
+export function CheckYourEmail({ email, title = "Check your email" }: { email: string; title?: string }) {
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
+
+  async function onResend() {
+    setStatus("sending")
+    const result = await resendVerificationEmail(email)
+    setStatus(result.error ? "error" : "sent")
+  }
+
+  return (
+    <AuthShell
+      title={title}
+      footer={
+        <Link to="/sign-in" className="text-primary hover:underline">
+          Back to sign in
+        </Link>
+      }
+    >
+      <div className="space-y-4 text-sm text-muted-foreground">
+        <p>
+          We sent a verification link to <span className="font-medium text-foreground">{email}</span>.
+          Click it to activate your account, then sign in.
+        </p>
+        <p>Didn't get it? Check spam, or resend below.</p>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={status === "sending" || status === "sent"}
+          className="w-full rounded-lg border border-input px-3 py-2 font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
+        >
+          {status === "sending" ? "…" : status === "sent" ? "Sent — check your inbox" : "Resend email"}
+        </button>
+        {status === "error" && (
+          <p role="alert" className="text-destructive">
+            Couldn't resend right now. Try again in a moment.
+          </p>
+        )}
+      </div>
+    </AuthShell>
   )
 }
 

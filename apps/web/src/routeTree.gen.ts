@@ -14,6 +14,7 @@ import { Route as DesignRouteImport } from './routes/design'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as VerifiedRouteImport } from './routes/verified'
 import { Route as TasksTaskIdRouteImport } from './routes/tasks.$taskId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +42,11 @@ const SignUpRoute = SignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifiedRoute = VerifiedRouteImport.update({
+  id: '/verified',
+  path: '/verified',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksTaskIdRoute = TasksTaskIdRouteImport.update({
   id: '/tasks/$taskId',
   path: '/tasks/$taskId',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/verified': typeof VerifiedRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/verified': typeof VerifiedRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
 }
 export interface FileRoutesById {
@@ -70,14 +78,28 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/verified': typeof VerifiedRoute
   '/tasks/$taskId': typeof TasksTaskIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/design' | '/settings' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
+    | '/'
+    | '/design'
+    | '/settings'
+    | '/sign-in'
+    | '/sign-up'
+    | '/verified'
+    | '/tasks/$taskId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/design' | '/settings' | '/sign-in' | '/sign-up' | '/tasks/$taskId'
+  to:
+    | '/'
+    | '/design'
+    | '/settings'
+    | '/sign-in'
+    | '/sign-up'
+    | '/verified'
+    | '/tasks/$taskId'
   id:
     | '__root__'
     | '/'
@@ -85,6 +107,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/sign-in'
     | '/sign-up'
+    | '/verified'
     | '/tasks/$taskId'
   fileRoutesById: FileRoutesById
 }
@@ -94,6 +117,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  VerifiedRoute: typeof VerifiedRoute
   TasksTaskIdRoute: typeof TasksTaskIdRoute
 }
 
@@ -134,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verified': {
+      id: '/verified'
+      path: '/verified'
+      fullPath: '/verified'
+      preLoaderRoute: typeof VerifiedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tasks/$taskId': {
       id: '/tasks/$taskId'
       path: '/tasks/$taskId'
@@ -150,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  VerifiedRoute: VerifiedRoute,
   TasksTaskIdRoute: TasksTaskIdRoute,
 }
 export const routeTree = rootRouteImport
