@@ -17,6 +17,7 @@ test("a task syncs to a second device (round-trip through the server)", async ({
   await pageA.getByLabel("Name").fill("Sync User")
   await pageA.getByLabel("Email").fill(email)
   await pageA.getByLabel("Password", { exact: true }).fill(PASSWORD)
+  await pageA.getByLabel("Confirm password").fill(PASSWORD)
   await pageA.getByRole("button", { name: "Sign up" }).click()
   await expectSignedIn(pageA, email)
 

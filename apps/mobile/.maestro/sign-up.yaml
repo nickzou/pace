@@ -32,6 +32,9 @@ appId: app.paceproductivity.mobile
 - tapOn:
     id: "password-input"
 - inputText: "Supersecret123!"
+- tapOn:
+    id: "confirm-password-input"
+- inputText: "Supersecret123!"
 # Dismiss the keyboard so it isn't covering the submit button.
 - hideKeyboard
 - tapOn:

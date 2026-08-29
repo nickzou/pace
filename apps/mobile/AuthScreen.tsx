@@ -14,14 +14,16 @@ export function AuthScreen() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
   const isSignUp = mode === "sign-up"
-  // On sign-up the password must satisfy the shared policy (@pace/validation) before we let the
-  // request go out; sign-in accepts any existing password.
-  const canSubmit = !pending && (!isSignUp || isPasswordValid(password))
+  const passwordsMatch = password === confirm
+  // On sign-up the password must satisfy the shared policy (@pace/validation) and be confirmed
+  // before we let the request go out; sign-in accepts any existing password.
+  const canSubmit = !pending && (!isSignUp || (isPasswordValid(password) && passwordsMatch))
 
   async function submit() {
     setPending(true)
@@ -107,6 +109,25 @@ export function AuthScreen() {
         </View>
       ) : null}
 
+      {isSignUp ? (
+        <>
+          <TextInput
+            testID="confirm-password-input"
+            style={styles.input}
+            placeholder="Confirm password"
+            placeholderTextColor={colors.textFaint}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={confirm}
+            onChangeText={setConfirm}
+          />
+          {confirm && !passwordsMatch ? (
+            <Text style={styles.error}>Passwords don't match</Text>
+          ) : null}
+        </>
+      ) : null}
+
       {error ? (
         <Text testID="auth-error" style={styles.error}>
           {error}
@@ -136,6 +157,7 @@ export function AuthScreen() {
           setName("")
           setEmail("")
           setPassword("")
+          setConfirm("")
           setShowPassword(false)
         }}
       >

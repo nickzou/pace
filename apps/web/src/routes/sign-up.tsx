@@ -12,8 +12,12 @@ function SignUp() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirm, setConfirm] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+
+  const passwordsMatch = password === confirm
+  const canSubmit = isPasswordValid(password) && passwordsMatch
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -46,12 +50,21 @@ function SignUp() {
           autoComplete="new-password"
           showChecklist
         />
+        <PasswordField
+          label="Confirm password"
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+        />
+        {confirm && !passwordsMatch && (
+          <p className="text-xs text-destructive">Passwords don't match</p>
+        )}
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         )}
-        <SubmitButton pending={pending} disabled={!isPasswordValid(password)}>
+        <SubmitButton pending={pending} disabled={!canSubmit}>
           Sign up
         </SubmitButton>
       </form>
