@@ -23,9 +23,9 @@ describe("desktop auth", () => {
     await $('input[autocomplete="name"]').setValue("Desktop User")
     await $('input[autocomplete="email"]').setValue(email)
     // Sign-up has two new-password inputs (password + confirm); fill both.
-    const passwordInputs = await $$('input[autocomplete="new-password"]')
-    await passwordInputs[0].setValue(PASSWORD)
-    await passwordInputs[1].setValue(PASSWORD)
+    for (const input of await $$('input[autocomplete="new-password"]')) {
+      await input.setValue(PASSWORD)
+    }
     await $('button[type="submit"]').click()
 
     // Redirected home, authenticated as the new user (bearer token stored).
