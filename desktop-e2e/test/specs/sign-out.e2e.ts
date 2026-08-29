@@ -1,4 +1,4 @@
-import { $, browser, expect } from "@wdio/globals"
+import { $, $$, browser, expect } from "@wdio/globals"
 import { PASSWORD, uniqueEmail } from "../helpers"
 
 // Regression guard for the sign-out bug. On desktop, sign-out must both return to
@@ -28,7 +28,10 @@ describe("desktop sign out", () => {
     await $("a*=Sign up").click()
     await $('input[autocomplete="name"]').setValue("Desktop SignOut")
     await $('input[autocomplete="email"]').setValue(email)
-    await $('input[autocomplete="new-password"]').setValue(PASSWORD)
+    // Sign-up has two new-password inputs (password + confirm); fill both.
+    for (const input of await $$('input[autocomplete="new-password"]')) {
+      await input.setValue(PASSWORD)
+    }
     await $('button[type="submit"]').click()
     await expect($(`span*=${email}`)).toBeDisplayed()
 
