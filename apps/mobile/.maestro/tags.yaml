@@ -24,7 +24,10 @@ appId: app.paceproductivity.mobile
 - inputText: ${output.email}
 - tapOn:
     id: "password-input"
-- inputText: "supersecret123"
+- inputText: "Supersecret123!"
+- tapOn:
+    id: "confirm-password-input"
+- inputText: "Supersecret123!"
 - hideKeyboard
 - tapOn:
     id: "submit-button"
