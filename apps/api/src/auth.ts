@@ -6,6 +6,8 @@ import { bearer, jwt } from "better-auth/plugins"
 import { db } from "./db"
 import * as schema from "./db/auth"
 import { seedUserStatuses } from "./db/seed"
+import { verificationEmail } from "./email/templates"
+import { sendEmail } from "./email/mailer"
 import { env } from "./env"
 
 // The mobile app (apps/mobile) authenticates via its deep-link scheme rather
@@ -20,7 +22,27 @@ export const auth = betterAuth({
   // Password policy: length is enforced natively here; the full complexity rule (upper/lower/
   // number/symbol) lives in @pace/validation and is enforced on the sign-up route (see
   // routes/api/auth/[...all].ts) so it stays a single source of truth shared with the clients.
-  emailAndPassword: { enabled: true, minPasswordLength: PASSWORD_MIN_LENGTH },
+  emailAndPassword: {
+    enabled: true,
+    minPasswordLength: PASSWORD_MIN_LENGTH,
+    // Behind a flag (Phase 5): when on, sign-up creates no session and sends a
+    // verification email, and sign-in is blocked until the address is verified.
+    requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
+  },
+  // Email verification. sendOnSignUp mails the link the moment an account is
+  // created; autoSignInAfterVerification signs the user in when they click it (in
+  // the browser — mobile/desktop then return to the app and sign in). The link
+  // Better Auth builds points at BETTER_AUTH_URL; we rewrite the callbackURL to
+  // the public web app so every platform lands on the same /verified page.
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60, // 1 hour
+    sendVerificationEmail: async ({ user, token }) => {
+      const url = `${env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}&callbackURL=${encodeURIComponent(`${env.WEB_URL}/verified`)}`
+      await sendEmail(verificationEmail(user.email, url))
+    },
+  },
   // Seed each new user's default status library (P2-03) right after the account row is
   // created, so their To Do/Done + settings exist before they ever create a task.
   databaseHooks: {
