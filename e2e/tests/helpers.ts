@@ -4,7 +4,7 @@ import { expect, type Page } from "@playwright/test"
 // API :3001) — see playwright.config.ts.
 export const API_URL = "http://localhost:3101"
 export const WEB_ORIGIN = "http://localhost:3100"
-export const PASSWORD = "supersecret123"
+export const PASSWORD = "Supersecret123!"
 
 // Unique per call so tests don't collide within a run (the DB is truncated once
 // at the start of the run, in global-setup).

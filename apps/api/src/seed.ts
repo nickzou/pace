@@ -13,7 +13,7 @@ import { auth } from "./auth"
 
 const TEST_USER = {
   email: "test@paceproductivity.app",
-  password: "pace-preview-tester",
+  password: "Pace-preview-tester1",
   name: "Preview Tester",
 }
 

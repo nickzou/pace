@@ -14,7 +14,8 @@ test("sign out → confirmed signed out, and stays out on reload", async ({ page
   await page.goto("/sign-up")
   await page.getByLabel("Name").fill("Sign Out User")
   await page.getByLabel("Email").fill(email)
-  await page.getByLabel("Password").fill(PASSWORD)
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD)
+  await page.getByLabel("Confirm password").fill(PASSWORD)
   await page.getByRole("button", { name: "Sign up" }).click()
   await expectSignedIn(page, email)
 

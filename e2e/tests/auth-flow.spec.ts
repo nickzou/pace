@@ -8,7 +8,8 @@ test("sign up → signed in → sign out → sign in (through the UI)", async ({
   await page.goto("/sign-up")
   await page.getByLabel("Name").fill("Flow User")
   await page.getByLabel("Email").fill(email)
-  await page.getByLabel("Password").fill(PASSWORD)
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD)
+  await page.getByLabel("Confirm password").fill(PASSWORD)
   await page.getByRole("button", { name: "Sign up" }).click()
 
   // Redirected home, authenticated as the new user.
@@ -19,7 +20,7 @@ test("sign up → signed in → sign out → sign in (through the UI)", async ({
 
   await page.goto("/sign-in")
   await page.getByLabel("Email").fill(email)
-  await page.getByLabel("Password").fill(PASSWORD)
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD)
   await page.getByRole("button", { name: "Sign in" }).click()
 
   await expectSignedIn(page, email)
