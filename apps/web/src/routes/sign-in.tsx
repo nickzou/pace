@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useState } from "react"
 import { signIn } from "#/lib/auth-client"
-import { AuthShell, Field, SubmitButton } from "./sign-up"
+import { AuthShell, Field, PasswordField, SubmitButton } from "./sign-up"
 
 export const Route = createFileRoute("/sign-in")({ component: SignIn })
 
@@ -36,13 +36,7 @@ function SignIn() {
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="Email" value={email} onChange={setEmail} type="email" autoComplete="email" />
-        <Field
-          label="Password"
-          value={password}
-          onChange={setPassword}
-          type="password"
-          autoComplete="current-password"
-        />
+        <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
         {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}

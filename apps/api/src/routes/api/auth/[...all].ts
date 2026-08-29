@@ -1,3 +1,4 @@
+import { isPasswordValid, PASSWORD_MESSAGE } from "@pace/validation"
 import { defineHandler } from "nitro/h3"
 import { auth } from "../../../auth"
 import { corsHeaders, preflightResponse } from "../../../cors"
@@ -16,10 +17,33 @@ export default defineHandler(async (event) => {
   // native Request the whole pipeline accepts.
   const raw = event.req
   const hasBody = raw.method !== "GET" && raw.method !== "HEAD"
+  const body = hasBody ? await raw.arrayBuffer() : undefined
+
+  // Enforce the full password policy on sign-up. Better Auth only checks length (minPasswordLength);
+  // the complexity rule lives in the shared @pace/validation validator, applied here too so it can't
+  // be bypassed by calling the endpoint directly. Reply with Better Auth's error shape { code,
+  // message } so the web/mobile clients surface the message unchanged.
+  if (body && raw.method === "POST" && new URL(raw.url).pathname.endsWith("/sign-up/email")) {
+    let password: unknown
+    try {
+      password = (JSON.parse(new TextDecoder().decode(body)) as { password?: unknown }).password
+    } catch {
+      password = undefined
+    }
+    if (typeof password === "string" && !isPasswordValid(password)) {
+      const res = Response.json(
+        { code: "WEAK_PASSWORD", message: PASSWORD_MESSAGE },
+        { status: 400 },
+      )
+      for (const [key, value] of headers) res.headers.set(key, value)
+      return res
+    }
+  }
+
   const req = new Request(raw.url, {
     method: raw.method,
     headers: raw.headers,
-    body: hasBody ? await raw.arrayBuffer() : undefined,
+    body,
   })
 
   const res = await auth.handler(req)

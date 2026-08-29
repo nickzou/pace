@@ -1,3 +1,5 @@
+import { isPasswordValid, passwordChecks } from "@pace/validation"
+import { Check, Circle, Eye, EyeOff } from "lucide-react-native"
 import { useState } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
 import { signIn, signUp } from "./lib/auth-client"
@@ -12,10 +14,14 @@ export function AuthScreen() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
   const isSignUp = mode === "sign-up"
+  // On sign-up the password must satisfy the shared policy (@pace/validation) before we let the
+  // request go out; sign-in accepts any existing password.
+  const canSubmit = !pending && (!isSignUp || isPasswordValid(password))
 
   async function submit() {
     setPending(true)
@@ -57,15 +63,49 @@ export function AuthScreen() {
         value={email}
         onChangeText={setEmail}
       />
-      <TextInput
-        testID="password-input"
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.textFaint}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+      <View style={styles.passwordRow}>
+        <TextInput
+          testID="password-input"
+          style={[styles.input, styles.passwordInput]}
+          placeholder="Password"
+          placeholderTextColor={colors.textFaint}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={password}
+          onChangeText={setPassword}
+        />
+        <Pressable
+          testID="password-peek"
+          style={styles.peek}
+          onPress={() => setShowPassword((s) => !s)}
+          accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+          hitSlop={8}
+        >
+          {showPassword ? (
+            <EyeOff size={18} color={colors.textSecondary} />
+          ) : (
+            <Eye size={18} color={colors.textSecondary} />
+          )}
+        </Pressable>
+      </View>
+
+      {isSignUp ? (
+        <View testID="password-checklist" style={styles.checklist}>
+          {passwordChecks(password).map((check) => (
+            <View key={check.key} style={styles.checkItem}>
+              {check.ok ? (
+                <Check size={14} color={colors.successText} />
+              ) : (
+                <Circle size={14} color={colors.textFaint} />
+              )}
+              <Text style={[styles.checkLabel, check.ok && styles.checkLabelOk]}>
+                {check.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {error ? (
         <Text testID="auth-error" style={styles.error}>
@@ -73,7 +113,12 @@ export function AuthScreen() {
         </Text>
       ) : null}
 
-      <Pressable testID="submit-button" style={styles.button} onPress={submit} disabled={pending}>
+      <Pressable
+        testID="submit-button"
+        style={[styles.button, !canSubmit && styles.buttonDisabled]}
+        onPress={submit}
+        disabled={!canSubmit}
+      >
         {pending ? (
           <ActivityIndicator color={colors.onPrimary} />
         ) : (
@@ -91,6 +136,7 @@ export function AuthScreen() {
           setName("")
           setEmail("")
           setPassword("")
+          setShowPassword(false)
         }}
       >
         <Text style={styles.switch}>
@@ -117,6 +163,19 @@ const makeStyles = (c: Palette) =>
       fontSize: 15,
     },
     error: { color: c.dangerText, fontSize: 14 },
+    passwordRow: { position: "relative", justifyContent: "center" },
+    passwordInput: { paddingRight: 44 },
+    peek: {
+      position: "absolute",
+      right: 0,
+      height: "100%",
+      paddingHorizontal: 14,
+      justifyContent: "center",
+    },
+    checklist: { gap: 4, marginTop: -4 },
+    checkItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+    checkLabel: { color: c.textFaint, fontSize: 13 },
+    checkLabelOk: { color: c.successText },
     button: {
       backgroundColor: c.primary,
       borderRadius: 10,
@@ -124,6 +183,7 @@ const makeStyles = (c: Palette) =>
       alignItems: "center",
       marginTop: 4,
     },
+    buttonDisabled: { opacity: 0.5 },
     buttonText: { color: c.onPrimary, fontSize: 15, fontWeight: "600" },
     switch: { color: c.primary, fontSize: 14, textAlign: "center", marginTop: 8 },
   })

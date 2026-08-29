@@ -1,4 +1,5 @@
 import { expo } from "@better-auth/expo"
+import { PASSWORD_MIN_LENGTH } from "@pace/validation"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { bearer, jwt } from "better-auth/plugins"
@@ -16,7 +17,10 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [...env.TRUSTED_ORIGINS.split(","), MOBILE_SCHEME],
   database: drizzleAdapter(db, { provider: "pg", schema }),
-  emailAndPassword: { enabled: true },
+  // Password policy: length is enforced natively here; the full complexity rule (upper/lower/
+  // number/symbol) lives in @pace/validation and is enforced on the sign-up route (see
+  // routes/api/auth/[...all].ts) so it stays a single source of truth shared with the clients.
+  emailAndPassword: { enabled: true, minPasswordLength: PASSWORD_MIN_LENGTH },
   // Seed each new user's default status library (P2-03) right after the account row is
   // created, so their To Do/Done + settings exist before they ever create a task.
   databaseHooks: {

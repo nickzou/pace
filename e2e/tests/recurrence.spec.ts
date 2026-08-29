@@ -18,7 +18,7 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.goto("/sign-up")
   await page.getByLabel("Name").fill("Recurrence User")
   await page.getByLabel("Email").fill(email)
-  await page.getByLabel("Password").fill(PASSWORD)
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD)
   await page.getByRole("button", { name: "Sign up" }).click()
   await expectSignedIn(page, email)
 }
