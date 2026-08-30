@@ -1,4 +1,4 @@
-import { describe, monthlyRuleBody, withAnchor } from "@pace/validation"
+import { activeTimezone, describe, monthlyRuleBody, withAnchor } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
 import { type Palette, useThemedStyles } from "../theme"
@@ -6,7 +6,8 @@ import { setTaskRecurrence } from "./mutations"
 
 // The "Repeat" control in the mobile task detail (P2-08) — the native twin of apps/web's. Frequency
 // chips + an on-completion toggle over the shared recurrence engine, anchored to the due date in the
-// device timezone. Needs a due date; without one it prompts for it.
+// user's ACCOUNT timezone (the same zone the server advances in). Needs a due date; without one it
+// prompts for it.
 const FREQS = [
   { key: "none", label: "None" },
   { key: "daily", label: "Daily" },
@@ -70,7 +71,7 @@ export function RecurrenceControl({ taskId }: { taskId: string }) {
     )
   }
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const tz = activeTimezone()
   const freq = freqOf(recurrence)
   const regen = recurrenceRegen === "duplicate" ? "duplicate" : "advance"
 

@@ -1,5 +1,6 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native"
 import { StatusesSection } from "../statuses/status-settings"
+import { TimezoneSection } from "../statuses/timezone-settings"
 import { TagsSection } from "../tags/tag-settings"
 import { type Palette, type ThemePref, useTheme, useThemedStyles } from "../theme"
 
@@ -80,6 +81,8 @@ function SettingsBody({ email, onClose }: { email: string; onClose: () => void }
             </View>
           </View>
         </View>
+
+        <TimezoneSection />
 
         <StatusesSection />
 

@@ -1,11 +1,11 @@
-import { describe, monthlyRuleBody, withAnchor } from "@pace/validation"
+import { activeTimezone, describe, monthlyRuleBody, withAnchor } from "@pace/validation"
 import { usePowerSync, useQuery } from "@powersync/react"
 import { setTaskRecurrence } from "#/lib/tasks/mutations"
 
 // The "Repeat" control in the task detail (P2-08). A frequency picker + an on-completion mode, over
-// the shared recurrence engine. Anchored to the task's due date in the device's timezone (the same
-// zone TimezoneSync records for the server). A repeat needs a due date, so without one it just
-// prompts for it.
+// the shared recurrence engine. Anchored to the task's due date in the user's ACCOUNT timezone (the
+// same zone the server advances in — see userTimezone in tasks.ts). A repeat needs a due date, so
+// without one it just prompts for it.
 const FREQS = [
   { key: "none", label: "Doesn't repeat" },
   { key: "daily", label: "Daily" },
@@ -75,7 +75,7 @@ export function RecurrenceControl({ taskId }: { taskId: string }) {
     )
   }
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const tz = activeTimezone()
   const freq = freqOf(recurrence)
   const regen = recurrenceRegen === "duplicate" ? "duplicate" : "advance"
 

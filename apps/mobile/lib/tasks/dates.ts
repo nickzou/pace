@@ -1,6 +1,9 @@
-// Timezone discipline for scheduling (P2-02): STORE UTC ISO strings, RENDER local.
-// The native DateTimePicker works with JS Date objects (local time), so these
-// bridge stored UTC ISO ↔ Date. (The web twin bridges to datetime-local strings.)
+import { activeTimezone, toLocalFields } from "@pace/validation"
+
+// Timezone discipline for scheduling (P2-02): STORE UTC ISO strings; RENDER + reason in the user's
+// ACCOUNT zone (P2 Timezones — the active tz, auto-detected or pinned in Settings). The native
+// DateTimePicker works with device-local JS Date objects, so the input bridges (toDate/combineDay/
+// combineTime) stay device-local for now; the display + overdue/today calc below use the account zone.
 
 // UTC ISO → a Date for the picker (undefined when unset → picker opens at "now").
 export function toDate(iso: string | null): Date | undefined {
@@ -38,21 +41,26 @@ export function combineTime(time: Date, currentIso: string | null): string {
   return d.toISOString()
 }
 
-// UTC ISO → a friendly local string. With a real time-of-day, includes it
+// UTC ISO → a friendly account-zone string. With a real time-of-day, includes it
 // ("Aug 15, 1:00 PM"); for a date-only entry (hasTime false), just "Aug 15".
-export function formatDate(iso: string | null, hasTime = false): string {
+export function formatDate(iso: string | null, hasTime = false, tz = activeTimezone()): string {
   if (!iso) return ""
   return new Date(iso).toLocaleString(undefined, {
+    timeZone: tz,
     month: "short",
     day: "numeric",
     ...(hasTime ? { hour: "numeric", minute: "2-digit" } : {}),
   })
 }
 
-// Just the local time of a stored ISO, e.g. "1:00 PM" — for the time chip.
-export function formatTime(iso: string | null): string {
+// Just the account-zone time of a stored ISO, e.g. "1:00 PM" — for the time chip.
+export function formatTime(iso: string | null, tz = activeTimezone()): string {
   if (!iso) return ""
-  return new Date(iso).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })
+  return new Date(iso).toLocaleString(undefined, {
+    timeZone: tz,
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
 // The due date's state relative to TODAY, by local CALENDAR DAY (not clock time):
@@ -63,12 +71,15 @@ export function formatTime(iso: string | null): string {
 export function dueDayState(
   dueIso: string | null,
   resolved: boolean,
+  tz = activeTimezone(),
 ): "overdue" | "today" | "upcoming" | null {
   if (!dueIso || resolved) return null
-  const due = new Date(dueIso)
-  const now = new Date()
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const due = toLocalFields(dueIso, tz)
+  const now = toLocalFields(new Date(), tz)
+  // Compare calendar days as YYYYMMDD integers, resolved in the account zone — day-based, so a task
+  // due today stays "today" all day regardless of clock time.
+  const dueDay = due.y * 10000 + due.mo * 100 + due.d
+  const today = now.y * 10000 + now.mo * 100 + now.d
   if (dueDay < today) return "overdue"
   if (dueDay > today) return "upcoming"
   return "today"

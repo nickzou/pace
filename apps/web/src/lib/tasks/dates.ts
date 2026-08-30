@@ -1,8 +1,12 @@
-// Timezone discipline for scheduling (P2-02): we STORE UTC ISO strings and RENDER
-// in the viewer's local zone. The pickers speak local wall-clock — a required
-// date ("YYYY-MM-DD") and an OPTIONAL time ("HH:mm") — so these bridge the two.
-// Time is optional because a due date is usually a day ("due Friday"); when it's
-// omitted we fall back to a sensible wall-clock time (see DUE_FALLBACK/START_FALLBACK).
+import { activeTimezone, fromLocalFields, toLocalFields } from "@pace/validation"
+
+// Timezone discipline for scheduling (P2-02): we STORE UTC ISO strings and RENDER/reason in the
+// user's ACCOUNT zone (P2 Timezones — the active tz, auto-detected or pinned in Settings), not the
+// raw device zone. The pickers speak local wall-clock — a required date ("YYYY-MM-DD") and an
+// OPTIONAL time ("HH:mm") — so these bridge the two through the account tz. Each fn takes an explicit
+// `tz` defaulting to the active zone, so it stays pure + testable (tests run in the env zone).
+// Time is optional because a due date is usually a day ("due Friday"); when it's omitted we fall
+// back to a sensible wall-clock time (see DUE_FALLBACK/START_FALLBACK).
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -12,34 +16,45 @@ const pad = (n: number) => String(n).padStart(2, "0")
 export const START_FALLBACK = "00:00"
 export const DUE_FALLBACK = "23:59"
 
-// UTC ISO → the local date a <input type="date"> expects. "" clears.
-export function toDateInput(iso: string | null): string {
+// UTC ISO → the account-zone date a <input type="date"> expects. "" clears.
+export function toDateInput(iso: string | null, tz = activeTimezone()): string {
   if (!iso) return ""
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const f = toLocalFields(iso, tz)
+  return `${f.y}-${pad(f.mo)}-${pad(f.d)}`
 }
 
-// UTC ISO → the local time a <input type="time"> expects. "" when no date.
-export function toTimeInput(iso: string | null): string {
+// UTC ISO → the account-zone time a <input type="time"> expects. "" when no date.
+export function toTimeInput(iso: string | null, tz = activeTimezone()): string {
   if (!iso) return ""
-  const d = new Date(iso)
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const f = toLocalFields(iso, tz)
+  return `${pad(f.h)}:${pad(f.min)}`
 }
 
-// A local date (required) + optional local time → UTC ISO to store. No date → null
-// (cleared). No time → the caller's fallback, so a date-only pick still saves as a
-// full timestamp. new Date("YYYY-MM-DDTHH:mm") parses as LOCAL, so toISOString is UTC.
-export function combineLocal(day: string, time: string, fallback: string): string | null {
+// An account-zone date (required) + optional time → UTC ISO to store. No date → null
+// (cleared). No time → the caller's fallback, so a date-only pick still saves as a full
+// timestamp. The wall-clock is interpreted in `tz` (DST-correct), then serialised to UTC.
+export function combineLocal(
+  day: string,
+  time: string,
+  fallback: string,
+  tz = activeTimezone(),
+): string | null {
   if (!day) return null
-  const d = new Date(`${day}T${time || fallback}`)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+  const [y, mo, d] = day.split("-").map(Number)
+  const [h, min] = (time || fallback).split(":").map(Number)
+  if ([y, mo, d, h, min].some((n) => n === undefined || Number.isNaN(n))) return null
+  return fromLocalFields(
+    { y: y as number, mo: mo as number, d: d as number, h: h as number, min: min as number },
+    tz,
+  ).toISOString()
 }
 
-// UTC ISO → a friendly local string. With a real time-of-day, includes it
+// UTC ISO → a friendly account-zone string. With a real time-of-day, includes it
 // ("Aug 15, 1:00 PM"); for a date-only entry (hasTime false), just "Aug 15".
-export function formatDate(iso: string | null, hasTime = false): string {
+export function formatDate(iso: string | null, hasTime = false, tz = activeTimezone()): string {
   if (!iso) return ""
   return new Date(iso).toLocaleString(undefined, {
+    timeZone: tz,
     month: "short",
     day: "numeric",
     ...(hasTime ? { hour: "numeric", minute: "2-digit" } : {}),
@@ -95,12 +110,15 @@ export function formatDayLabel(day: string, time = "", now = new Date()): string
 export function dueDayState(
   dueIso: string | null,
   resolved: boolean,
+  tz = activeTimezone(),
 ): "overdue" | "today" | "upcoming" | null {
   if (!dueIso || resolved) return null
-  const due = new Date(dueIso)
-  const now = new Date()
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const due = toLocalFields(dueIso, tz)
+  const now = toLocalFields(new Date(), tz)
+  // Compare calendar days as YYYYMMDD integers — day-based, so a task due today stays "today" all
+  // day regardless of clock time. Both sides are resolved in the account zone.
+  const dueDay = due.y * 10000 + due.mo * 100 + due.d
+  const today = now.y * 10000 + now.mo * 100 + now.d
   if (dueDay < today) return "overdue"
   if (dueDay > today) return "upcoming"
   return "today"

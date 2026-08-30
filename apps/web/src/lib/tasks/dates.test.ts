@@ -17,6 +17,31 @@ const daysFromNow = (n: number) => {
   return d.toISOString()
 }
 
+// P2 Timezones: the calc helpers take an explicit account `tz` and must resolve in it, not the
+// device zone. Pin the zone so the assertions are deterministic wherever the suite runs.
+describe("account timezone", () => {
+  it("interprets a picked wall-clock in the given zone (combineLocal ↔ toDateInput/toTimeInput)", () => {
+    // 09:00 in Tokyo is the previous day 20:00 UTC / 16:00 in New York.
+    const iso = combineLocal("2026-06-15", "09:00", DUE_FALLBACK, "Asia/Tokyo")
+    expect(iso).toBe("2026-06-15T00:00:00.000Z")
+    // Round-trips in the same zone…
+    expect(toDateInput(iso, "Asia/Tokyo")).toBe("2026-06-15")
+    expect(toTimeInput(iso, "Asia/Tokyo")).toBe("09:00")
+    // …but reads as the prior day in New York.
+    expect(toDateInput(iso, "America/New_York")).toBe("2026-06-14")
+  })
+
+  it("resolves the calendar day (which drives overdue/today) in the account zone", () => {
+    // 2026-06-15 20:00 UTC lands on the 16th in Tokyo but is still the 15th in Los Angeles — the
+    // day boundary dueDayState compares against differs by zone.
+    const lateIso = "2026-06-15T20:00:00.000Z"
+    expect(toDateInput(lateIso, "Asia/Tokyo")).toBe("2026-06-16")
+    expect(toDateInput(lateIso, "America/Los_Angeles")).toBe("2026-06-15")
+    // A far-past instant is "overdue" regardless of zone (sanity that the tz path still works).
+    expect(dueDayState("2020-01-01T00:00:00.000Z", false, "Asia/Tokyo")).toBe("overdue")
+  })
+})
+
 // These bridge stored UTC ISO ↔ the local wall-clock the pickers speak. The
 // assertions are timezone-independent on purpose: they round-trip a value back
 // through the local-rendering helpers rather than pin an exact UTC string, so the
