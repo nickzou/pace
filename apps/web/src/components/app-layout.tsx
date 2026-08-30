@@ -250,6 +250,7 @@ function SidebarNav({
       <div className="mt-auto flex items-center gap-1 text-sm">
         <Link
           to="/settings"
+          search={{ tab: "account" }}
           onClick={onNavigate}
           title="Settings"
           className={cn(

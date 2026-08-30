@@ -41,7 +41,8 @@ export async function expectSignedOut(page: Page): Promise<void> {
 // pre-sync default both misfires under slow sync and can clobber an already-on value
 // (e.g. when an earlier spec enabled it and the server already says true). Idempotent.
 export async function enableCustomStatuses(page: Page): Promise<void> {
-  await page.goto("/settings")
+  // Statuses live under the Task Defaults tab; the tab is a URL param so we deep-link to it.
+  await page.goto("/settings?tab=task-defaults")
   const toggle = page.getByRole("switch", { name: "Enable custom statuses" })
   await expect(toggle).toBeEnabled({ timeout: 30_000 })
   if ((await toggle.getAttribute("aria-checked")) !== "true") await toggle.click()
