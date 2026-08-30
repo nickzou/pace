@@ -1,4 +1,5 @@
 import * as rruleModule from "rrule"
+import { fromLocalFields, type LocalFields, toLocalFields } from "./timezone"
 
 // rrule resolves to its CommonJS build under the server's ESM runtime (nitro — which then needs a
 // DEFAULT import; a named `import { RRule }` throws "Named export not found") but to its ESM build
@@ -25,64 +26,8 @@ type RRuleInstance = InstanceType<typeof RRule>
 // rather than re-anchoring to the current due, so COUNT ("after N times") and UNTIL both reason from
 // that stable origin and exhaust correctly as the task marches forward.
 
-type LocalFields = { y: number; mo: number; d: number; h: number; min: number }
-
-// The offset (minutes ahead of UTC) of `tz` at a given instant.
-function tzOffsetMinutes(instant: Date, tz: string): number {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-  const p: Record<string, string> = {}
-  for (const part of dtf.formatToParts(instant)) p[part.type] = part.value
-  const asUtc = Date.UTC(
-    Number(p.year),
-    Number(p.month) - 1,
-    Number(p.day),
-    Number(p.hour),
-    Number(p.minute),
-    Number(p.second),
-  )
-  return (asUtc - instant.getTime()) / 60000
-}
-
-// UTC ISO → the wall-clock fields a viewer in `tz` sees.
-function toLocalFields(iso: string, tz: string): LocalFields {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  const p: Record<string, string> = {}
-  for (const part of dtf.formatToParts(new Date(iso))) p[part.type] = part.value
-  return {
-    y: Number(p.year),
-    mo: Number(p.month),
-    d: Number(p.day),
-    h: Number(p.hour),
-    min: Number(p.minute),
-  }
-}
-
-// Local wall-clock fields in `tz` → the real UTC instant. DST-correct: solve for the offset at the
-// target local time, then re-solve once if the resolved instant landed on the other side of a jump.
-function fromLocalFields(f: LocalFields, tz: string): Date {
-  const guess = Date.UTC(f.y, f.mo - 1, f.d, f.h, f.min)
-  const off1 = tzOffsetMinutes(new Date(guess), tz)
-  const utc1 = guess - off1 * 60000
-  const off2 = tzOffsetMinutes(new Date(utc1), tz)
-  return off2 === off1 ? new Date(utc1) : new Date(guess - off2 * 60000)
-}
+// tz ↔ local-wall-clock conversions (tzOffsetMinutes/toLocalFields/fromLocalFields) live in
+// ./timezone — shared with the date pickers (dates.ts) so there's one implementation.
 
 // A "fake UTC" Date whose UTC fields equal the given local fields (the frame rrule reasons over).
 function toFakeUtc(f: LocalFields): Date {

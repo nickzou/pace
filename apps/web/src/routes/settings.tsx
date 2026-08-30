@@ -7,6 +7,7 @@ import { Input } from "#/components/ui/input"
 import { authClient, signOut, useSession, useTokens } from "#/lib/auth-client"
 import { getConfig } from "#/lib/config"
 import { StatusesSettings } from "#/lib/statuses/status-settings"
+import { TimezoneSettings } from "#/lib/statuses/timezone-settings"
 import { TagsSettings } from "#/lib/tags/tag-settings"
 import { type Theme, useTheme } from "#/lib/theme"
 import { useToast } from "#/lib/toast"
@@ -108,6 +109,8 @@ function Settings() {
               <ThemeToggle />
             </Row>
           </Section>
+
+          <TimezoneSettings />
 
           <StatusesSettings />
 
