@@ -35,10 +35,13 @@ appId: app.paceproductivity.mobile
 - assertVisible:
     id: "signed-in"
 
-# Open Settings and enable custom statuses. The toggle is disabled until user_settings
-# syncs down (P2-03) — wait for it to enable so the tap actually toggles.
+# Open Settings, switch to the Task Defaults tab (statuses live there now), and enable custom
+# statuses. The toggle is disabled until user_settings syncs down (P2-03) — wait for it to enable
+# so the tap actually toggles.
 - tapOn:
     id: "settings-open"
+- tapOn:
+    id: "settings-tab-task-defaults"
 - extendedWaitUntil:
     visible:
       id: "statuses-toggle"
@@ -115,6 +118,9 @@ appId: app.paceproductivity.mobile
     id: "settings-close"
 - tapOn:
     id: "settings-open"
+# Reopening starts on the Account tab — switch back to Task Defaults where the statuses live.
+- tapOn:
+    id: "settings-tab-task-defaults"
 # Reopening remounts the section, so the optimistic override resets and the toggle reflects the local
 # DB — which can still read disabled if the enable hasn't converged server→client under CI load. Scroll
 # the toggle into view and re-enable if the off-hint shows (sticky again for this mount) so the persisted
