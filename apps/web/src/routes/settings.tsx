@@ -1,6 +1,6 @@
 import { usePowerSync } from "@powersync/react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Moon, Sun } from "lucide-react"
+import { ChevronLeft, ChevronRight, Moon, Sun } from "lucide-react"
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
 import { AppLayout } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
@@ -36,9 +36,10 @@ function isTabKey(value: unknown): value is TabKey {
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
-  validateSearch: (search: Record<string, unknown>): { tab: TabKey } => ({
-    tab: isTabKey(search.tab) ? search.tab : "account",
-  }),
+  // `tab` is optional: absent = the section list (on narrow screens) or the default section (on
+  // wide, where the rail is always shown). A value = that section's detail.
+  validateSearch: (search: Record<string, unknown>): { tab?: TabKey } =>
+    isTabKey(search.tab) ? { tab: search.tab } : {},
 })
 
 function SettingsPage() {
@@ -52,26 +53,35 @@ function SettingsPage() {
 function Settings() {
   const { tab } = Route.useSearch()
   const navigate = useNavigate()
+  // On a wide screen the rail is always shown, so fall back to the first section. On a narrow
+  // screen an absent tab means the section list (see below).
+  const contentTab: TabKey = tab ?? "account"
+
+  const openTab = (key: TabKey) => navigate({ to: "/settings", search: { tab: key } })
+  const backToList = () => navigate({ to: "/settings", search: {} })
 
   return (
     <>
-      <header className="flex items-center gap-4 border-b border-border px-8 py-5">
+      <header className="flex items-center gap-4 border-b border-border px-6 py-5 md:px-8">
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto flex h-full max-w-4xl gap-8 px-8 py-6">
-          {/* Left tab rail. */}
-          <nav className="flex w-44 shrink-0 flex-col gap-0.5" aria-label="Settings sections">
+        <div className="mx-auto flex h-full max-w-4xl gap-8 px-6 py-6 md:px-8">
+          {/* Left rail — desktop / wide only. */}
+          <nav
+            className="hidden w-44 shrink-0 flex-col gap-0.5 md:flex"
+            aria-label="Settings sections"
+          >
             {TABS.map((t) => (
               <button
                 key={t.key}
                 type="button"
-                aria-current={t.key === tab ? "page" : undefined}
-                onClick={() => navigate({ to: "/settings", search: { tab: t.key } })}
+                aria-current={t.key === contentTab ? "page" : undefined}
+                onClick={() => openTab(t.key)}
                 className={cn(
                   "rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                  t.key === tab
+                  t.key === contentTab
                     ? "bg-accent font-medium text-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
@@ -81,29 +91,63 @@ function Settings() {
             ))}
           </nav>
 
-          {/* Content for the active tab. */}
-          <div className="min-w-0 flex-1 overflow-auto pb-6">
-            <div className="flex flex-col gap-6">
-              {tab === "account" ? <AccountTab /> : null}
-              {tab === "general" ? <GeneralTab /> : null}
-              {tab === "notifications" ? (
-                <StubTab title="Notifications" message="Notification settings are coming soon." />
-              ) : null}
-              {tab === "subscriptions" ? (
-                <StubTab title="Subscriptions" message="Nothing here yet." />
-              ) : null}
-              {tab === "theme" ? <ThemeTab /> : null}
-              {tab === "sidebar" ? (
-                <StubTab title="Sidebar" message="Sidebar customisation is coming soon." />
-              ) : null}
-              {tab === "task-defaults" ? <TaskDefaultsTab /> : null}
-              {tab === "data" ? <DataTab /> : null}
-            </div>
+          {/* Narrow screens: the section list, shown only when no section is open (list → detail). */}
+          {!tab ? (
+            <nav className="flex-1 overflow-auto md:hidden" aria-label="Settings sections">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => openTab(t.key)}
+                  className="flex w-full items-center justify-between border-b border-border px-1 py-4 text-left text-sm text-foreground"
+                >
+                  {t.label}
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              ))}
+            </nav>
+          ) : null}
+
+          {/* Content — always on wide; on narrow only when a section is open. */}
+          <div
+            className={cn("min-w-0 flex-1 overflow-auto pb-6", tab ? "block" : "hidden md:block")}
+          >
+            {/* Narrow-only back to the section list. */}
+            <button
+              type="button"
+              onClick={backToList}
+              className="mb-4 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
+            >
+              <ChevronLeft className="size-4" />
+              Settings
+            </button>
+            <div className="flex flex-col gap-6">{renderTab(contentTab)}</div>
           </div>
         </div>
       </div>
     </>
   )
+}
+
+function renderTab(tab: TabKey) {
+  switch (tab) {
+    case "account":
+      return <AccountTab />
+    case "general":
+      return <GeneralTab />
+    case "notifications":
+      return <StubTab title="Notifications" message="Notification settings are coming soon." />
+    case "subscriptions":
+      return <StubTab title="Subscriptions" message="Nothing here yet." />
+    case "theme":
+      return <ThemeTab />
+    case "sidebar":
+      return <StubTab title="Sidebar" message="Sidebar customisation is coming soon." />
+    case "task-defaults":
+      return <TaskDefaultsTab />
+    case "data":
+      return <DataTab />
+  }
 }
 
 function AccountTab() {
