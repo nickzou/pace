@@ -1,4 +1,5 @@
 import { usePowerSync } from "@powersync/react-native"
+import { ChevronRight } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import {
   Modal,
@@ -72,58 +73,69 @@ function SettingsBody({
   onSignOut: () => void
 }) {
   const styles = useThemedStyles(makeStyles)
-  const [tab, setTab] = useState<TabKey>("account")
+  const { colors } = useTheme()
+  // null = the section list; a key = that section's detail (list → detail, iOS/Android idiom).
+  const [tab, setTab] = useState<TabKey | null>(null)
 
+  if (tab === null) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Settings</Text>
+          <Pressable testID="settings-close" onPress={onClose} hitSlop={8}>
+            <Text style={styles.done}>Done</Text>
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.listContent}>
+          {TABS.map((t) => (
+            <Pressable
+              key={t.key}
+              testID={`settings-tab-${t.key}`}
+              onPress={() => setTab(t.key)}
+              style={styles.listRow}
+            >
+              <Text style={styles.listLabel}>{t.label}</Text>
+              <ChevronRight size={18} color={colors.textFaint} />
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    )
+  }
+
+  const current = TABS.find((t) => t.key === tab)
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-        <Pressable testID="settings-close" onPress={onClose} hitSlop={8}>
-          <Text style={styles.done}>Done</Text>
+        <Pressable testID="settings-back" onPress={() => setTab(null)} hitSlop={8}>
+          <Text style={styles.back}>‹ Settings</Text>
         </Pressable>
+        <Text style={styles.detailTitle} numberOfLines={1}>
+          {current?.label}
+        </Text>
+        <View style={styles.headerSpacer} />
       </View>
-
-      <View style={styles.body}>
-        <ScrollView style={styles.rail} contentContainerStyle={styles.railContent}>
-          {TABS.map((t) => {
-            const active = t.key === tab
-            return (
-              <Pressable
-                key={t.key}
-                testID={`settings-tab-${t.key}`}
-                onPress={() => setTab(t.key)}
-                style={[styles.tab, active ? styles.tabActive : null]}
-              >
-                <Text style={[styles.tabText, active ? styles.tabTextActive : null]}>
-                  {t.label}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
-          {tab === "account" ? <AccountTab email={email} onSignOut={onSignOut} /> : null}
-          {tab === "general" ? <GeneralTab /> : null}
-          {tab === "notifications" ? (
-            <StubTab title="Notifications" message="Notification settings are coming soon." />
-          ) : null}
-          {tab === "subscriptions" ? (
-            <StubTab title="Subscriptions" message="Nothing here yet." />
-          ) : null}
-          {tab === "theme" ? <ThemeTab /> : null}
-          {tab === "sidebar" ? (
-            <StubTab title="Sidebar" message="Sidebar customisation is coming soon." />
-          ) : null}
-          {tab === "task-defaults" ? (
-            <>
-              <StatusesSection />
-              <TagsSection />
-            </>
-          ) : null}
-          {tab === "data" ? <DataTab /> : null}
-        </ScrollView>
-      </View>
+      <ScrollView contentContainerStyle={styles.contentInner}>
+        {tab === "account" ? <AccountTab email={email} onSignOut={onSignOut} /> : null}
+        {tab === "general" ? <GeneralTab /> : null}
+        {tab === "notifications" ? (
+          <StubTab title="Notifications" message="Notification settings are coming soon." />
+        ) : null}
+        {tab === "subscriptions" ? (
+          <StubTab title="Subscriptions" message="Nothing here yet." />
+        ) : null}
+        {tab === "theme" ? <ThemeTab /> : null}
+        {tab === "sidebar" ? (
+          <StubTab title="Sidebar" message="Sidebar customisation is coming soon." />
+        ) : null}
+        {tab === "task-defaults" ? (
+          <>
+            <StatusesSection />
+            <TagsSection />
+          </>
+        ) : null}
+        {tab === "data" ? <DataTab /> : null}
+      </ScrollView>
     </View>
   )
 }
@@ -298,14 +310,26 @@ const makeStyles = (c: Palette) =>
     },
     title: { color: c.textPrimary, fontSize: 24, fontWeight: "700" },
     done: { color: c.primary, fontSize: 15, fontWeight: "600" },
-    body: { flex: 1, flexDirection: "row" },
-    rail: { width: 124, borderRightWidth: 1, borderRightColor: c.border },
-    railContent: { padding: 8, gap: 2 },
-    tab: { borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
-    tabActive: { backgroundColor: c.surface },
-    tabText: { color: c.textSecondary, fontSize: 13 },
-    tabTextActive: { color: c.textPrimary, fontWeight: "600" },
-    content: { flex: 1 },
+    back: { color: c.primary, fontSize: 15, fontWeight: "600", width: 84 },
+    detailTitle: {
+      color: c.textPrimary,
+      fontSize: 17,
+      fontWeight: "600",
+      flex: 1,
+      textAlign: "center",
+    },
+    headerSpacer: { width: 84 },
+    listContent: { paddingVertical: 4 },
+    listRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: c.border,
+    },
+    listLabel: { color: c.textPrimary, fontSize: 16 },
     contentInner: { padding: 16, gap: 16 },
     section: {
       gap: 12,
