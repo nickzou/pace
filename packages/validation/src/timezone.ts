@@ -109,6 +109,21 @@ export function detectTimezone(): string {
   }
 }
 
+// The app's ambient "active" timezone: the user's account tz once it's synced. The date
+// helpers (dates.ts) default to it so every due/start-date calc and label resolves in the
+// account zone without threading tz through dozens of call sites. TimezoneSync sets it from
+// user_settings; until then it falls back to the device zone (unchanged behaviour). Per-app
+// module state (each client bundles its own copy) — fine for a single-user client.
+let active: string | null = null
+
+export function setActiveTimezone(tz: string | null | undefined): void {
+  active = tz || null
+}
+
+export function activeTimezone(): string {
+  return active ?? detectTimezone()
+}
+
 // A "GMT-4"-style current-offset label for a zone (empty string if the zone is invalid), for the
 // Settings picker so a user recognises the zone without knowing the IANA name.
 export function timezoneOffsetLabel(zone: string, now: Date = new Date()): string {
