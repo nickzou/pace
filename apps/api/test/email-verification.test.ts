@@ -39,9 +39,9 @@ async function waitForEmailTo(to: string) {
 }
 
 function tokenFromLink(text: string): string {
-  const match = text.match(/[?&]token=([^&\s]+)/)
-  if (!match) throw new Error("no token found in verification email")
-  return decodeURIComponent(match[1])
+  const token = text.match(/[?&]token=([^&\s]+)/)?.[1]
+  if (!token) throw new Error("no token found in verification email")
+  return decodeURIComponent(token)
 }
 
 afterEach(() => {
