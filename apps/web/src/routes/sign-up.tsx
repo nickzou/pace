@@ -202,7 +202,13 @@ export function PasswordField({
 // Shown after sign-up (and reused when an unverified user tries to sign in): the
 // account exists but is gated until the emailed link is clicked. Offers a resend
 // with a short cooldown so the button can't be spammed.
-export function CheckYourEmail({ email, title = "Check your email" }: { email: string; title?: string }) {
+export function CheckYourEmail({
+  email,
+  title = "Check your email",
+}: {
+  email: string
+  title?: string
+}) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
 
   async function onResend() {
@@ -222,8 +228,9 @@ export function CheckYourEmail({ email, title = "Check your email" }: { email: s
     >
       <div className="space-y-4 text-sm text-muted-foreground">
         <p>
-          We sent a verification link to <span className="font-medium text-foreground">{email}</span>.
-          Click it to activate your account, then sign in.
+          We sent a verification link to{" "}
+          <span className="font-medium text-foreground">{email}</span>. Click it to activate your
+          account, then sign in.
         </p>
         <p>Didn't get it? Check spam, or resend below.</p>
         <button
@@ -232,7 +239,11 @@ export function CheckYourEmail({ email, title = "Check your email" }: { email: s
           disabled={status === "sending" || status === "sent"}
           className="w-full rounded-lg border border-input px-3 py-2 font-medium text-foreground transition hover:bg-muted disabled:opacity-50"
         >
-          {status === "sending" ? "…" : status === "sent" ? "Sent — check your inbox" : "Resend email"}
+          {status === "sending"
+            ? "…"
+            : status === "sent"
+              ? "Sent — check your inbox"
+              : "Resend email"}
         </button>
         {status === "error" && (
           <p role="alert" className="text-destructive">

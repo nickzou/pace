@@ -6,8 +6,8 @@ import { bearer, jwt } from "better-auth/plugins"
 import { db } from "./db"
 import * as schema from "./db/auth"
 import { seedUserStatuses } from "./db/seed"
-import { verificationEmail } from "./email/templates"
 import { sendEmail } from "./email/mailer"
+import { verificationEmail } from "./email/templates"
 import { env } from "./env"
 
 // The mobile app (apps/mobile) authenticates via its deep-link scheme rather

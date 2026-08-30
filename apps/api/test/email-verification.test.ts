@@ -66,9 +66,7 @@ describe("email verification gate", () => {
     await auth.api.signUpEmail({ body: { name: "Verify Me", email, password: PASSWORD } })
 
     // Unverified sign-in is refused.
-    await expect(
-      auth.api.signInEmail({ body: { email, password: PASSWORD } }),
-    ).rejects.toThrow()
+    await expect(auth.api.signInEmail({ body: { email, password: PASSWORD } })).rejects.toThrow()
 
     // "Click" the emailed link.
     const mail = await waitForEmailTo(email)
