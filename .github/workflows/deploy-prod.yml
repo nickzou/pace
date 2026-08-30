@@ -102,6 +102,8 @@ jobs:
           BASE_DOMAIN: paceproductivity.app
           POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
           BETTER_AUTH_SECRET: ${{ secrets.PROD_BETTER_AUTH_SECRET }}
+          # Resend API key — render-env.sh consumes it as SMTP_PASS for prod only.
+          RESEND_API_KEY: ${{ secrets.PROD_RESEND_API_KEY }}
           SHA: ${{ github.event.workflow_run.head_sha }}
           REG: ghcr.io/${{ github.repository }}
         run: |
@@ -145,6 +147,7 @@ jobs:
                IMAGE_API_MIGRATE='$REG/api-migrate:$SHA' \
                POSTGRES_PASSWORD='$POSTGRES_PASSWORD' \
                BETTER_AUTH_SECRET='$BETTER_AUTH_SECRET' \
+               RESEND_API_KEY='$RESEND_API_KEY' \
                bash deploy/bin/up.sh prod \
             && docker image prune -f"
 
