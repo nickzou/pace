@@ -44,6 +44,26 @@ POSTGRES_IMAGE="${POSTGRES_IMAGE:-postgres:17-alpine}"
 DB_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/pace"
 STORAGE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@powersync-storage:5432/powersync"
 
+# Email verification. Prod is the ONLY env that gates + actually sends: the flag is
+# on and SMTP points at Resend (the key comes from the environment — the
+# PROD_RESEND_API_KEY secret in CI). Every other env keeps the gate OFF, so sign-up
+# sends no mail and needs no SMTP server (matches CI). WEB_URL is the public origin
+# every verification link points at, so one link works from web/desktop/mobile.
+if [ "$ENV_NAME" = "prod" ]; then
+  REQUIRE_EMAIL_VERIFICATION=true
+  SMTP_HOST=smtp.resend.com
+  SMTP_PORT=587
+  SMTP_USER=resend
+  SMTP_PASS="${RESEND_API_KEY:?RESEND_API_KEY is required for prod (set the PROD_RESEND_API_KEY secret)}"
+else
+  REQUIRE_EMAIL_VERIFICATION=false
+  SMTP_HOST=""
+  SMTP_PORT=""
+  SMTP_USER=""
+  SMTP_PASS=""
+fi
+EMAIL_FROM="Pace <no-reply@${BASE_DOMAIN}>"
+
 OUT_DIR="$(cd "$(dirname "$0")/.." && pwd)/envs"
 mkdir -p "$OUT_DIR"
 OUT="${OUT_DIR}/${ENV_NAME}.env"
@@ -73,6 +93,14 @@ TRUSTED_ORIGINS=https://${HOST},tauri://localhost,http://tauri.localhost
 
 API_URL=https://${HOST}
 POWERSYNC_URL=https://${HOST}/powersync
+
+REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION}
+WEB_URL=https://${HOST}
+EMAIL_FROM="${EMAIL_FROM}"
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_USER=${SMTP_USER}
+SMTP_PASS="${SMTP_PASS}"
 
 PS_DATA_SOURCE_URI=${DB_URL}
 PS_STORAGE_SOURCE_URI=${STORAGE_URL}
