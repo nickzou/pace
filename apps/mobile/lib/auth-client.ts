@@ -28,6 +28,13 @@ export const authClient = createAuthClient({
 
 export const { useSession, signIn, signUp } = authClient
 
+// (Re)send the verification email. The API rewrites the link's callbackURL to the
+// public web /verified page regardless of what we pass, so the same link works
+// from every platform — we just name the destination here for clarity.
+export function resendVerificationEmail(email: string) {
+  return authClient.sendVerificationEmail({ email, callbackURL: "/verified" })
+}
+
 // Wrap sign-out to also wipe the local PowerSync DB. This is the ONLY place we
 // clear it, so an incidental unmount (e.g. a transient session blip on reconnect)
 // can never drop local data — including offline writes still waiting to upload.

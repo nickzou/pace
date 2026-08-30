@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router"
 import { type FormEvent, useState } from "react"
 import { signIn } from "#/lib/auth-client"
-import { AuthShell, Field, PasswordField, SubmitButton } from "./sign-up"
+import { AuthShell, CheckYourEmail, Field, PasswordField, SubmitButton } from "./sign-up"
 
 export const Route = createFileRoute("/sign-in")({ component: SignIn })
 
@@ -11,6 +11,9 @@ function SignIn() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Better Auth blocks sign-in for an unverified account (403). Swap in the
+  // verify prompt (which resends the link) rather than a dead-end error.
+  const [needsVerification, setNeedsVerification] = useState(false)
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -19,10 +22,18 @@ function SignIn() {
     const result = await signIn.email({ email, password })
     setPending(false)
     if (result.error) {
+      if (result.error.status === 403) {
+        setNeedsVerification(true)
+        return
+      }
       setError(result.error.message ?? "Could not sign in")
       return
     }
     navigate({ to: "/" })
+  }
+
+  if (needsVerification) {
+    return <CheckYourEmail email={email} title="Verify your email" />
   }
 
   return (

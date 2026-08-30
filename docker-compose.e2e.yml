@@ -39,6 +39,21 @@ services:
       timeout: 3s
       retries: 20
 
+  # Email sink for verification-flow specs. The API (when started with the gate on)
+  # sends here over SMTP :1025; tests read the link back via the REST API on :8025.
+  # Dedicated ports so it coexists with the dev-stack Mailpit (1025/8025 there too —
+  # only one e2e-or-dev Mailpit runs at a time in practice).
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "1026:1025" # SMTP  (dev Mailpit owns 1025)
+      - "8026:8025" # REST API + UI (dev Mailpit owns 8025)
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q -O - http://localhost:8025/readyz || exit 1"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+
   # PowerSync, reusing ./powersync/service.yaml but env-pointed at the e2e stack:
   # it replicates pace_test and validates client JWTs against the test API's JWKS,
   # which Playwright starts on the host at :3101. Published on 8180.

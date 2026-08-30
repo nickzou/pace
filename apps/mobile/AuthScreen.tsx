@@ -2,7 +2,7 @@ import { isPasswordValid, passwordChecks } from "@pace/validation"
 import { Check, Circle, Eye, EyeOff } from "lucide-react-native"
 import { useState } from "react"
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native"
-import { signIn, signUp } from "./lib/auth-client"
+import { resendVerificationEmail, signIn, signUp } from "./lib/auth-client"
 import { type Palette, useTheme, useThemedStyles } from "./lib/theme"
 
 type Mode = "sign-in" | "sign-up"
@@ -18,6 +18,9 @@ export function AuthScreen() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  // Set once the account exists but is gated on email verification — from a gated
+  // sign-up (no session returned) or a 403 on sign-in. Swaps the form for a prompt.
+  const [awaitingVerification, setAwaitingVerification] = useState(false)
 
   const isSignUp = mode === "sign-up"
   const passwordsMatch = password === confirm
@@ -33,9 +36,34 @@ export function AuthScreen() {
       : await signIn.email({ email, password })
     setPending(false)
     if (result.error) {
+      // Sign-in is blocked (403) until the address is verified — show the prompt
+      // rather than a dead-end error.
+      if (!isSignUp && result.error.status === 403) {
+        setAwaitingVerification(true)
+        return
+      }
       setError(result.error.message ?? "Something went wrong")
+      return
     }
-    // On success, useSession() in App re-renders to the signed-in view.
+    // With the gate on, sign-up returns no session token — the user must verify
+    // first. Without it, a token means they're in and App re-renders via useSession.
+    if (isSignUp) {
+      const signedIn = Boolean((result.data as { token?: string | null } | null)?.token)
+      if (!signedIn) setAwaitingVerification(true)
+    }
+  }
+
+  if (awaitingVerification) {
+    return (
+      <CheckYourEmail
+        email={email}
+        onBack={() => {
+          setAwaitingVerification(false)
+          setMode("sign-in")
+          setError(null)
+        }}
+      />
+    )
   }
 
   return (
@@ -164,6 +192,49 @@ export function AuthScreen() {
         <Text style={styles.switch}>
           {isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up"}
         </Text>
+      </Pressable>
+    </View>
+  )
+}
+
+// Shown after a gated sign-up (and when an unverified user tries to sign in): the
+// account exists but is locked until the emailed link is tapped. Offers a resend.
+function CheckYourEmail({ email, onBack }: { email: string; onBack: () => void }) {
+  const styles = useThemedStyles(makeStyles)
+  const { colors } = useTheme()
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
+
+  async function onResend() {
+    setStatus("sending")
+    const result = await resendVerificationEmail(email)
+    setStatus(result.error ? "error" : "sent")
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.brand}>Check your email</Text>
+      <Text testID="verify-notice" style={styles.tag}>
+        We sent a verification link to {email}. Tap it to activate your account, then sign in.
+      </Text>
+      <Pressable
+        testID="resend-button"
+        style={[styles.button, status !== "idle" && status !== "error" && styles.buttonDisabled]}
+        onPress={onResend}
+        disabled={status === "sending" || status === "sent"}
+      >
+        {status === "sending" ? (
+          <ActivityIndicator color={colors.onPrimary} />
+        ) : (
+          <Text style={styles.buttonText}>
+            {status === "sent" ? "Sent — check your inbox" : "Resend email"}
+          </Text>
+        )}
+      </Pressable>
+      {status === "error" ? (
+        <Text style={styles.error}>Couldn't resend right now. Try again in a moment.</Text>
+      ) : null}
+      <Pressable testID="back-to-sign-in" onPress={onBack}>
+        <Text style={styles.switch}>Back to sign in</Text>
       </Pressable>
     </View>
   )
