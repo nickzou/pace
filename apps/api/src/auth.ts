@@ -35,7 +35,10 @@ export const auth = betterAuth({
   // Better Auth builds points at BETTER_AUTH_URL; we rewrite the callbackURL to
   // the public web app so every platform lands on the same /verified page.
   emailVerification: {
-    sendOnSignUp: true,
+    // Only mail on sign-up when the gate is actually on. With it off (dev default,
+    // and CI's default) sign-up stays a pure, email-free path — existing e2e flows
+    // are untouched and no SMTP server is needed.
+    sendOnSignUp: env.REQUIRE_EMAIL_VERIFICATION,
     autoSignInAfterVerification: true,
     expiresIn: 60 * 60, // 1 hour
     sendVerificationEmail: async ({ user, token }) => {
