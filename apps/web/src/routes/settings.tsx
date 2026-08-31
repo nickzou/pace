@@ -1,11 +1,13 @@
+import { usePowerSync } from "@powersync/react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Moon, Sun } from "lucide-react"
+import { ChevronLeft, ChevronRight, Moon, Sun } from "lucide-react"
 import { type FormEvent, type ReactNode, useEffect, useState } from "react"
 import { AppLayout } from "#/components/app-layout"
 import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { authClient, signOut, useSession, useTokens } from "#/lib/auth-client"
 import { getConfig } from "#/lib/config"
+import { collectExport } from "#/lib/settings/export"
 import { StatusesSettings } from "#/lib/statuses/status-settings"
 import { TimezoneSettings } from "#/lib/statuses/timezone-settings"
 import { TagsSettings } from "#/lib/tags/tag-settings"
@@ -13,7 +15,32 @@ import { type Theme, useTheme } from "#/lib/theme"
 import { useToast } from "#/lib/toast"
 import { cn } from "#/lib/utils"
 
-export const Route = createFileRoute("/settings")({ component: SettingsPage })
+// The settings page is organised as vertical tabs (nav on the left, one section's content on the
+// right). The active tab lives in the URL (?tab=) so it's deep-linkable and survives a refresh.
+const TABS = [
+  { key: "account", label: "Account" },
+  { key: "general", label: "General" },
+  { key: "notifications", label: "Notifications" },
+  { key: "subscriptions", label: "Subscriptions" },
+  { key: "theme", label: "Theme" },
+  { key: "sidebar", label: "Sidebar" },
+  { key: "task-defaults", label: "Task Defaults" },
+  { key: "data", label: "Data" },
+] as const
+
+type TabKey = (typeof TABS)[number]["key"]
+
+function isTabKey(value: unknown): value is TabKey {
+  return typeof value === "string" && TABS.some((t) => t.key === value)
+}
+
+export const Route = createFileRoute("/settings")({
+  component: SettingsPage,
+  // `tab` is optional: absent = the section list (on narrow screens) or the default section (on
+  // wide, where the rail is always shown). A value = that section's detail.
+  validateSearch: (search: Record<string, unknown>): { tab?: TabKey } =>
+    isTabKey(search.tab) ? { tab: search.tab } : {},
+})
 
 function SettingsPage() {
   return (
@@ -23,14 +50,113 @@ function SettingsPage() {
   )
 }
 
-// Rendered inside AppLayout, so the session is guaranteed present. Account settings:
-// an editable display name (persisted via Better Auth), read-only account/app info,
-// and sign-out.
 function Settings() {
+  const { tab } = Route.useSearch()
+  const navigate = useNavigate()
+  // On a wide screen the rail is always shown, so fall back to the first section. On a narrow
+  // screen an absent tab means the section list (see below).
+  const contentTab: TabKey = tab ?? "account"
+
+  const openTab = (key: TabKey) => navigate({ to: "/settings", search: { tab: key } })
+  const backToList = () => navigate({ to: "/settings", search: {} })
+
+  return (
+    <>
+      <header className="flex items-center gap-4 border-b border-border px-6 py-5 md:px-8">
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+      </header>
+
+      <div className="flex-1 overflow-hidden">
+        <div className="mx-auto flex h-full max-w-4xl gap-8 md:px-6 py-6 md:px-8">
+          {/* Left rail — desktop / wide only. */}
+          <nav
+            className="hidden w-44 shrink-0 flex-col gap-0.5 md:flex"
+            aria-label="Settings sections"
+          >
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                aria-current={t.key === contentTab ? "page" : undefined}
+                onClick={() => openTab(t.key)}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                  t.key === contentTab
+                    ? "bg-accent font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Narrow screens: the section list, shown only when no section is open (list → detail). */}
+          {!tab ? (
+            <nav className="flex-1 overflow-auto px-4 md:hidden" aria-label="Settings sections">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => openTab(t.key)}
+                  className="flex w-full items-center justify-between border-b border-border px-1 py-4 text-left text-sm text-foreground"
+                >
+                  {t.label}
+                  <ChevronRight className="size-4 text-muted-foreground" />
+                </button>
+              ))}
+            </nav>
+          ) : null}
+
+          {/* Content — always on wide; on narrow only when a section is open. */}
+          <div
+            className={cn(
+              "min-w-0 flex-1 overflow-auto md:px-8 px-4 pb-6",
+              tab ? "block" : "hidden md:block",
+            )}
+          >
+            {/* Narrow-only back to the section list. */}
+            <button
+              type="button"
+              onClick={backToList}
+              className="mb-4 flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
+            >
+              <ChevronLeft className="size-4" />
+              Settings
+            </button>
+            <div className="flex flex-col gap-6">{renderTab(contentTab)}</div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function renderTab(tab: TabKey) {
+  switch (tab) {
+    case "account":
+      return <AccountTab />
+    case "general":
+      return <GeneralTab />
+    case "notifications":
+      return <StubTab title="Notifications" message="Notification settings are coming soon." />
+    case "subscriptions":
+      return <StubTab title="Subscriptions" message="Nothing here yet." />
+    case "theme":
+      return <ThemeTab />
+    case "sidebar":
+      return <StubTab title="Sidebar" message="Sidebar customisation is coming soon." />
+    case "task-defaults":
+      return <TaskDefaultsTab />
+    case "data":
+      return <DataTab />
+  }
+}
+
+function AccountTab() {
   const { data: session } = useSession()
   const toast = useToast()
   const navigate = useNavigate()
-  const config = getConfig()
 
   const currentName = session?.user.name ?? ""
   const email = session?.user.email ?? ""
@@ -64,89 +190,139 @@ function Settings() {
 
   return (
     <>
-      <header className="flex items-center gap-4 border-b border-border px-8 py-5">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-      </header>
-
-      <div className="flex-1 overflow-auto px-8 py-6">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <Section title="Account">
-            <div className="flex items-center gap-3 border-b border-border pb-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                {initials}
-              </span>
-              <div className="min-w-0">
-                <div className="truncate font-medium">{currentName || "Your account"}</div>
-                <div className="truncate text-sm text-muted-foreground">{email}</div>
-              </div>
-            </div>
-
-            <form onSubmit={save} className="flex flex-col gap-1.5">
-              <label htmlFor="display-name" className="text-sm text-muted-foreground">
-                Display name
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id="display-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="flex-1"
-                />
-                <Button type="submit" disabled={!dirty || saving}>
-                  {saving ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            </form>
-
-            <Row label="Email">
-              <span className="text-muted-foreground">{email}</span>
-            </Row>
-          </Section>
-
-          <Section title="Appearance">
-            <Row label="Theme">
-              <ThemeToggle />
-            </Row>
-          </Section>
-
-          <TimezoneSettings />
-
-          <StatusesSettings />
-
-          <TagsSettings />
-
-          <Section title="About">
-            <Row label="App">Pace</Row>
-            <Row label="Platform">
-              <span className="text-muted-foreground">{useTokens ? "Desktop" : "Web"}</span>
-            </Row>
-            <Row label="API">
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {config.apiUrl}
-              </span>
-            </Row>
-            <Row label="Sync">
-              <span className="truncate font-mono text-xs text-muted-foreground">
-                {config.powersyncUrl}
-              </span>
-            </Row>
-          </Section>
-
-          <div className="flex">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                await signOut()
-                navigate({ to: "/sign-in" })
-              }}
-            >
-              Sign out
-            </Button>
+      <Section title="Account">
+        <div className="flex items-center gap-3 border-b border-border pb-4">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            {initials}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate font-medium">{currentName || "Your account"}</div>
+            <div className="truncate text-sm text-muted-foreground">{email}</div>
           </div>
         </div>
+
+        <form onSubmit={save} className="flex flex-col gap-1.5">
+          <label htmlFor="display-name" className="text-sm text-muted-foreground">
+            Display name
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id="display-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              className="flex-1"
+            />
+            <Button type="submit" disabled={!dirty || saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </div>
+        </form>
+
+        <Row label="Email">
+          <span className="text-muted-foreground">{email}</span>
+        </Row>
+      </Section>
+
+      <div className="flex">
+        <Button
+          variant="outline"
+          onClick={async () => {
+            await signOut()
+            navigate({ to: "/sign-in" })
+          }}
+        >
+          Sign out
+        </Button>
       </div>
     </>
+  )
+}
+
+function GeneralTab() {
+  const config = getConfig()
+  return (
+    <>
+      <TimezoneSettings />
+      <Section title="About">
+        <Row label="App">Pace</Row>
+        <Row label="Platform">
+          <span className="text-muted-foreground">{useTokens ? "Desktop" : "Web"}</span>
+        </Row>
+        <Row label="API">
+          <span className="truncate font-mono text-xs text-muted-foreground">{config.apiUrl}</span>
+        </Row>
+        <Row label="Sync">
+          <span className="truncate font-mono text-xs text-muted-foreground">
+            {config.powersyncUrl}
+          </span>
+        </Row>
+      </Section>
+    </>
+  )
+}
+
+function ThemeTab() {
+  return (
+    <Section title="Theme">
+      <Row label="Theme">
+        <ThemeToggle />
+      </Row>
+    </Section>
+  )
+}
+
+function TaskDefaultsTab() {
+  return (
+    <>
+      <StatusesSettings />
+      <TagsSettings />
+    </>
+  )
+}
+
+function DataTab() {
+  const db = usePowerSync()
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+
+  async function onExport() {
+    setBusy(true)
+    try {
+      const data = await collectExport(db, new Date().toISOString())
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `pace-export-${data.exportedAt.slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.show("Couldn't export your data. Try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Section title="Data">
+      <p className="text-sm text-muted-foreground">
+        Download a copy of your tasks, statuses, and tags as a JSON file.
+      </p>
+      <div className="flex">
+        <Button variant="outline" onClick={onExport} disabled={busy}>
+          {busy ? "Exporting…" : "Export data (JSON)"}
+        </Button>
+      </div>
+    </Section>
+  )
+}
+
+function StubTab({ title, message }: { title: string; message: string }) {
+  return (
+    <Section title={title}>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </Section>
   )
 }
 

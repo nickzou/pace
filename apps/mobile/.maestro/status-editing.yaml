@@ -35,10 +35,13 @@ appId: app.paceproductivity.mobile
 - assertVisible:
     id: "signed-in"
 
-# Open Settings and enable custom statuses. The toggle is disabled until user_settings
-# syncs down (P2-03) — wait for it to enable so the tap actually toggles.
+# Open Settings, switch to the Task Defaults tab (statuses live there now), and enable custom
+# statuses. The toggle is disabled until user_settings syncs down (P2-03) — wait for it to enable
+# so the tap actually toggles.
 - tapOn:
     id: "settings-open"
+- tapOn:
+    id: "settings-tab-task-defaults"
 - extendedWaitUntil:
     visible:
       id: "statuses-toggle"
@@ -103,18 +106,19 @@ appId: app.paceproductivity.mobile
 - assertVisible:
     id: "group-name-Sprint2"
 
-# Persistence: close + reopen Settings, then scroll back to the statuses section. The
-# renamed status and list are read from local SQLite, proving the edits reached Postgres
-# and synced down — not just optimistic UI. (settings-close sits at the top of the modal,
-# scrolled off after all the edits, and reopening lands at the top — hence the scrolls.)
-- scrollUntilVisible:
-    element:
-      id: "settings-close"
-    direction: UP
+# Persistence: close + reopen Settings, then re-enter the statuses section. The renamed status
+# and list are read from local SQLite, proving the edits reached Postgres and synced down — not
+# just optimistic UI. Settings is list→detail: back out of the Task Defaults detail to the section
+# list (where Done lives), close, reopen, then tap back into Task Defaults.
+- tapOn:
+    id: "settings-back"
 - tapOn:
     id: "settings-close"
 - tapOn:
     id: "settings-open"
+# Reopening lands on the section list — tap into Task Defaults where the statuses live.
+- tapOn:
+    id: "settings-tab-task-defaults"
 # Reopening remounts the section, so the optimistic override resets and the toggle reflects the local
 # DB — which can still read disabled if the enable hasn't converged server→client under CI load. Scroll
 # the toggle into view and re-enable if the off-hint shows (sticky again for this mount) so the persisted

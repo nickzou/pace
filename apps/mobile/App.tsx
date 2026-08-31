@@ -130,6 +130,7 @@ function SignedIn({ email, onSignOut }: { email: string; onSignOut: () => void }
           visible={settingsOpen}
           email={email}
           onClose={() => setSettingsOpen(false)}
+          onSignOut={onSignOut}
         />
       </PowerSyncProvider>
     </ScrollViewContainer>
