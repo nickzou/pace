@@ -67,7 +67,7 @@ function Settings() {
       </header>
 
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto flex h-full max-w-4xl gap-8 px-6 py-6 md:px-8">
+        <div className="mx-auto flex h-full max-w-4xl gap-8 md:px-6 py-6 md:px-8">
           {/* Left rail — desktop / wide only. */}
           <nav
             className="hidden w-44 shrink-0 flex-col gap-0.5 md:flex"
@@ -93,7 +93,7 @@ function Settings() {
 
           {/* Narrow screens: the section list, shown only when no section is open (list → detail). */}
           {!tab ? (
-            <nav className="flex-1 overflow-auto md:hidden" aria-label="Settings sections">
+            <nav className="flex-1 overflow-auto px-4 md:hidden" aria-label="Settings sections">
               {TABS.map((t) => (
                 <button
                   key={t.key}
@@ -110,7 +110,10 @@ function Settings() {
 
           {/* Content — always on wide; on narrow only when a section is open. */}
           <div
-            className={cn("min-w-0 flex-1 overflow-auto pb-6", tab ? "block" : "hidden md:block")}
+            className={cn(
+              "min-w-0 flex-1 overflow-auto md:px-8 px-4 pb-6",
+              tab ? "block" : "hidden md:block",
+            )}
           >
             {/* Narrow-only back to the section list. */}
             <button
