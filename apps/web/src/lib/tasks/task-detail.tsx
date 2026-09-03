@@ -2,6 +2,7 @@ import { usePowerSync, useQuery } from "@powersync/react"
 import { Link } from "@tanstack/react-router"
 import { useMemo, useRef, useState } from "react"
 import { TagChips, type TagOption, TagPicker } from "#/lib/tags/tag-control"
+import { ActivityPanel } from "#/lib/tasks/activity-panel"
 import { DateRangeField } from "#/lib/tasks/date-range-field"
 import {
   combineLocal,
@@ -168,137 +169,149 @@ export function TaskDetail({ id, onDeleted }: { id: string; onDeleted?: () => vo
         : "border-border text-foreground"
 
   return (
-    <div className="space-y-4">
-      {parent ? (
-        <Link
-          to="/tasks/$taskId"
-          params={{ taskId: parent.id }}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground hover:underline"
-        >
-          ↑ {parent.title}
-        </Link>
-      ) : null}
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <div className="space-y-4">
+        {parent ? (
+          <Link
+            to="/tasks/$taskId"
+            params={{ taskId: parent.id }}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition hover:text-foreground hover:underline"
+          >
+            ↑ {parent.title}
+          </Link>
+        ) : null}
 
-      <div className="flex items-start gap-3">
-        <div className="mt-1 shrink-0">
-          <StatusControl
-            current={{
-              id: task.status_id,
-              name: task.status_name,
-              color: task.status_color,
-              category: task.status_category,
-            }}
-            options={options}
-            onSelect={(sid) => void setTaskStatus(db, id, sid)}
+        <div className="flex items-start gap-3">
+          <div className="mt-1 shrink-0">
+            <StatusControl
+              current={{
+                id: task.status_id,
+                name: task.status_name,
+                color: task.status_color,
+                category: task.status_category,
+              }}
+              options={options}
+              onSelect={(sid) => void setTaskStatus(db, id, sid)}
+            />
+          </div>
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            onBlur={saveTitle}
+            placeholder="Task title"
+            className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-medium text-foreground outline-none focus:border-ring focus:bg-background"
           />
         </div>
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          onBlur={saveTitle}
-          placeholder="Task title"
-          className="flex-1 rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-lg font-medium text-foreground outline-none focus:border-ring focus:bg-background"
-        />
-      </div>
 
-      {groups.length > 1 ? (
+        {groups.length > 1 ? (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            List
+            <select
+              aria-label="Status list"
+              value={task.status_group_id}
+              onChange={(event) => selectGroup(event.target.value)}
+              className="rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          List
+          Parent
           <select
-            aria-label="Status list"
-            value={task.status_group_id}
-            onChange={(event) => selectGroup(event.target.value)}
-            className="rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
+            aria-label="Parent task"
+            value={task.parent_id ?? ""}
+            onChange={(event) => void setTaskParent(db, id, event.target.value || null)}
+            className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
           >
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.name}
+            <option value="">None (top-level)</option>
+            {task.parent_id && parent && !topLevel.some((t) => t.id === task.parent_id) ? (
+              <option value={parent.id}>{parent.title} (current)</option>
+            ) : null}
+            {topLevel.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.title}
               </option>
             ))}
           </select>
         </label>
-      ) : null}
 
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        Parent
-        <select
-          aria-label="Parent task"
-          value={task.parent_id ?? ""}
-          onChange={(event) => void setTaskParent(db, id, event.target.value || null)}
-          className="min-w-0 flex-1 rounded-lg border border-input bg-background px-2 py-1 text-sm text-foreground outline-none focus:border-ring"
-        >
-          <option value="">None (top-level)</option>
-          {task.parent_id && parent && !topLevel.some((t) => t.id === task.parent_id) ? (
-            <option value={parent.id}>{parent.title} (current)</option>
-          ) : null}
-          {topLevel.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {/* Tags — all shown (no +k collapse; the detail has room). Click a chip to edit it;
+        {/* Tags — all shown (no +k collapse; the detail has room). Click a chip to edit it;
           the picker assigns/creates. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <TagChips tags={taskTags} taskId={id} max={99} />
-        <TagPicker
-          taskId={id}
-          assignedIds={assignedIds}
-          allTags={allTags}
-          nextPosition={allTags.length}
+        <div className="flex flex-wrap items-center gap-2">
+          <TagChips tags={taskTags} taskId={id} max={99} />
+          <TagPicker
+            taskId={id}
+            assignedIds={assignedIds}
+            allTags={allTags}
+            nextPosition={allTags.length}
+          />
+        </div>
+
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          onBlur={saveDescription}
+          placeholder="Add notes…"
+          rows={5}
+          className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
         />
+
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            Due
+            {dueState === "overdue" ? (
+              <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                Overdue
+              </span>
+            ) : dueState === "today" ? (
+              <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                Today
+              </span>
+            ) : null}
+          </span>
+          <DateRangeField
+            startDay={startDay}
+            startTime={startTime}
+            dueDay={dueDay}
+            dueTime={dueTime}
+            onChangeStart={saveStart}
+            onChangeDue={saveDue}
+            buttonClass={dueFieldClass}
+            taskId={id}
+          />
+        </div>
+
+        <SubtaskSection parentId={id} depth={depth} />
+
+        {/* Narrow / modal: activity as a collapsible section under the fields (default closed). */}
+        <div className="lg:hidden">
+          <ActivityPanel taskId={id} collapsible />
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={async () => {
+              await deleteWithUndo(db, task, toast)
+              onDeleted?.()
+            }}
+            className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
+          >
+            Delete
+          </button>
+        </div>
       </div>
 
-      <textarea
-        value={description}
-        onChange={(event) => setDescription(event.target.value)}
-        onBlur={saveDescription}
-        placeholder="Add notes…"
-        rows={5}
-        className="w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
-      />
-
-      <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          Due
-          {dueState === "overdue" ? (
-            <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
-              Overdue
-            </span>
-          ) : dueState === "today" ? (
-            <span className="rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-              Today
-            </span>
-          ) : null}
-        </span>
-        <DateRangeField
-          startDay={startDay}
-          startTime={startTime}
-          dueDay={dueDay}
-          dueTime={dueTime}
-          onChangeStart={saveStart}
-          onChangeDue={saveDue}
-          buttonClass={dueFieldClass}
-          taskId={id}
-        />
-      </div>
-
-      <SubtaskSection parentId={id} depth={depth} />
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={async () => {
-            await deleteWithUndo(db, task, toast)
-            onDeleted?.()
-          }}
-          className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition hover:border-destructive/50 hover:text-destructive"
-        >
-          Delete
-        </button>
-      </div>
+      {/* Wide (lg+): activity as a persistent right-hand panel (wireframe 2). */}
+      <aside className="hidden lg:block">
+        <ActivityPanel taskId={id} />
+      </aside>
     </div>
   )
 }

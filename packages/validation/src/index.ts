@@ -1,6 +1,18 @@
 // The recurrence engine (P2-08). Re-exported from the barrel — rolldown (web) doesn't resolve an
 // exports subpath, and `sideEffects: false` lets bundlers tree-shake rrule out of schema-only
 // consumers regardless.
+export {
+  type ActivityAction,
+  type ActivityMeta,
+  activityActionSchema,
+  activityMetaSchema,
+  type NewTaskActivity,
+  newTaskActivitySchema,
+  type TaskActivity,
+  type TaskActivityQuery,
+  taskActivityQuerySchema,
+  taskActivitySchema,
+} from "./activity"
 export * from "./password"
 export * from "./presets"
 export * from "./recurrence"

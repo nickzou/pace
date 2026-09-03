@@ -43,3 +43,12 @@ streams:
   task_tags:
     auto_subscribe: true
     query: SELECT * FROM task_tags WHERE user_id = auth.user_id()
+
+  # Task activity history (P3-08) — a user's append-only audit trail. Same per-user
+  # scoping, but deliberately NO `deleted_at IS NULL` filter: activity rows are immutable
+  # (never soft-deleted) and must keep syncing even after their task is soft-deleted, so a
+  # deleted task's history survives. Clients only read this table; they never write it
+  # after the initial insert (the connector routes that insert to activity.create).
+  task_activity:
+    auto_subscribe: true
+    query: SELECT * FROM task_activity WHERE user_id = auth.user_id()

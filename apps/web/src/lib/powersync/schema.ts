@@ -80,6 +80,21 @@ const task_tags = new Table({
   created_at: column.text,
 })
 
+// Task activity history (P3-08) — an append-only audit trail, one immutable row per change.
+// Clients read this table; they insert once (at mutation time) and never update/delete it.
+// `meta` is a JSON string (display snapshots); `created_at` is when the change happened
+// (client-authored), `recorded_at` is server-stamped on upload.
+const task_activity = new Table({
+  task_id: column.text,
+  action: column.text,
+  field: column.text,
+  from_value: column.text,
+  to_value: column.text,
+  meta: column.text,
+  created_at: column.text,
+  recorded_at: column.text,
+})
+
 export const AppSchema = new Schema({
   tasks,
   status_groups,
@@ -87,6 +102,7 @@ export const AppSchema = new Schema({
   user_settings,
   tags,
   task_tags,
+  task_activity,
 })
 
 // Bump this on ANY change above (add/remove/rename a table or column). On load,
@@ -102,4 +118,5 @@ export const AppSchema = new Schema({
 // v5 (P2-06): + tasks.sort_order (manual ordering / drag-and-drop).
 // v6 (P2-08): + tasks.recurrence / recurrence_regen + user_settings.timezone / timezone_auto
 // (repeating tasks: the rule, its regen mode, and the zone recurrence math runs in).
-export const SCHEMA_VERSION = "6"
+// v7 (P3-08): + task_activity table (append-only per-task history).
+export const SCHEMA_VERSION = "7"

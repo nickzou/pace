@@ -1,3 +1,4 @@
+import { insertActivities } from "@pace/api-client"
 import type { AbstractPowerSyncDatabase } from "@powersync/react-native"
 import * as Crypto from "expo-crypto"
 
@@ -7,6 +8,7 @@ import * as Crypto from "expo-crypto"
 // Note on delete/undo: a task's soft-delete does NOT cascade to its task_tags links
 // (cascade fires only on a hard delete), so links survive a task delete + undo untouched.
 const now = () => new Date().toISOString()
+const newId = () => Crypto.randomUUID()
 
 // Returns the minted id so callers can create-and-assign in one step (the tag picker).
 export async function createTag(
@@ -49,14 +51,50 @@ export async function reorderTags(db: AbstractPowerSyncDatabase, orderedIds: str
 }
 
 // Assign / unassign a tag to a task via the join. The link id is deterministic, so the
-// insert is idempotent (OR IGNORE) and converges across offline devices.
-export function assignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
-  return db.execute(
-    "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id, created_at) VALUES (?, ?, ?, ?)",
-    [`${taskId}_${tagId}`, taskId, tagId, now()],
+// insert is idempotent (OR IGNORE) and converges across offline devices. Each records a
+// tags_changed activity entry (P3-08) — with the tag's name/colour snapshot — in the same
+// local tx as the link write.
+export async function assignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
+  const ts = now()
+  const [tag] = await db.getAll<{ name: string; color: string }>(
+    "SELECT name, color FROM tags WHERE id = ?",
+    [tagId],
   )
+  await db.writeTransaction(async (tx) => {
+    await tx.execute(
+      "INSERT OR IGNORE INTO task_tags (id, task_id, tag_id, created_at) VALUES (?, ?, ?, ?)",
+      [`${taskId}_${tagId}`, taskId, tagId, ts],
+    )
+    await insertActivities(tx, newId, [
+      {
+        taskId,
+        action: "tags_changed",
+        field: "added",
+        toValue: tagId,
+        meta: tag ? { tag } : null,
+        createdAt: ts,
+      },
+    ])
+  })
 }
 
-export function unassignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
-  return db.execute("DELETE FROM task_tags WHERE id = ?", [`${taskId}_${tagId}`])
+export async function unassignTag(db: AbstractPowerSyncDatabase, taskId: string, tagId: string) {
+  const ts = now()
+  const [tag] = await db.getAll<{ name: string; color: string }>(
+    "SELECT name, color FROM tags WHERE id = ?",
+    [tagId],
+  )
+  await db.writeTransaction(async (tx) => {
+    await tx.execute("DELETE FROM task_tags WHERE id = ?", [`${taskId}_${tagId}`])
+    await insertActivities(tx, newId, [
+      {
+        taskId,
+        action: "tags_changed",
+        field: "removed",
+        fromValue: tagId,
+        meta: tag ? { tag } : null,
+        createdAt: ts,
+      },
+    ])
+  })
 }
