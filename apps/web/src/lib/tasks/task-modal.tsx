@@ -22,7 +22,9 @@ export function TaskModal({ id, onClose }: { id: string | null; onClose: () => v
         if (!open) onClose()
       }}
     >
-      <DialogContent aria-describedby={undefined}>
+      {/* Roomier on desktop (lg+) so the two-column detail — fields + the persistent activity
+          panel — has space to breathe; stays the default width on narrow/mobile. */}
+      <DialogContent aria-describedby={undefined} className="lg:max-w-5xl">
         <DialogTitle className="sr-only">Task details</DialogTitle>
         {lastId ? (
           <>

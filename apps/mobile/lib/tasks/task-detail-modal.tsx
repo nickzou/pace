@@ -6,6 +6,7 @@ import { ScrollViewContainer } from "react-native-reorderable-list"
 import { TagChips, type TagOption, TagPicker } from "../tags/tag-control"
 import { type Palette, useTheme, useThemedStyles } from "../theme"
 import { useToast } from "../toast"
+import { ActivityPanel } from "./activity-panel"
 import { DateRangeField } from "./date-range-field"
 import { deleteWithUndo, setTaskParent, setTaskStatus, type Task, updateTask } from "./mutations"
 import { StatusControl, type StatusOption } from "./status-control"
@@ -306,6 +307,8 @@ function Detail({
           />
 
           <SubtaskSection parentId={id} depth={depth} onOpenTask={onOpenTask} />
+
+          <ActivityPanel taskId={id} />
 
           <Pressable
             testID="detail-delete"

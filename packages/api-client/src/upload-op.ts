@@ -9,6 +9,18 @@ import type { useTRPCClient } from "./react"
 // @powersync/web and @powersync/react-native build on), so this works under Vite and Metro alike.
 export type TrpcClient = ReturnType<typeof useTRPCClient>
 type StatusCategory = "open" | "in_progress" | "done"
+type ActivityAction =
+  | "created"
+  | "title_changed"
+  | "description_changed"
+  | "status_changed"
+  | "start_changed"
+  | "due_changed"
+  | "reparented"
+  | "recurrence_changed"
+  | "tags_changed"
+  | "deleted"
+  | "restored"
 
 // Map one local row op to the matching tRPC procedure. Split by table; each table's PUT
 // (create — upserts on the client-minted id) / PATCH (partial update) / DELETE (soft
@@ -171,5 +183,26 @@ export async function uploadOp(
       }
       return
     }
+
+    case "task_activity":
+      // Append-only (P3-08): the client inserts each entry exactly once and never updates or
+      // deletes it, so PUT is the only op that can reach here — route it to the create procedure
+      // (which upserts on the client-minted id, making a replayed op idempotent). A PATCH/DELETE
+      // would mean history was mutated, which nothing does; ignore it rather than invent a call.
+      // `meta` rides as a JSON string in SQLite; parse it back to the object the schema expects.
+      // recorded_at is server-owned, so we never upload it.
+      if (type === UpdateType.PUT) {
+        await trpc.activity.create.mutate({
+          id,
+          taskId: String(data.task_id ?? ""),
+          action: String(data.action ?? "") as ActivityAction,
+          ...(data.field != null ? { field: String(data.field) } : {}),
+          ...(data.from_value != null ? { fromValue: String(data.from_value) } : {}),
+          ...(data.to_value != null ? { toValue: String(data.to_value) } : {}),
+          ...(data.meta != null ? { meta: JSON.parse(String(data.meta)) } : {}),
+          ...(data.created_at != null ? { createdAt: String(data.created_at) } : {}),
+        })
+      }
+      return
   }
 }
