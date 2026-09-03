@@ -62,6 +62,11 @@ export default defineConfig({
         BETTER_AUTH_URL: API,
         TRUSTED_ORIGINS: WEB,
         PORT: "3101",
+        // Keep the auth flow email-free and hermetic: pin verification OFF so the run never
+        // depends on the dev repo-root .env (which turns it ON to exercise the feature). Without
+        // this, sign-up creates no session locally and every spec loads signed-out. CI has no
+        // .env, so it already defaulted off — this just makes local match CI.
+        REQUIRE_EMAIL_VERIFICATION: "false",
       },
     },
     {
