@@ -7,6 +7,7 @@ import { Button } from "#/components/ui/button"
 import { Input } from "#/components/ui/input"
 import { authClient, signOut, useSession, useTokens } from "#/lib/auth-client"
 import { getConfig } from "#/lib/config"
+import { DeleteAccountDialog } from "#/lib/settings/delete-account-dialog"
 import { collectExport } from "#/lib/settings/export"
 import { StatusesSettings } from "#/lib/statuses/status-settings"
 import { TimezoneSettings } from "#/lib/statuses/timezone-settings"
@@ -165,6 +166,7 @@ function AccountTab() {
   const [name, setName] = useState(currentName)
   const [baseline, setBaseline] = useState(currentName)
   const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Sync when the session's name loads/changes (e.g. after a save elsewhere).
   useEffect(() => {
@@ -235,6 +237,23 @@ function AccountTab() {
           Sign out
         </Button>
       </div>
+
+      {/* Danger zone — account deletion (30-day grace period). */}
+      <Section title="Danger zone">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="font-medium text-destructive">Delete account</div>
+            <p className="text-sm text-muted-foreground">
+              Schedule your account for deletion. You have 30 days to change your mind.
+            </p>
+          </div>
+          <Button variant="destructive" className="shrink-0" onClick={() => setDeleteOpen(true)}>
+            Delete account…
+          </Button>
+        </div>
+      </Section>
+
+      <DeleteAccountDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} />
     </>
   )
 }
