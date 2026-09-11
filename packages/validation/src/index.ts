@@ -2,6 +2,11 @@
 // exports subpath, and `sideEffects: false` lets bundlers tree-shake rrule out of schema-only
 // consumers regardless.
 export {
+  DELETE_CONFIRMATION,
+  type RequestDeletion,
+  requestDeletionSchema,
+} from "./account"
+export {
   type ActivityAction,
   type ActivityMeta,
   activityActionSchema,

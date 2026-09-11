@@ -19,6 +19,16 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [...env.TRUSTED_ORIGINS.split(","), MOBILE_SCHEME],
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  // Custom fields on the user table (Better Auth owns the `user` schema — declare here, then
+  // `pnpm auth:generate` writes them into db/auth.ts). `deletionRequestedAt` powers the P?-XX
+  // account-deletion grace period: null = active; set = pending deletion (purged 30 days later).
+  // `input: false` so it can never be set through a sign-up/update payload — only our own
+  // request-deletion / reactivation server logic touches it.
+  user: {
+    additionalFields: {
+      deletionRequestedAt: { type: "date", required: false, input: false },
+    },
+  },
   // Password policy: length is enforced natively here; the full complexity rule (upper/lower/
   // number/symbol) lives in @pace/validation and is enforced on the sign-up route (see
   // routes/api/auth/[...all].ts) so it stays a single source of truth shared with the clients.
