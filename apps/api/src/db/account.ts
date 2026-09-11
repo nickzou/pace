@@ -1,6 +1,10 @@
-import { and, eq, isNotNull } from "drizzle-orm"
+import { and, eq, isNotNull, lt } from "drizzle-orm"
 import { account, session, user } from "./auth"
 import { db } from "./index"
+
+// Days a pending-deletion account is retained before permanent purge (the grace / recovery
+// window). Kept here as the single source of truth for the 30-day rule.
+export const DELETION_GRACE_DAYS = 30
 
 // Account-lifecycle DB helpers for the Delete Account grace period. Kept out of auth.ts (the
 // Better Auth *config*) so the sign-in reactivation hook and the request-deletion procedure
@@ -36,4 +40,17 @@ export async function clearDeletionRequest(userId: string): Promise<boolean> {
     .where(and(eq(user.id, userId), isNotNull(user.deletionRequestedAt)))
     .returning({ id: user.id })
   return rows.length > 0
+}
+
+// Permanent purge: hard-delete every account whose grace window has elapsed. The FK cascades
+// (tasks/statuses/tags/activity/settings/sessions/accounts all `onDelete: cascade`) wipe the rest
+// in the same delete. Idempotent — only ever removes rows already past the cutoff. Returns the
+// count purged. Run by the daily Nitro scheduled task (src/tasks/db/purge-deleted.ts).
+export async function purgeExpiredDeletions(graceDays = DELETION_GRACE_DAYS): Promise<number> {
+  const cutoff = new Date(Date.now() - graceDays * 86_400_000)
+  const rows = await db
+    .delete(user)
+    .where(and(isNotNull(user.deletionRequestedAt), lt(user.deletionRequestedAt, cutoff)))
+    .returning({ id: user.id })
+  return rows.length
 }
