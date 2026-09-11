@@ -16,6 +16,7 @@ import { StatusesSection } from "../statuses/status-settings"
 import { TimezoneSection } from "../statuses/timezone-settings"
 import { TagsSection } from "../tags/tag-settings"
 import { type Palette, type ThemePref, useTheme, useThemedStyles } from "../theme"
+import { DeleteAccountDialog } from "./delete-account-dialog"
 
 // The mobile settings screen — the twin of apps/web's tabbed /settings. A full-screen Modal with a
 // vertical tab rail on the left and the active section's content on the right (web parity).
@@ -148,6 +149,7 @@ function AccountTab({ email, onSignOut }: { email: string; onSignOut: () => void
   const [name, setName] = useState(currentName)
   const [baseline, setBaseline] = useState(currentName)
   const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
     setName(currentName)
@@ -197,6 +199,27 @@ function AccountTab({ email, onSignOut }: { email: string; onSignOut: () => void
       <Pressable testID="settings-sign-out" onPress={onSignOut} style={styles.outlineBtn}>
         <Text style={styles.outlineBtnText}>Sign out</Text>
       </Pressable>
+
+      {/* Danger zone — account deletion (30-day grace period). */}
+      <View style={styles.dangerZone}>
+        <Text style={styles.dangerTitle}>Danger zone</Text>
+        <Text style={styles.dangerHint}>
+          Schedule your account for deletion. You have 30 days to change your mind.
+        </Text>
+        <Pressable
+          testID="delete-account"
+          onPress={() => setDeleteOpen(true)}
+          style={styles.deleteBtn}
+        >
+          <Text style={styles.deleteBtnText}>Delete account…</Text>
+        </Pressable>
+      </View>
+
+      <DeleteAccountDialog
+        visible={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={onSignOut}
+      />
     </View>
   )
 }
@@ -379,6 +402,24 @@ const makeStyles = (c: Palette) =>
       alignItems: "center",
     },
     outlineBtnText: { color: c.textPrimary, fontWeight: "600", fontSize: 14 },
+    dangerZone: {
+      marginTop: 20,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: c.border,
+      gap: 6,
+    },
+    dangerTitle: { color: c.danger, fontWeight: "600", fontSize: 14 },
+    dangerHint: { color: c.textMuted, fontSize: 13 },
+    deleteBtn: {
+      marginTop: 6,
+      borderWidth: 1,
+      borderColor: c.danger,
+      borderRadius: 8,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    deleteBtnText: { color: c.danger, fontWeight: "600", fontSize: 14 },
     segment: {
       flexDirection: "row",
       gap: 2,
