@@ -1,4 +1,5 @@
 import { router } from "./init"
+import { accountRouter } from "./routers/account"
 import { activityRouter } from "./routers/activity"
 import { statusesRouter } from "./routers/statuses"
 import { tagsRouter } from "./routers/tags"
@@ -9,6 +10,7 @@ export const appRouter = router({
   statuses: statusesRouter,
   tags: tagsRouter,
   activity: activityRouter,
+  account: accountRouter,
 })
 
 // The single type M09's clients import to get end-to-end type safety against
