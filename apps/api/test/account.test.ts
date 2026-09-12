@@ -13,6 +13,7 @@ const PASSWORD = "Supersecret123!"
 async function makeUser(email = `${randomUUID()}@test.local`): Promise<string> {
   await auth.api.signUpEmail({ body: { email, password: PASSWORD, name: "T" } })
   const [u] = await db.select().from(user).where(eq(user.email, email))
+  if (!u) throw new Error(`user not created: ${email}`)
   return u.id
 }
 async function pendingAt(userId: string): Promise<Date | null> {
