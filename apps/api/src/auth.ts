@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { bearer, jwt } from "better-auth/plugins"
 import { db } from "./db"
+import { clearDeletionRequest } from "./db/account"
 import * as schema from "./db/auth"
 import { seedUserStatuses } from "./db/seed"
 import { sendEmail } from "./email/mailer"
@@ -19,6 +20,16 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [...env.TRUSTED_ORIGINS.split(","), MOBILE_SCHEME],
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  // Custom fields on the user table (Better Auth owns the `user` schema — declare here, then
+  // `pnpm auth:generate` writes them into db/auth.ts). `deletionRequestedAt` powers the Delete
+  // Account grace period: null = active; set = pending deletion (purged 30 days later).
+  // `input: false` so it can never be set through a sign-up/update payload — only our own
+  // request-deletion / reactivation server logic touches it.
+  user: {
+    additionalFields: {
+      deletionRequestedAt: { type: "date", required: false, input: false },
+    },
+  },
   // Password policy: length is enforced natively here; the full complexity rule (upper/lower/
   // number/symbol) lives in @pace/validation and is enforced on the sign-up route (see
   // routes/api/auth/[...all].ts) so it stays a single source of truth shared with the clients.
@@ -53,6 +64,15 @@ export const auth = betterAuth({
       create: {
         after: async (user) => {
           await seedUserStatuses(user.id)
+        },
+      },
+    },
+    // Reactivation (Delete Account grace period): signing back in within the 30-day window cancels
+    // a pending deletion. A no-op for normal sign-ins (the flag isn't set), guarded by a WHERE.
+    session: {
+      create: {
+        after: async (session) => {
+          await clearDeletionRequest(session.userId)
         },
       },
     },

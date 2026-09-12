@@ -66,7 +66,9 @@ test("rename a status group → persists across a reload", async ({ page }) => {
   await expect(page.getByLabel(`Rename ${renamed} list`)).toBeVisible()
 
   await page.reload()
-  await expect(page.getByLabel(`Rename ${renamed} list`)).toHaveValue(renamed)
+  // The renamed group has to cold-sync back down after the reload; the 5s default loses that race
+  // on a slow CI runner. toHaveValue auto-waits for the input to appear with the value.
+  await expect(page.getByLabel(`Rename ${renamed} list`)).toHaveValue(renamed, { timeout: 30_000 })
 })
 
 test("move a task to another status list → its status changes and persists", async ({ page }) => {
