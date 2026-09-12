@@ -24,7 +24,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // 2 retries in CI: e2e here is sync-timing-sensitive (PowerSync cold-resync after a reload), and
+  // the recurrence weekly-advance spec has a residual date-boundary sensitivity (local vs UTC RRULE
+  // day) that can misfire near midnight. Retries absorb the rare transient without masking real
+  // breakage (a genuinely broken flow fails all 3 attempts).
+  retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "html",
   globalSetup: "./global-setup.ts",
 

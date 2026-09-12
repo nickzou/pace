@@ -67,6 +67,10 @@ test("weekly repeat (advance): completing reschedules the task one week out and 
     await page.getByText(title, { exact: true }).click()
     const d = page.getByRole("dialog")
     await expect(d.getByRole("button", { name: "To Do" })).toBeVisible()
+    // Gate on the advanced due date having synced down BEFORE opening the picker: opening it on an
+    // empty field auto-commits *today* (DateRangeField handleOpenChange), which would clobber the
+    // reschedule and poison every retry. The button reads "Due Date" only while still empty.
+    await expect(d.getByTestId("due-date-button")).not.toContainText("Due Date")
     await openDatePicker(page)
     await expectDaySelected(page, dueNext)
   }).toPass({ timeout: 30_000 })
