@@ -28,7 +28,9 @@ test("create a custom done status, assign it in the list → task reads as done 
     .locator("div.rounded-lg")
     .filter({ has: page.getByLabel("Rename Default list") })
   await defaultBlock.getByPlaceholder("New status…").fill(statusName)
-  await defaultBlock.getByLabel("Category").selectOption("done")
+  // exact: the AddStatus picker is labelled "Category"; each existing status row now has a
+  // "<name> category" select too (P3 — editable category), which a loose match would collide with.
+  await defaultBlock.getByLabel("Category", { exact: true }).selectOption("done")
   await defaultBlock.getByRole("button", { name: "green", exact: true }).click() // a palette colour
   await defaultBlock.getByRole("button", { name: "Add", exact: true }).click()
 
