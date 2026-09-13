@@ -30,6 +30,7 @@ import {
   createStatus,
   deleteGroup,
   deleteStatus,
+  recategorizeStatus,
   recolorStatus,
   renameGroup,
   renameStatus,
@@ -190,6 +191,11 @@ function StatusList({ statuses }: { statuses: StatusRow[] }) {
     ? (order.map((id) => statuses.find((s) => s.id === id)).filter(Boolean) as StatusRow[])
     : statuses
 
+  // The group must keep ≥1 open and ≥1 done (the server enforces this on category change and
+  // delete). Pass the live counts down so a row can lock the last open/done into its category.
+  const openCount = statuses.filter((s) => s.category === "open").length
+  const doneCount = statuses.filter((s) => s.category === "done").length
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -215,7 +221,7 @@ function StatusList({ statuses }: { statuses: StatusRow[] }) {
       <SortableContext items={ordered.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <ul className="flex flex-col gap-1.5">
           {ordered.map((s) => (
-            <EditableStatus key={s.id} status={s} />
+            <EditableStatus key={s.id} status={s} openCount={openCount} doneCount={doneCount} />
           ))}
         </ul>
       </SortableContext>
@@ -223,12 +229,20 @@ function StatusList({ statuses }: { statuses: StatusRow[] }) {
   )
 }
 
-// A status row that can be recoloured and renamed in place (system statuses too — only
-// delete is protected). The colour dot toggles the same 12-swatch picker AddStatus uses;
-// the name is an inline input that saves on blur. Category isn't editable here: the server
-// enforces "≥1 open / ≥1 done per group" only on delete, so letting a category change slip
-// through would let a user break that invariant. (Recolour/rename can't.)
-function EditableStatus({ status }: { status: StatusRow }) {
+// A status row that can be recoloured, renamed, and recategorised in place (system statuses
+// too — only delete is protected). The colour dot toggles the same 12-swatch picker AddStatus
+// uses; the name is an inline input that saves on blur; the category is a dropdown. To keep the
+// group's "≥1 open / ≥1 done" invariant (which the server also enforces), the last open/done
+// status locks its category — every other option is disabled so it can't be moved away.
+function EditableStatus({
+  status,
+  openCount,
+  doneCount,
+}: {
+  status: StatusRow
+  openCount: number
+  doneCount: number
+}) {
   const db = usePowerSync()
   const { theme } = useTheme()
   const [name, setName] = useState(status.name)
@@ -277,9 +291,29 @@ function EditableStatus({ status }: { status: StatusRow }) {
           aria-label={`Rename ${status.name}`}
           className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 outline-none focus:border-ring focus:bg-background"
         />
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {status.category.replace("_", " ")}
-        </span>
+        <select
+          value={status.category}
+          onChange={(e) => void recategorizeStatus(db, status.id, e.target.value)}
+          aria-label={`${status.name} category`}
+          className="shrink-0 rounded border border-transparent bg-transparent text-xs text-muted-foreground outline-none hover:text-foreground focus:border-ring focus:bg-background"
+        >
+          {CATEGORIES.map((c) => {
+            // Locked when this is the group's last open/done: only the current value stays
+            // selectable, so the invariant can't be broken from the UI.
+            const locked =
+              (status.category === "open" && openCount === 1) ||
+              (status.category === "done" && doneCount === 1)
+            return (
+              <option
+                key={c.value}
+                value={c.value}
+                disabled={locked && c.value !== status.category}
+              >
+                {c.label}
+              </option>
+            )
+          })}
+        </select>
         {status.is_system ? null : (
           <button
             type="button"

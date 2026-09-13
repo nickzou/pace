@@ -82,6 +82,17 @@ export function renameStatus(db: AbstractPowerSyncDatabase, id: string, name: st
   return db.execute("UPDATE statuses SET name = ?, updated_at = ? WHERE id = ?", [name, now(), id])
 }
 
+// Change a status's lifecycle category. The connector routes it to statuses.items.update,
+// which guards the "≥1 open / ≥1 done per group" invariant and re-derives resolved_at for
+// tasks in this status — so the UI must not offer a change that would strip the last open/done.
+export function recategorizeStatus(db: AbstractPowerSyncDatabase, id: string, category: string) {
+  return db.execute("UPDATE statuses SET category = ?, updated_at = ? WHERE id = ?", [
+    category,
+    now(),
+    id,
+  ])
+}
+
 export function deleteStatus(db: AbstractPowerSyncDatabase, id: string) {
   return db.execute("DELETE FROM statuses WHERE id = ?", [id])
 }

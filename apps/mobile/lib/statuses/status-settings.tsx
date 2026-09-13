@@ -10,6 +10,7 @@ import {
   createStatus,
   deleteGroup,
   deleteStatus,
+  recategorizeStatus,
   recolorStatus,
   renameGroup,
   renameStatus,
@@ -107,6 +108,11 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
     else setName(group.name)
   }
 
+  // The group must keep ≥1 open and ≥1 done (the server enforces this on category change and
+  // delete); the counts let a row lock the last open/done into its category.
+  const openCount = statuses.filter((s) => s.category === "open").length
+  const doneCount = statuses.filter((s) => s.category === "done").length
+
   return (
     <View style={styles.group}>
       <View style={styles.groupHead}>
@@ -127,18 +133,27 @@ function GroupBlock({ group, statuses }: { group: GroupRow; statuses: StatusRow[
         )}
       </View>
       {statuses.map((s) => (
-        <EditableStatus key={s.id} status={s} />
+        <EditableStatus key={s.id} status={s} openCount={openCount} doneCount={doneCount} />
       ))}
       <AddStatus groupId={group.id} nextPosition={statuses.length} />
     </View>
   )
 }
 
-// A status row that can be recoloured and renamed in place (system statuses too — only
-// delete is protected). Tapping the dot toggles the swatch picker; the name is an inline
-// input that saves on blur. Category isn't editable here: the server enforces "≥1 open /
-// ≥1 done per group" only on delete, so a category change could break that invariant.
-function EditableStatus({ status }: { status: StatusRow }) {
+// A status row that can be recoloured, renamed, and recategorised in place (system statuses
+// too — only delete is protected). Tapping the dot toggles the swatch picker; the name is an
+// inline input that saves on blur; the category is a row of buttons. To keep the group's
+// "≥1 open / ≥1 done" invariant (which the server also enforces), the last open/done status
+// locks its category — the other buttons are disabled so it can't be moved away.
+function EditableStatus({
+  status,
+  openCount,
+  doneCount,
+}: {
+  status: StatusRow
+  openCount: number
+  doneCount: number
+}) {
   const db = usePowerSync()
   const styles = useThemedStyles(makeStyles)
   const { scheme, colors } = useTheme()
@@ -170,12 +185,38 @@ function EditableStatus({ status }: { status: StatusRow }) {
           placeholderTextColor={colors.textFaint}
           style={styles.statusNameInput}
         />
-        <Text style={styles.cat}>{status.category.replace("_", " ")}</Text>
         {status.is_system ? null : (
           <Pressable onPress={() => void deleteStatus(db, status.id)} hitSlop={8}>
             <X size={14} color={colors.dangerText} />
           </Pressable>
         )}
+      </View>
+      <View style={styles.catRow}>
+        {CATEGORIES.map((c) => {
+          const active = status.category === c.value
+          // Locked when this is the group's last open/done: only the current value stays
+          // enabled, so the invariant can't be broken from the UI.
+          const locked =
+            (status.category === "open" && openCount === 1) ||
+            (status.category === "done" && doneCount === 1)
+          const disabled = locked && !active
+          return (
+            <Pressable
+              key={c.value}
+              disabled={disabled}
+              onPress={() => {
+                if (!active) void recategorizeStatus(db, status.id, c.value)
+              }}
+              style={[
+                styles.catBtn,
+                active ? styles.catBtnActive : null,
+                disabled ? styles.catBtnDisabled : null,
+              ]}
+            >
+              <Text style={[styles.catText, active ? styles.catTextActive : null]}>{c.label}</Text>
+            </Pressable>
+          )
+        })}
       </View>
       {picking ? (
         <View style={styles.swatchRow}>
@@ -329,7 +370,6 @@ const makeStyles = (c: Palette) =>
     statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     dot: { width: 12, height: 12, borderRadius: 6 },
     statusNameInput: { color: c.textPrimary, fontSize: 14, flex: 1, paddingVertical: 2 },
-    cat: { color: c.textMuted, fontSize: 12 },
     del: { color: c.dangerText, fontSize: 13 },
     addBox: { gap: 8, borderTopWidth: 1, borderTopColor: c.border, paddingTop: 8 },
     addRow: { flexDirection: "row", gap: 8 },
@@ -360,6 +400,7 @@ const makeStyles = (c: Palette) =>
       paddingHorizontal: 10,
     },
     catBtnActive: { backgroundColor: c.primary, borderColor: c.primary },
+    catBtnDisabled: { opacity: 0.4 },
     catText: { color: c.textSecondary, fontSize: 12 },
     catTextActive: { color: c.onPrimary },
     swatchRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

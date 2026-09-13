@@ -203,6 +203,60 @@ describe("statuses router", () => {
     expect(row?.position).toBe(3) // untouched
   })
 
+  it("changes a status's category when the group keeps another of the old kind", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const groupId = await defaultGroupId(userId)
+    // A second open status alongside the seeded To Do, so moving it off `open` is allowed.
+    const laterId = await caller.statuses.items.create({
+      groupId,
+      name: "Later",
+      color: "blue",
+      category: "open",
+    })
+    await caller.statuses.items.update({ id: laterId, category: "in_progress" })
+    const [row] = await db.select().from(statuses).where(eq(statuses.id, laterId))
+    expect(row?.category).toBe("in_progress")
+  })
+
+  it("won't move the last open (or last done) status to another category", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    // The seeded default group has exactly one open (To Do) and one done (Done).
+    await expect(
+      caller.statuses.items.update({ id: await seededStatus(userId, "open"), category: "done" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" })
+    await expect(
+      caller.statuses.items.update({ id: await seededStatus(userId, "done"), category: "open" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" })
+  })
+
+  it("re-derives resolved_at when a status's category flips to and from done", async () => {
+    const userId = await makeUser()
+    const caller = appRouter.createCaller({ db, userId })
+    const groupId = await defaultGroupId(userId)
+    // A second open status so it's free to move category; a task sits in it.
+    const laterId = await caller.statuses.items.create({
+      groupId,
+      name: "Later",
+      color: "blue",
+      category: "open",
+    })
+    const t = await caller.tasks.create({ title: "x", statusId: laterId })
+    expect(t.resolvedAt).toBeNull()
+
+    // → done stamps resolved_at for the task without touching its status.
+    await caller.statuses.items.update({ id: laterId, category: "done" })
+    const [doneRow] = await db.select().from(tasks).where(eq(tasks.id, t.id))
+    expect(doneRow?.statusId).toBe(laterId)
+    expect(doneRow?.resolvedAt).not.toBeNull()
+
+    // → back off done clears it again.
+    await caller.statuses.items.update({ id: laterId, category: "in_progress" })
+    const [openRow] = await db.select().from(tasks).where(eq(tasks.id, t.id))
+    expect(openRow?.resolvedAt).toBeNull()
+  })
+
   it("recolours and renames a seeded (system) status — only delete is protected", async () => {
     const userId = await makeUser()
     const caller = appRouter.createCaller({ db, userId })

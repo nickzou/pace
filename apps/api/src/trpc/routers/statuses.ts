@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server"
-import { and, eq, isNull, ne } from "drizzle-orm"
+import { and, eq, isNull, ne, sql } from "drizzle-orm"
 import { statuses, statusGroups, userSettings } from "../../db/statuses"
 import { tasks } from "../../db/tasks"
 import {
@@ -193,6 +193,55 @@ const items = router({
 
   update: protectedProcedure.input(updateStatusSchema).mutation(async ({ ctx, input }) => {
     const { id, ...fields } = input
+
+    // A category change is guarded like a delete: the group must keep ≥1 open and ≥1 done,
+    // so moving the last open/done to another category is blocked. It also re-derives
+    // resolved_at for the tasks sitting in this status — entering `done` stamps it (COALESCE
+    // keeps the first time), leaving `done` clears it — mirroring tasks.update's status edge.
+    // (A bulk category flip does NOT fire recurrence generation; that's a per-task action.)
+    if (fields.category !== undefined) {
+      const status = await ownedStatus(ctx, id)
+      if (fields.category !== status.category) {
+        if (status.category === "open" || status.category === "done") {
+          const [remaining] = await ctx.db
+            .select({ id: statuses.id })
+            .from(statuses)
+            .where(
+              and(
+                eq(statuses.groupId, status.groupId),
+                eq(statuses.userId, ctx.userId),
+                eq(statuses.category, status.category),
+                isNull(statuses.deletedAt),
+                ne(statuses.id, id),
+              ),
+            )
+            .limit(1)
+          if (!remaining)
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `A group must keep at least one ${status.category} status`,
+            })
+        }
+        const resolvedAt =
+          fields.category === "done" ? sql`coalesce(${tasks.resolvedAt}, now())` : null
+        const [row] = await ctx.db.transaction(async (tx) => {
+          await tx
+            .update(tasks)
+            .set({ resolvedAt })
+            .where(and(eq(tasks.statusId, id), eq(tasks.userId, ctx.userId)))
+          return tx
+            .update(statuses)
+            .set(fields)
+            .where(
+              and(eq(statuses.id, id), eq(statuses.userId, ctx.userId), isNull(statuses.deletedAt)),
+            )
+            .returning()
+        })
+        if (!row) throw new TRPCError({ code: "NOT_FOUND" })
+        return row.id
+      }
+    }
+
     const [row] = await ctx.db
       .update(statuses)
       .set(fields)
